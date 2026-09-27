@@ -342,13 +342,13 @@ function RoundFormDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit}>
-          <div className="grid gap-4">
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-8">
             <label htmlFor="round-name" className="grid gap-2 font-bold">
               Round name
               <Input id="round-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={150} required />
@@ -367,7 +367,7 @@ function RoundFormDialog({
                 <Input id="round-end" type="time" value={timing.end} onChange={(e) => setTiming({ ...timing, end: e.target.value })} />
               </label>
             </div>
-            <p className="-mt-2 text-xs text-muted-foreground">Leave both empty to run all day. An end time earlier than the start time runs overnight (e.g. 18:00–06:00).</p>
+            <p className="-mt-2 text-xs text-muted-foreground lg:col-span-2">Leave both empty to run all day. An end time earlier than the start time runs overnight (e.g. 18:00–06:00).</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <label htmlFor="round-ack" className="grid gap-2 font-bold">
                 Check Due Soon shows for (seconds)
@@ -378,12 +378,12 @@ function RoundFormDialog({
                 <Input id="round-tap" type="number" min={10} max={7200} placeholder="Default" value={timing.tap} onChange={(e) => setTiming({ ...timing, tap: e.target.value })} />
               </label>
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <p className="font-bold">Checkpoints (in patrol order)</p>
               {activeCheckpoints.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">No active checkpoints at this Site yet.</p>
               ) : (
-                <div className="mt-2 grid gap-2">
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   {activeCheckpoints.map((cp) => (
                     <div key={cp.id} className="flex items-center gap-3">
                       <Checkbox
