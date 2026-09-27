@@ -20,6 +20,9 @@ import type {
   NfcWriterPayload,
   DashboardSummary,
   Incident,
+  ManagedRound,
+  SaveRoundRequest,
+  RoundStatus,
   PersonnelMpinRegenerated,
   EmergencyContact,
   CreateEmergencyContactRequest,
@@ -148,13 +151,32 @@ export const managementApi = {
     api.request<{ revoked: true }>(`/sites/${siteId}/checkpoints/${checkpointId}/revoke-tag`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }),
     }),
-  // Batch 1 (2026-09-07): listRounds/createRound/updateRound were removed
-  // here. They called `/sites/:siteId/rounds*`, a contract confirmed to
-  // have never existed on origin/main or production — the real backend
-  // Round module (`/checkpoint-rounds`) is a differently-shaped,
-  // non-Site-scoped, create-only endpoint. See site-rounds-panel.tsx and
-  // BACKEND_GAPS.md. A real Patrol Schedule contract will be designed in a
-  // dedicated later batch rather than reusing these signatures.
+  // Dry-run fix (branch release/dry-run-ops): the Batch 1 comment this
+  // replaced is now out of date — `/sites/:siteId/rounds*` is a real,
+  // newly-built, authenticated backend contract (CheckpointRoundsService.
+  // listRoundsForRequester/createRoundForRequester/updateRoundForRequester/
+  // deactivateRoundForRequester), reusing SiteOperationalAccessService for
+  // authorization exactly like the checkpoints/NFC endpoints above.
+  listRounds: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<ManagedRound[]>(`/sites/${siteId}/rounds`),
+  createRound: (api: AuthenticatedApiClient, siteId: number, body: SaveRoundRequest) =>
+    api.request<ManagedRound>(`/sites/${siteId}/rounds`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
+  updateRound: (api: AuthenticatedApiClient, siteId: number, roundId: number, body: Partial<SaveRoundRequest>) =>
+    api.request<ManagedRound>(`/sites/${siteId}/rounds/${roundId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
+  deactivateRound: (api: AuthenticatedApiClient, siteId: number, roundId: number) =>
+    api.request<ManagedRound>(`/sites/${siteId}/rounds/${roundId}/deactivate`, {
+      method: 'PATCH',
+    }),
+  // Schedules visibility — the same public, Guard-app-facing status
+  // endpoint the Guard App polls, reused read-only here (next due, current
+  // alert, missed count). No auth header is required by the backend, but
+  // this client sends one anyway for consistency; the endpoint ignores it.
+  getRoundStatus: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<RoundStatus>(`/checkpoint-rounds/site/${siteId}/status`),
 
   // Batch 2 — Emergency Contacts. GET is genuinely unauthenticated at the
   // backend (guard-facing); no update/deactivate/delete endpoint exists.

@@ -263,15 +263,26 @@ export type CreateUserRequest = {
   role: Exclude<UserRole, 'super_admin'>;
 };
 
+// Dry-run fix (branch release/dry-run-ops) — matches the real, newly-built
+// authenticated backend contract exactly (GET/POST/PATCH
+// sites/:siteId/rounds, CheckpointRoundsService.listRoundsForRequester /
+// createRoundForRequester / updateRoundForRequester /
+// deactivateRoundForRequester). `checkpoint_status` lets this UI warn when
+// a round points at a deactivated checkpoint — the exact "Quick Round"
+// situation this feature was built to let an operator fix.
 export type RoundStop = {
   id: number;
   checkpoint_id: number;
   tap_order: number;
   checkpoint_name: string;
+  tag_uid: string | null;
+  checkpoint_status?: string;
 };
 
 export type ManagedRound = {
   id: number;
+  organization_id: number;
+  site_id: number;
   name: string;
   due_interval_minutes: number;
   is_active: boolean;
@@ -282,6 +293,19 @@ export type SaveRoundRequest = {
   name: string;
   dueIntervalMinutes: number;
   checkpointIds: number[];
+};
+
+// Schedules visibility (branch release/dry-run-ops) — mirrors
+// CheckpointRoundsService.getStatus's real response shape exactly (the
+// same public, Guard-app-facing, meant-to-be-polled endpoint), reused
+// read-only on the Admin Web Rounds tab.
+export type RoundStatus = {
+  currentAlert: unknown | null;
+  missedCount: number;
+  catchUpEligible: boolean;
+  nextDueAt: string | null;
+  nextDueRoundId: number | null;
+  nextDueIntervalMinutes: number | null;
 };
 
 // DEPLOYMENT READINESS + ADMIN DASHBOARD PHASE (2026-09-02) — mirrors
