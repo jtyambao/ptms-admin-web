@@ -8,7 +8,6 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { ProtectedPortal } from '@/components/protected-portal';
@@ -19,7 +18,6 @@ import { canCreateSite } from '@/lib/portal-access';
 import type { Site } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 export default function SitesPage() {
-  const router = useRouter();
   const session = useSession();
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +81,8 @@ export default function SitesPage() {
           ? { latitude: parsedLatitude, longitude: parsedLongitude }
           : {}),
       });
-      router.push(`/sites/${created.id}?setup=1`);
+      // Full-page navigation: see the vinext router note in app/layout.tsx.
+      window.location.assign(`/sites/${created.id}?setup=1`);
     } catch (reason) {
       setError(
         reason instanceof ApiRequestError
