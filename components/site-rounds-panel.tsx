@@ -342,7 +342,7 @@ function RoundFormDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
