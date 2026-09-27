@@ -7,7 +7,7 @@ where node >nul 2>nul || (
   pause
   exit /b 1
 )
-if not exist .env copy .env.example .env >nul
+if not exist .env echo NEXT_PUBLIC_PTMS_API_BASE_URL=https://ptms-api.onrender.com/api/v1> .env
 if not exist node_modules (
   echo Installing PTMS Admin Web - first run only, this can take a few minutes...
   call npm install || (pause & exit /b 1)
