@@ -29,6 +29,8 @@ import type {
   VisitorLogEntry,
   VoluntaryObservationReportEntry,
   SosAlertEntry,
+  SpecialCheckRequest,
+  CreateSpecialCheckRequest,
   PersonnelMpinRegenerated,
   EmergencyContact,
   CreateEmergencyContactRequest,
@@ -65,6 +67,17 @@ export const managementApi = {
   // Site-scoped SOS list route on the backend.
   listSosAlerts: (api: AuthenticatedApiClient) =>
     api.request<SosAlertEntry[]>('/sos-alerts'),
+  // Special Check Requests create page (branch release/dry-run-ops).
+  // GET is Guard-facing/unauthenticated at the backend (siteId query
+  // param); POST is JWT + SENDER_ROLES.
+  listSpecialCheckRequests: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<SpecialCheckRequest[]>(`/special-check-requests?siteId=${siteId}`),
+  createSpecialCheckRequest: (api: AuthenticatedApiClient, body: CreateSpecialCheckRequest) =>
+    api.request<SpecialCheckRequest>('/special-check-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
   listSites: (api: AuthenticatedApiClient) =>
     api.request<Site[]>('/management/sites'),
   getSite: (api: AuthenticatedApiClient, id: number) =>

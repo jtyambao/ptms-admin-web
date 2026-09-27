@@ -53,6 +53,19 @@ export const canViewSos = (role: UserRole) =>
   role === 'site_manager' ||
   role === 'supervisor';
 
+// Special Check Requests create page (branch release/dry-run-ops) —
+// verified against a fresh origin/main read of
+// SpecialCheckRequestsController's SENDER_ROLES constant
+// (src/special-check-requests/special-check-requests.controller.ts):
+// exactly super_admin, org_admin, site_manager, supervisor. `admin`/
+// `site_admin` cannot send one today — a real, current backend
+// limitation, not something to paper over here.
+export const canSendSpecialCheckRequest = (role: UserRole) =>
+  role === 'super_admin' ||
+  role === 'org_admin' ||
+  role === 'site_manager' ||
+  role === 'supervisor';
+
 // "Today" for a widget that has no server-computed boundary of its own
 // (unlike the old fake summary, which used each Site's own configured
 // timezone) is necessarily the viewer's local calendar day — an honest

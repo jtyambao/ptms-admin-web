@@ -532,6 +532,40 @@ export type SosAlertEntry = {
   site_name: string | null;
 };
 
+// Special Check Requests create page (branch release/dry-run-ops) —
+// mirrors SpecialCheckRequestsService's real row shape and
+// CreateSpecialCheckRequestDto exactly (src/special-check-requests/).
+// GET is Guard-facing/unauthenticated at the backend, filtered by siteId
+// query param; POST is JWT + SENDER_ROLES (super_admin/org_admin/
+// site_manager/supervisor) — `admin`/`site_admin` cannot send one today.
+export type SpecialCheckRequest = {
+  id: number;
+  organization_id: number;
+  personnel_id: number | null;
+  site_id: number | null;
+  created_by: number;
+  title: string;
+  instructions: string | null;
+  priority: 'normal' | 'urgent';
+  status: 'sent' | 'acknowledged' | 'completed' | 'expired';
+  needed_by: string | null;
+  type: 'standard' | 'spot_visit';
+  sent_at: string;
+  acknowledged_at: string | null;
+  completed_at: string | null;
+  completion_remarks: string | null;
+  selfie_url: string | null;
+};
+
+export type CreateSpecialCheckRequest = {
+  siteId: number;
+  title: string;
+  instructions?: string;
+  priority?: 'normal' | 'urgent';
+  neededBy?: string;
+  type?: 'standard' | 'spot_visit';
+};
+
 export type ApiEnvelope<T> = {
   success: boolean;
   statusCode?: number;

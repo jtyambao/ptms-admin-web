@@ -26,6 +26,7 @@ import { SiteOperationsPanel } from '@/components/site-operations-panel';
 import { SiteRoundsPanel } from '@/components/site-rounds-panel';
 import { SiteEmergencyContactsPanel } from '@/components/site-emergency-contacts-panel';
 import { SiteReportsPanel } from '@/components/site-reports-panel';
+import { SiteSpecialCheckRequestsPanel } from '@/components/site-special-check-requests-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,7 +52,7 @@ import {
 import type { Site, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
-type Section = 'overview' | 'people' | 'devices' | 'checkpoints' | 'rounds' | 'emergency-contacts' | 'reports';
+type Section = 'overview' | 'people' | 'devices' | 'checkpoints' | 'rounds' | 'emergency-contacts' | 'reports' | 'requests';
 
 export default function SiteDetailPage() {
   const params = useParams<{ siteId: string }>();
@@ -318,6 +319,9 @@ export default function SiteDetailPage() {
                   <TabsTrigger className="min-h-10 px-4" value="reports">
                     Reports
                   </TabsTrigger>
+                  <TabsTrigger className="min-h-10 px-4" value="requests">
+                    Requests
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview" className="mt-6 space-y-7">
                   <section>
@@ -491,6 +495,9 @@ export default function SiteDetailPage() {
                 </TabsContent>
                 <TabsContent value="reports">
                   <SiteReportsPanel siteId={siteId} />
+                </TabsContent>
+                <TabsContent value="requests">
+                  <SiteSpecialCheckRequestsPanel siteId={siteId} />
                 </TabsContent>
               </Tabs>
             </>
