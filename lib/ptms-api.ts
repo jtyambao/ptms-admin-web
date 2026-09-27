@@ -59,6 +59,15 @@ export type User = {
   updated_at: string;
 };
 
+// My Account page (P4(b), branch release/dry-run-ops) — matches
+// UpdateOwnProfileDto/ChangeOwnPasswordDto exactly
+// (src/users/dto/). `fullName` is the only editable profile field that
+// exists on `users` today (no phone/other column); PATCH /users/me has
+// no field for role/organizationId/email/status at all, not just
+// server-side rejection of them.
+export type UpdateOwnProfileRequest = { fullName?: string };
+export type ChangeOwnPasswordRequest = { currentPassword: string; newPassword: string };
+
 export type TokenPair = { accessToken: string; refreshToken: string };
 export type LoginRequest = { email: string; password: string };
 export type LoginResult = TokenPair & { user: User };
@@ -171,14 +180,37 @@ export type OicHandoverResult = {
   newSiteMpin: string;
   credentialGeneration: number;
 };
+// P4 fix (branch release/dry-run-ops backend commit 06cb63e) —
+// getStaffingStatus now surfaces the 'admin' assignment as its own
+// `admin` field (previously queried but never shaped into the response),
+// and staffingComplete now accepts either `siteAdmin` (legacy) or
+// `admin` (final-role-model replacement) being filled.
 export type StaffingStatus = {
   site: Pick<Site, 'id' | 'organization_id' | 'name' | 'status'> & {
     patrol_operations_active: boolean;
   };
   supervisor: SiteUserAssignment | null;
   siteAdmin: SiteUserAssignment | null;
+  admin: SiteUserAssignment | null;
   oic: SiteOicAssignment | null;
   staffingComplete: boolean;
+};
+
+// P4 fix (branch release/dry-run-ops) — regenerateSiteCredential now also
+// allows `admin` (own assigned Site only), matching
+// PTMS_FINAL_ROLE_PERMISSION_POLICY.md's OIC section.
+export type SiteCredentialRegenerationResult = {
+  siteId: number;
+  newSiteMpin: string;
+  credentialGeneration: number;
+};
+
+// Deactivate Admin account (P4(a)) — Supervisor only, own assigned Site
+// only; target must be an active 'admin' with an active assignment at
+// that exact Site.
+export type DeactivateAdminAccountResult = {
+  user: { id: number; status: 'active' | 'inactive' };
+  assignment: SiteUserAssignment;
 };
 export type AssignmentHistory = {
   userAssignments: SiteUserAssignment[];

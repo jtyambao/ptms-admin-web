@@ -37,6 +37,10 @@ import type {
   CreateUserRequest,
   OperationalSettings,
   UpdateOperationalSettingsRequest,
+  SiteCredentialRegenerationResult,
+  DeactivateAdminAccountResult,
+  UpdateOwnProfileRequest,
+  ChangeOwnPasswordRequest,
 } from './ptms-api';
 export const managementApi = {
   // Not currently deployed (see ptms-api.ts's DashboardSiteRow comment) —
@@ -148,10 +152,36 @@ export const managementApi = {
     api.request<SiteUserAssignment>(`/sites/${siteId}/assignments/admin`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
+  // P4(a) (branch release/dry-run-ops backend commit 06cb63e) —
+  // Supervisor only, own assigned Site only; target must be an active
+  // 'admin' with an active assignment at that exact Site.
+  deactivateAdminAccount: (api: AuthenticatedApiClient, siteId: number, userId: number, reason?: string) =>
+    api.request<DeactivateAdminAccountResult>(`/sites/${siteId}/admin-accounts/${userId}/deactivate`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    }),
+  // P4 finding fix (branch release/dry-run-ops) — now allows `admin` at
+  // its own assigned Site (previously supervisor/site_admin/super_admin
+  // only). Returns the new plaintext Site MPIN exactly once, same
+  // one-time-display contract as handoverOic's newSiteMpin.
+  regenerateSiteCredential: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<SiteCredentialRegenerationResult>(`/sites/${siteId}/credential-regeneration`, {
+      method: 'POST',
+    }),
   getAssignmentHistory: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<AssignmentHistory>(`/sites/${siteId}/assignment-history`),
   getStaffing: (api: AuthenticatedApiClient, id: number) =>
     api.request<StaffingStatus>(`/sites/${id}/staffing-status`),
+  // My Account page (P4(b)) — any authenticated role, self only.
+  updateOwnProfile: (api: AuthenticatedApiClient, body: UpdateOwnProfileRequest) =>
+    api.request<User>('/users/me', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
+  changeOwnPassword: (api: AuthenticatedApiClient, body: ChangeOwnPasswordRequest) =>
+    api.request<void>('/users/me/change-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
   listPersonnel: (api: AuthenticatedApiClient) =>
     api.request<Personnel[]>('/personnel'),
   createPersonnel: (api: AuthenticatedApiClient, body: CreatePersonnelRequest) =>

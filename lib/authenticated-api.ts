@@ -108,6 +108,12 @@ export function createAuthenticatedApiClient(options: ClientOptions): Authentica
       throw new ApiRequestError('service', response.status);
     }
 
+    // My Account / change-password (P4(b)) — POST /users/me/change-password
+    // returns a bare 204 No Content on success, the first response body on
+    // this client with nothing to parse; every route before it always
+    // returned an ApiEnvelope body, so this check didn't exist until now.
+    if (response.status === 204) return undefined as T;
+
     const envelope = (await response.json()) as ApiEnvelope<T>;
     return envelope.data;
   }

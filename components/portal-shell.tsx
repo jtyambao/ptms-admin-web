@@ -9,6 +9,7 @@ import {
   Moon,
   Settings,
   Sun,
+  User,
   Users,
   X,
 } from 'lucide-react';
@@ -57,7 +58,7 @@ export function PortalShell({
   children,
   siteName,
 }: {
-  active: 'dashboard' | 'sites' | 'accounts' | 'settings';
+  active: 'dashboard' | 'sites' | 'accounts' | 'settings' | 'account';
   children: ReactNode;
   siteName?: string;
 }) {
@@ -119,8 +120,17 @@ export function PortalShell({
           <p className="mt-1 text-xs text-white/50">
             {session.user ? roleLabel(session.user.role) : ''}
           </p>
+          <Link
+            aria-current={active === 'account' ? 'page' : undefined}
+            className={`mt-4 flex h-11 items-center gap-3 rounded-xl px-4 text-sm font-bold ${active === 'account' ? 'bg-[#f36f0a]' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+            href="/account"
+            onClick={() => setOpen(false)}
+          >
+            <User className="size-4" />
+            My Account
+          </Link>
           <Button
-            className="mt-4 w-full justify-start text-white/70"
+            className="mt-1 w-full justify-start text-white/70"
             onClick={() => void session.logout()}
             variant="ghost"
           >

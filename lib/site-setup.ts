@@ -25,7 +25,11 @@ export const canEditSiteInformation = (role: UserRole) =>
 // — unchanged since Batch 1/2.
 export const canSetUpSupervisor = (role: UserRole) =>
   role === 'manager' || role === 'engineer';
-export const canSetUpSiteAdmin = (role: UserRole) => role === 'supervisor';
+// Renamed from canSetUpSiteAdmin (P4, branch release/dry-run-ops) — the
+// panel this gates now creates the `admin` role (createAdminAccount),
+// not the legacy `site_admin` one; the underlying authority is unchanged
+// (Supervisor only — matches createAdminAccount's requireRole exactly).
+export const canSetUpAdmin = (role: UserRole) => role === 'supervisor';
 
 export type SetupSignals = {
   staffing: StaffingStatus | null;
@@ -40,7 +44,10 @@ export function setupSteps(signals: SetupSignals) {
   return [
     { label: 'Site Information', complete: true },
     { label: 'Supervisor', complete: !!signals.staffing?.supervisor },
-    { label: 'Admin', complete: !!signals.staffing?.siteAdmin },
+    // P4 fix (branch release/dry-run-ops) — accepts either the legacy
+    // `siteAdmin` or the final-role-model `admin` tier, matching
+    // getStaffingStatus's own staffingComplete formula exactly.
+    { label: 'Admin', complete: !!(signals.staffing?.siteAdmin || signals.staffing?.admin) },
     {
       label: 'Personnel',
       complete:

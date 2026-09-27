@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BadgeCheck, History, ShieldCheck, UserCog } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, History, ShieldCheck, UserCog, UserX } from 'lucide-react';
 import { useEffect, useState, type SyntheticEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,20 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { managementApi } from '@/lib/management-api';
-import { canSetUpSiteAdmin, canSetUpSupervisor } from '@/lib/site-setup';
+import { canSetUpAdmin, canSetUpSupervisor } from '@/lib/site-setup';
 import type { AssignmentHistory, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
-type Tier = 'supervisor' | 'site_admin';
+type Tier = 'supervisor' | 'admin';
 
+// P4 fix (branch release/dry-run-ops backend commit 06cb63e) —
+// getStaffingStatus now surfaces the `admin` assignment as its own field,
+// closing the gap this panel's own prior comment documented. Switched
+// creation/assignment to the final-role-model `admin` tier
+// (createAdminAccount/assignAdmin); a Site whose Admin tier still shows a
+// legacy `site_admin` assignment (created before this cutover) keeps
+// showing it, read-only — this panel no longer creates or reassigns
+// site_admin, but does not hide or touch an existing one.
 export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
   siteId: number;
   staffing: StaffingStatus | null;
@@ -22,7 +30,7 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
   const session = useSession();
   const role = session.user?.role;
   const canSupervisor = !!role && canSetUpSupervisor(role);
-  const canSiteAdmin = !!role && canSetUpSiteAdmin(role);
+  const canAdmin = !!role && canSetUpAdmin(role);
   const [tier, setTier] = useState<Tier | null>(null);
   const [history, setHistory] = useState<AssignmentHistory | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -34,6 +42,9 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deactivateReason, setDeactivateReason] = useState('');
+  const [deactivating, setDeactivating] = useState(false);
 
   useEffect(() => () => setPassword(''), []);
 
@@ -47,35 +58,40 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
     setSaving(true); setError(''); setSuccess('');
     let assignmentUserId = pendingUserId;
     try {
-      // Batch 3 correction (2026-09-26): a 2026-09-24 edit incorrectly
-      // claimed the site_admin routes had been deleted and switched this
-      // panel to the newer bare `admin` role — current production has not
-      // undergone that cutover yet. Verified against a fresh origin/main
-      // read: both
-      // routes are live, but getStaffingStatus() only recognizes
-      // `assignment_role === 'site_admin'` for its `siteAdmin` field —
-      // assigning `admin` here would leave this card stuck on "Needs setup"
-      // forever even after a successful assignment. Reverted to site_admin,
-      // which the staffing-status contract actually reads. (Backend gap:
-      // getStaffingStatus not yet recognizing `admin` — not fixed here,
-      // this is a read-only reference worktree.)
       assignmentUserId = pendingUserId ?? (tier === 'supervisor'
         ? (await managementApi.createSupervisorAccount(session.api, { fullName: fullName.trim(), email: email.trim(), password })).id
-        : (await managementApi.createSiteAdminAccount(session.api, siteId, { fullName: fullName.trim(), email: email.trim(), password })).id);
+        : (await managementApi.createAdminAccount(session.api, siteId, { fullName: fullName.trim(), email: email.trim(), password })).id);
       setPendingUserId(assignmentUserId);
       if (tier === 'supervisor') {
         await managementApi.assignSupervisor(session.api, siteId, { userId: assignmentUserId, ...(reason.trim() ? { reason: reason.trim() } : {}) });
       } else {
-        await managementApi.assignSiteAdmin(session.api, siteId, { userId: assignmentUserId, ...(reason.trim() ? { reason: reason.trim() } : {}) });
+        await managementApi.assignAdmin(session.api, siteId, { userId: assignmentUserId, ...(reason.trim() ? { reason: reason.trim() } : {}) });
       }
       setPassword('');
       onStaffingChange(await managementApi.getStaffing(session.api, siteId));
-      setSuccess(`${tier === 'supervisor' ? 'Supervisor' : 'Site Admin'} account created and assigned.`);
+      setSuccess(`${tier === 'supervisor' ? 'Supervisor' : 'Admin'} account created and assigned.`);
       close();
     } catch (cause) {
       setPassword('');
       setError(assignmentUserId ? 'The account exists, but assignment did not complete. Retry the assignment.' : cause instanceof ApiRequestError ? cause.message : 'The assignment could not be completed.');
     } finally { setSaving(false); }
+  }
+
+  function openDeactivate() {
+    setDeactivateReason(''); setError(''); setDeactivateOpen(true);
+  }
+
+  async function confirmDeactivate() {
+    if (!staffing?.admin) return;
+    setDeactivating(true); setError('');
+    try {
+      await managementApi.deactivateAdminAccount(session.api, siteId, staffing.admin.user_id, deactivateReason.trim() || undefined);
+      onStaffingChange(await managementApi.getStaffing(session.api, siteId));
+      setSuccess('Admin account deactivated.');
+      setDeactivateOpen(false);
+    } catch (cause) {
+      setError(cause instanceof ApiRequestError ? cause.message : 'The Admin account could not be deactivated.');
+    } finally { setDeactivating(false); }
   }
 
   async function openHistory() {
@@ -98,12 +114,20 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
       {success && <p className="mt-4 flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"><BadgeCheck className="size-4" />{success}</p>}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <TierCard icon={<ShieldCheck />} title="Supervisor" name={staffing?.supervisor?.full_name} allowed={canSupervisor} action={() => setTier('supervisor')} />
-        <TierCard icon={<UserCog />} title="Site Admin" name={staffing?.siteAdmin?.full_name} allowed={canSiteAdmin} action={() => setTier('site_admin')} />
+        <TierCard
+          icon={<UserCog />}
+          title="Admin"
+          name={staffing?.admin?.full_name}
+          legacyName={!staffing?.admin ? staffing?.siteAdmin?.full_name : undefined}
+          allowed={canAdmin}
+          action={() => setTier('admin')}
+          secondaryAction={staffing?.admin && canAdmin ? { label: 'Deactivate', icon: <UserX />, onClick: openDeactivate } : undefined}
+        />
       </div>
 
       <Dialog open={tier !== null} onOpenChange={(open) => { if (!open) close(); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{staffing?.[tier === 'supervisor' ? 'supervisor' : 'siteAdmin'] ? 'Change' : 'Assign'} {tier === 'supervisor' ? 'Supervisor' : 'Site Admin'}</DialogTitle><DialogDescription>Create the authorized account and assign it to this Site. Any previous assignment is closed and retained in history.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{staffing?.[tier === 'supervisor' ? 'supervisor' : 'admin'] ? 'Change' : 'Assign'} {tier === 'supervisor' ? 'Supervisor' : 'Admin'}</DialogTitle><DialogDescription>Create the authorized account and assign it to this Site. Any previous assignment is closed and retained in history.</DialogDescription></DialogHeader>
           <form onSubmit={createAndAssign}>
             <div className="grid gap-4">
               <label htmlFor="hierarchy-full-name" className="grid gap-2 font-bold">Full name<Input id="hierarchy-full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={pendingUserId !== null} required /></label>
@@ -125,10 +149,60 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
           <DialogFooter><Button onClick={() => setHistoryOpen(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={deactivateOpen} onOpenChange={(open) => { if (!open) setDeactivateOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Admin account</DialogTitle>
+            <DialogDescription>
+              {staffing?.admin?.full_name} will no longer be able to sign in, and their assignment to this
+              Site ends immediately. This cannot be undone from here — a new Admin would need to be set up again.
+            </DialogDescription>
+          </DialogHeader>
+          <label htmlFor="deactivate-reason" className="grid gap-2 text-sm font-bold">
+            Reason (optional)
+            <Input id="deactivate-reason" value={deactivateReason} onChange={(e) => setDeactivateReason(e.target.value)} maxLength={500} />
+          </label>
+          <DialogFooter className="mt-5">
+            <Button type="button" variant="outline" onClick={() => setDeactivateOpen(false)}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={deactivating} onClick={() => void confirmDeactivate()}>
+              {deactivating ? 'Deactivating…' : 'Deactivate account'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
 
-function TierCard({ icon, title, name, allowed, action }: { icon: React.ReactNode; title: string; name?: string; allowed: boolean; action: () => void }) {
-  return <div className="rounded-2xl border bg-card p-5"><div className="flex items-start gap-3"><div className="grid size-10 place-items-center rounded-xl bg-orange-100 text-[#e86405] dark:bg-orange-500/15">{icon}</div><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{title}</p><p className="mt-1 truncate font-black">{name || 'Needs setup'}</p></div></div>{allowed && <Button className="mt-4 w-full" variant="outline" onClick={action}>{name ? 'Change assignment' : `Set up ${title}`}</Button>}</div>;
+function TierCard({ icon, title, name, legacyName, allowed, action, secondaryAction }: {
+  icon: React.ReactNode;
+  title: string;
+  name?: string;
+  // A legacy site_admin assignment shown read-only when there is no
+  // current `admin` one — this panel never creates/reassigns it, only
+  // displays it so it isn't silently hidden.
+  legacyName?: string;
+  allowed: boolean;
+  action: () => void;
+  secondaryAction?: { label: string; icon: React.ReactNode; onClick: () => void };
+}) {
+  return (
+    <div className="rounded-2xl border bg-card p-5">
+      <div className="flex items-start gap-3">
+        <div className="grid size-10 place-items-center rounded-xl bg-orange-100 text-[#e86405] dark:bg-orange-500/15">{icon}</div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{title}</p>
+          <p className="mt-1 truncate font-black">{name || legacyName || 'Needs setup'}</p>
+          {legacyName && <p className="mt-0.5 text-xs text-muted-foreground">Legacy Site Admin assignment (read-only)</p>}
+        </div>
+      </div>
+      {allowed && <Button className="mt-4 w-full" variant="outline" onClick={action}>{name ? 'Change assignment' : `Set up ${title}`}</Button>}
+      {secondaryAction && (
+        <Button className="mt-2 w-full" variant="outline" onClick={secondaryAction.onClick}>
+          {secondaryAction.icon}{secondaryAction.label}
+        </Button>
+      )}
+    </div>
+  );
 }

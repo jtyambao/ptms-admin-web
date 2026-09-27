@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   canEditSiteInformation,
-  canSetUpSiteAdmin,
+  canSetUpAdmin,
   canSetUpSupervisor,
   hasCoordinates,
   setupSteps,
@@ -26,9 +26,9 @@ test('hierarchy setup controls match the verified backend roles exactly', () => 
   assert.equal(canSetUpSupervisor('manager'), true);
   assert.equal(canSetUpSupervisor('engineer'), true);
   assert.equal(canSetUpSupervisor('supervisor'), false);
-  assert.equal(canSetUpSiteAdmin('supervisor'), true);
-  assert.equal(canSetUpSiteAdmin('admin'), false);
-  assert.equal(canSetUpSiteAdmin('manager'), false);
+  assert.equal(canSetUpAdmin('supervisor'), true);
+  assert.equal(canSetUpAdmin('admin'), false);
+  assert.equal(canSetUpAdmin('manager'), false);
   assert.equal(canEditSiteInformation('engineer'), true);
   assert.equal(canEditSiteInformation('manager'), true);
   assert.equal(canEditSiteInformation('supervisor'), false);
