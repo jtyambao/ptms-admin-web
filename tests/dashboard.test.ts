@@ -2,33 +2,35 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { canViewIncidents, canViewSitesOverview, isToday } from '../lib/dashboard.ts';
 
-// Verified against a fresh origin/main read of SitesService.findAllForRequester:
-// super_admin/engineer/manager (org-wide), supervisor/site_admin (own
-// assigned sites). admin and org_admin both throw ForbiddenException there.
+// Dry-run fix (branch release/dry-run-ops): `admin` is added to
+// findAllForRequester's assignment-scoped branch on the backend, closing
+// the gap the superseded version of this test documented.
 test('canViewSitesOverview matches findAllForRequester exactly', () => {
   assert.equal(canViewSitesOverview('super_admin'), true);
   assert.equal(canViewSitesOverview('engineer'), true);
   assert.equal(canViewSitesOverview('manager'), true);
   assert.equal(canViewSitesOverview('supervisor'), true);
   assert.equal(canViewSitesOverview('site_admin'), true);
-  assert.equal(canViewSitesOverview('admin'), false);
+  assert.equal(canViewSitesOverview('admin'), true);
   assert.equal(canViewSitesOverview('org_admin'), false);
   assert.equal(canViewSitesOverview('site_manager'), false);
   assert.equal(canViewSitesOverview('auditor'), false);
   assert.equal(canViewSitesOverview('client_viewer'), false);
 });
 
-// Verified against a fresh origin/main read of IncidentsController's
-// RESPONDER_ROLES constant: super_admin, org_admin, site_manager, supervisor.
-test('canViewIncidents matches RESPONDER_ROLES exactly', () => {
+// Dry-run fix (branch release/dry-run-ops): `admin`/`site_admin` gain
+// READ-only, site-scoped Incident visibility via a new READ_ROLES set on
+// the backend (RESPONDER_ROLES itself, gating acknowledge/resolve, is
+// unchanged and still excludes both).
+test('canViewIncidents matches READ_ROLES exactly (RESPONDER_ROLES + admin + site_admin)', () => {
   assert.equal(canViewIncidents('super_admin'), true);
   assert.equal(canViewIncidents('org_admin'), true);
   assert.equal(canViewIncidents('site_manager'), true);
   assert.equal(canViewIncidents('supervisor'), true);
+  assert.equal(canViewIncidents('admin'), true);
+  assert.equal(canViewIncidents('site_admin'), true);
   assert.equal(canViewIncidents('engineer'), false);
   assert.equal(canViewIncidents('manager'), false);
-  assert.equal(canViewIncidents('admin'), false);
-  assert.equal(canViewIncidents('site_admin'), false);
   assert.equal(canViewIncidents('auditor'), false);
   assert.equal(canViewIncidents('client_viewer'), false);
 });

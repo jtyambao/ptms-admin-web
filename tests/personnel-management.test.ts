@@ -48,13 +48,16 @@ test('management controls are limited to Supervisor and Site Admin', () => {
   assert.equal(canManagePersonnel('super_admin'), false);
 });
 
-test('view matches findAllForRequester exactly — super_admin/engineer/manager org-wide, supervisor/site_admin assigned-site', () => {
+// Dry-run fix (branch release/dry-run-ops): `admin` is added to
+// findAllForRequester/findOneForRequester's assignment-scoped branch on
+// the backend (read-only — canManagePersonnel above is unchanged).
+test('view matches findAllForRequester exactly — super_admin/engineer/manager org-wide, supervisor/site_admin/admin assigned-site', () => {
   assert.equal(canViewPersonnel('super_admin'), true);
   assert.equal(canViewPersonnel('engineer'), true);
   assert.equal(canViewPersonnel('manager'), true);
   assert.equal(canViewPersonnel('supervisor'), true);
   assert.equal(canViewPersonnel('site_admin'), true);
-  assert.equal(canViewPersonnel('admin'), false);
+  assert.equal(canViewPersonnel('admin'), true);
   assert.equal(canViewPersonnel('org_admin'), false);
 });
 

@@ -25,15 +25,18 @@ export function generatePersonnelMpin(
 export const canManagePersonnel = (role: UserRole) =>
   role === 'supervisor' || role === 'site_admin';
 
-// View is the same set as manage for Personnel — there is no broader
-// backend-authorized "read only" tier beyond what findAllForRequester
-// itself already grants (super_admin/engineer/manager org-wide,
-// supervisor/site_admin assigned-site). This mirrors that function's real
-// role branches exactly (personnel.service.ts), not merely canManagePersonnel's
-// narrower per-site create/deactivate tier.
+// View mirrors findAllForRequester's real role branches exactly
+// (personnel.service.ts) — broader than canManagePersonnel's narrower
+// per-site create/deactivate tier.
+//
+// Dry-run fix (branch release/dry-run-ops): `admin` is added to
+// findAllForRequester/findOneForRequester's assignment-scoped branch on
+// the backend (read-only — canManagePersonnel above is intentionally
+// unchanged, `admin` still has no personnel create/deactivate authority).
 export const canViewPersonnel = (role: UserRole) =>
   role === 'super_admin' ||
   role === 'engineer' ||
   role === 'manager' ||
   role === 'supervisor' ||
-  role === 'site_admin';
+  role === 'site_admin' ||
+  role === 'admin';

@@ -3,31 +3,42 @@ import type { UserRole } from './ptms-api';
 // P1 Dashboard (2026-09-26) — verified against a fresh origin/main read of
 // SitesService.findAllForRequester (src/sites/sites.service.ts): exactly
 // super_admin (all sites), engineer/manager (own org), supervisor/site_admin
-// (their own assigned sites only). `admin` and `org_admin` both throw
-// ForbiddenException here — a real, current backend gap (the known live
-// `admin` account has no endpoint to discover its own assigned Site at all
-// today; this is not introduced by this pass, the pre-existing Sites list
-// page already called listSites unconditionally for every role). Kept as
-// its own predicate, not reused from portal-access.ts, because it mirrors
-// this one specific service method, not general portal access.
+// (their own assigned sites only). Kept as its own predicate, not reused
+// from portal-access.ts, because it mirrors this one specific service
+// method, not general portal access.
+//
+// Dry-run fix (branch release/dry-run-ops, backend commit
+// "admin assigned-site access for Personnel and Incidents"): `admin` is
+// added to the assignment-scoped branch on the backend, closing the gap
+// this comment used to document — `admin` can now discover its own
+// assigned Site here too.
 export const canViewSitesOverview = (role: UserRole) =>
   role === 'super_admin' ||
   role === 'engineer' ||
   role === 'manager' ||
   role === 'supervisor' ||
-  role === 'site_admin';
+  role === 'site_admin' ||
+  role === 'admin';
 
 // Verified against a fresh origin/main read of IncidentsController's
 // RESPONDER_ROLES constant (src/incidents/incidents.controller.ts): exactly
 // super_admin, org_admin, site_manager, supervisor. `org_admin`/
 // `site_manager` are not in PORTAL_ROLES (no Admin Web portal access at
-// all), so in practice only super_admin/supervisor can reach this widget
-// today — a real, current limitation, not hidden here.
+// all), so in practice only super_admin/supervisor could reach this widget
+// before this fix.
+//
+// Dry-run fix (branch release/dry-run-ops): `admin`/`site_admin` gain
+// READ-only, site-scoped Incident visibility via a new READ_ROLES set on
+// the backend (separate from RESPONDER_ROLES, which still gates
+// acknowledge/resolve — admin has no write authority here, matching the
+// backend's least-privilege design).
 export const canViewIncidents = (role: UserRole) =>
   role === 'super_admin' ||
   role === 'org_admin' ||
   role === 'site_manager' ||
-  role === 'supervisor';
+  role === 'supervisor' ||
+  role === 'site_admin' ||
+  role === 'admin';
 
 // "Today" for a widget that has no server-computed boundary of its own
 // (unlike the old fake summary, which used each Site's own configured
