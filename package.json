@@ -11,7 +11,8 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "lint": "oxlint",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "deploy": "vinext build && wrangler deploy --config dist/server/wrangler.json --name ptms-admin"
   },
   "dependencies": {
     "react": "19.2.6",
