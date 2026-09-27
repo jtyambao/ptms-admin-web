@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { IncomingSosBanner } from '@/components/incoming-sos-banner';
 import { roleLabel } from '@/lib/role-labels';
 import { useSession } from '@/lib/session-provider';
 export function OfficialBrand() {
@@ -129,34 +130,37 @@ export function PortalShell({
         </div>
       </aside>
       <section className="min-h-screen lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-20 items-center border-b bg-background/90 px-4 backdrop-blur sm:px-8">
-          <Button
-            aria-label="Open navigation"
-            className="lg:hidden"
-            onClick={() => setOpen(true)}
-            size="icon"
-            variant="ghost"
-          >
-            <Menu />
-          </Button>
-          <div className="ml-3 lg:ml-0">
-            <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">
-              PTMS operations
-            </p>
-            <p className="text-sm font-black">
-              {siteName ?? 'Operational console'}
-            </p>
-          </div>
-          <Button
-            aria-label={`Use ${dark ? 'light' : 'dark'} theme`}
-            className="ml-auto"
-            onClick={() => setDark(!dark)}
-            size="icon"
-            variant="outline"
-          >
-            {dark ? <Sun /> : <Moon />}
-          </Button>
-        </header>
+        <div className="sticky top-0 z-20">
+          <IncomingSosBanner />
+          <header className="flex h-20 items-center border-b bg-background/90 px-4 backdrop-blur sm:px-8">
+            <Button
+              aria-label="Open navigation"
+              className="lg:hidden"
+              onClick={() => setOpen(true)}
+              size="icon"
+              variant="ghost"
+            >
+              <Menu />
+            </Button>
+            <div className="ml-3 lg:ml-0">
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">
+                PTMS operations
+              </p>
+              <p className="text-sm font-black">
+                {siteName ?? 'Operational console'}
+              </p>
+            </div>
+            <Button
+              aria-label={`Use ${dark ? 'light' : 'dark'} theme`}
+              className="ml-auto"
+              onClick={() => setDark(!dark)}
+              size="icon"
+              variant="outline"
+            >
+              {dark ? <Sun /> : <Moon />}
+            </Button>
+          </header>
+        </div>
         {children}
       </section>
     </main>

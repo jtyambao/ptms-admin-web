@@ -46,12 +46,20 @@ export const managementApi = {
     api.request<DashboardSummary>('/management/dashboard/summary'),
   // P1 Dashboard (2026-09-26) — GET /incidents, verified real and committed
   // (origin/main:src/incidents/incidents.controller.ts findAll). Role-gated
-  // server-side to exactly super_admin/org_admin/site_manager/supervisor
-  // (see lib/dashboard.ts's canViewIncidents, kept in lock-step with this).
-  // Org-wide (RLS-scoped by organization_id, not filtered to any one Site),
-  // so this is a single call regardless of how many Sites the org has.
+  // server-side (see lib/dashboard.ts's canViewIncidents, kept in
+  // lock-step with this): super_admin/org_admin/site_manager/supervisor
+  // see every Incident in the org; admin/site_admin (dry-run fix) see only
+  // Incidents at their own actively assigned Site — the backend itself
+  // narrows the result set, this call is identical for every role.
   listIncidents: (api: AuthenticatedApiClient) =>
     api.request<Incident[]>('/incidents'),
+  // P3(b) (branch release/dry-run-ops) — admin/site_admin now also have
+  // acknowledge/resolve authority, restricted server-side to their own
+  // assigned Site (IncidentsService.transition()); legacy roles unchanged.
+  acknowledgeIncident: (api: AuthenticatedApiClient, id: number) =>
+    api.request<Incident>(`/incidents/${id}/acknowledge`, { method: 'POST' }),
+  resolveIncident: (api: AuthenticatedApiClient, id: number) =>
+    api.request<Incident>(`/incidents/${id}/resolve`, { method: 'POST' }),
   // Reports page (branch release/dry-run-ops) — read-only, existing
   // endpoints only, no new backend routes.
   listMissedCheckpoints: (api: AuthenticatedApiClient, siteId: number) =>
@@ -62,11 +70,24 @@ export const managementApi = {
     api.request<VisitorLogEntry[]>(`/visitor-logs/site/${siteId}`),
   listVoluntaryObservationReports: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<VoluntaryObservationReportEntry[]>(`/voluntary-observation-reports/site/${siteId}`),
-  // Org-wide (JWT + RESPONDER_ROLES: super_admin/org_admin/site_manager/
-  // supervisor only) — filter to one Site client-side; there is no
-  // Site-scoped SOS list route on the backend.
+  // JWT + RESPONDER_ROLES. super_admin/org_admin/site_manager/supervisor
+  // get every SOS alert in the org (still filtered to one Site
+  // client-side here); admin/site_admin (dry-run fix, P3(a)) are already
+  // narrowed server-side to their own assigned Site.
   listSosAlerts: (api: AuthenticatedApiClient) =>
     api.request<SosAlertEntry[]>('/sos-alerts'),
+  // Incoming SOS banner + Reports widget (P3, branch release/dry-run-ops)
+  // — admin/site_admin can now acknowledge/cancel too, restricted
+  // server-side to their own assigned Site (SosService); legacy roles
+  // unchanged. `reason` matches CancelSosAlertDto.reason (optional).
+  acknowledgeSos: (api: AuthenticatedApiClient, id: number) =>
+    api.request<SosAlertEntry>(`/sos-alerts/${id}/acknowledge`, { method: 'POST' }),
+  cancelSos: (api: AuthenticatedApiClient, id: number, reason?: string) =>
+    api.request<SosAlertEntry>(`/sos-alerts/${id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    }),
   // Special Check Requests create page (branch release/dry-run-ops).
   // GET is Guard-facing/unauthenticated at the backend (siteId query
   // param); POST is JWT + SENDER_ROLES.

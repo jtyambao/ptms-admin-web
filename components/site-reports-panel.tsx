@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { ApiRequestError } from '@/lib/authenticated-api';
-import { canViewIncidents, canViewSos } from '@/lib/dashboard';
+import { canRespondToSos, canViewIncidents, canViewSos } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
 import type {
   GovernedMissedCheckpointTap,
@@ -45,6 +45,8 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
   const [visitorLogs, setVisitorLogs] = useState<Widget<VisitorLogEntry[]>>({ kind: 'loading' });
   const [vorReports, setVorReports] = useState<Widget<VoluntaryObservationReportEntry[]>>({ kind: 'loading' });
   const [sos, setSos] = useState<Widget<SosAlertEntry[]>>({ kind: 'loading' });
+  const [actingOn, setActingOn] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
   const load = useCallback(async () => {
     if (session.status !== 'authenticated') return;
@@ -95,6 +97,34 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  // Incident acknowledge/resolve + SOS acknowledge/cancel (P3, branch
+  // release/dry-run-ops) — same "one shared action runner, reload the
+  // one affected list" shape for both, since both actions are
+  // server-side site-scoped already (IncidentsService.transition() /
+  // SosService), so a 403 here means the assignment genuinely doesn't
+  // cover this Site, not a UI bug to work around.
+  async function runIncidentAction(id: number, action: 'acknowledge' | 'resolve') {
+    setActingOn(`incident-${id}`); setActionError('');
+    try {
+      await (action === 'acknowledge' ? managementApi.acknowledgeIncident(session.api, id) : managementApi.resolveIncident(session.api, id));
+      const all = await managementApi.listIncidents(session.api);
+      setIncidents({ kind: 'loaded', data: all.filter((i) => i.site_id === siteId) });
+    } catch (reason) {
+      setActionError(errorMessage(reason));
+    } finally { setActingOn(null); }
+  }
+
+  async function runSosAction(id: number, action: 'acknowledge' | 'cancel') {
+    setActingOn(`sos-${id}`); setActionError('');
+    try {
+      await (action === 'acknowledge' ? managementApi.acknowledgeSos(session.api, id) : managementApi.cancelSos(session.api, id));
+      const all = await managementApi.listSosAlerts(session.api);
+      setSos({ kind: 'loaded', data: all.filter((a) => a.site_id === siteId) });
+    } catch (reason) {
+      setActionError(errorMessage(reason));
+    } finally { setActingOn(null); }
+  }
+
   return (
     <section className="mt-8 space-y-6" aria-labelledby="reports-heading">
       <div>
@@ -105,6 +135,8 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
         </p>
       </div>
 
+      {actionError && <p role="alert" className="flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100"><AlertTriangle className="size-4 shrink-0" />{actionError}</p>}
+
       <ReportSection title="Incidents" icon={ClipboardList} widget={incidents}>
         {(data) => data.length === 0 ? <EmptyRow text="No Incidents reported at this Site." /> : (
           <div className="divide-y">
@@ -114,6 +146,16 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
                 <Badge variant="outline" className="uppercase">{incident.severity}</Badge>
                 <Badge variant={incident.status === 'resolved' ? 'outline' : 'secondary'} className="uppercase">{incident.status}</Badge>
                 <span className="text-xs text-muted-foreground">{new Date(incident.occurred_at).toLocaleString()}</span>
+                {role && canViewIncidents(role) && incident.status === 'open' && (
+                  <Button size="sm" variant="outline" disabled={actingOn === `incident-${incident.id}`} onClick={() => void runIncidentAction(incident.id, 'acknowledge')}>
+                    Acknowledge
+                  </Button>
+                )}
+                {role && canViewIncidents(role) && incident.status === 'acknowledged' && (
+                  <Button size="sm" variant="outline" disabled={actingOn === `incident-${incident.id}`} onClick={() => void runIncidentAction(incident.id, 'resolve')}>
+                    Resolve
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -186,6 +228,16 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
                 <p className="min-w-0 flex-1 font-bold">{alert.personnel_name ?? 'Unknown Personnel'}</p>
                 <Badge variant={alert.status === 'resolved' || alert.status === 'cancelled' ? 'outline' : 'secondary'} className="uppercase">{alert.status}</Badge>
                 <span className="text-xs text-muted-foreground">{new Date(alert.triggered_at).toLocaleString()}</span>
+                {role && canRespondToSos(role) && alert.status === 'active' && (
+                  <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'acknowledge')}>
+                    Acknowledge
+                  </Button>
+                )}
+                {role && canRespondToSos(role) && (alert.status === 'active' || alert.status === 'acknowledged') && (
+                  <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'cancel')}>
+                    Cancel
+                  </Button>
+                )}
               </div>
             ))}
           </div>

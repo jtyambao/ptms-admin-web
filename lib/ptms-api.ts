@@ -513,15 +513,19 @@ export type VoluntaryObservationReportEntry = {
   created_at: string;
 };
 
-// sos-alerts (GET, JWT + RESPONDER_ROLES — super_admin/org_admin/
-// site_manager/supervisor only, org-wide) — SosService.findAll. Filtered
-// client-side to this one Site since the endpoint itself is org-wide, not
-// Site-scoped.
+// sos-alerts (GET, JWT + RESPONDER_ROLES) — SosService.findAll. Org-wide
+// for super_admin/org_admin/site_manager/supervisor (filtered to one Site
+// client-side); already Site-scoped server-side for admin/site_admin
+// (P3(a), branch release/dry-run-ops). latitude/longitude come from the
+// Guard app's separate PATCH .../location follow-up call — null until (or
+// if) that resolves.
 export type SosAlertEntry = {
   id: number;
   organization_id: number;
   personnel_id: number | null;
   site_id: number | null;
+  latitude: number | null;
+  longitude: number | null;
   status: 'active' | 'acknowledged' | 'cancelled' | 'resolved';
   triggered_at: string;
   acknowledged_at: string | null;

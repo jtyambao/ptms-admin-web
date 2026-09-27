@@ -40,9 +40,21 @@ test('SOS is org-wide at the backend and filtered to this Site client-side (no S
   assert.match(panel, /all\.filter\(\(a\) => a\.site_id === siteId\)/);
 });
 
+// P3(a) update (branch release/dry-run-ops): `admin`/`site_admin` gained
+// full view/acknowledge/cancel authority, restricted server-side to their
+// own assigned Site (SosService).
 test('canViewSos matches SosController RESPONDER_ROLES exactly', () => {
   assert.match(dashboard, /export const canViewSos = \(role: UserRole\) =>/);
-  assert.match(dashboard, /role === 'super_admin' \|\|\s*\n\s*role === 'org_admin' \|\|\s*\n\s*role === 'site_manager' \|\|\s*\n\s*role === 'supervisor';/);
+  assert.match(dashboard, /role === 'super_admin' \|\|\s*\n\s*role === 'org_admin' \|\|\s*\n\s*role === 'site_manager' \|\|\s*\n\s*role === 'supervisor' \|\|\s*\n\s*role === 'site_admin' \|\|\s*\n\s*role === 'admin';/);
+});
+
+test('Incidents acknowledge/resolve and SOS acknowledge/cancel actions are gated and call the real endpoints', () => {
+  assert.match(panel, /canViewIncidents\(role\)/);
+  assert.match(panel, /canRespondToSos\(role\)/);
+  assert.match(panel, /managementApi\.acknowledgeIncident/);
+  assert.match(panel, /managementApi\.resolveIncident/);
+  assert.match(panel, /managementApi\.acknowledgeSos/);
+  assert.match(panel, /managementApi\.cancelSos/);
 });
 
 test('checkpoint visits/scans has no listing endpoint and is explicitly reported as such, not silently omitted', () => {

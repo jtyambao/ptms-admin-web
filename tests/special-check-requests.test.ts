@@ -24,9 +24,12 @@ test('uses the real, existing create/list contract, siteId scoped from the route
   assert.match(api, /method: 'POST'/);
 });
 
+// P3(c) update (branch release/dry-run-ops): `admin`/`site_admin` gained
+// create authority, restricted server-side to their own assigned Site
+// (SpecialCheckRequestsService.create()).
 test('canSendSpecialCheckRequest matches SpecialCheckRequestsController SENDER_ROLES exactly', () => {
   assert.match(dashboard, /export const canSendSpecialCheckRequest = \(role: UserRole\) =>/);
-  assert.match(dashboard, /role === 'super_admin' \|\|\s*\n\s*role === 'org_admin' \|\|\s*\n\s*role === 'site_manager' \|\|\s*\n\s*role === 'supervisor';/);
+  assert.match(dashboard, /role === 'super_admin' \|\|\s*\n\s*role === 'org_admin' \|\|\s*\n\s*role === 'site_manager' \|\|\s*\n\s*role === 'supervisor' \|\|\s*\n\s*role === 'site_admin' \|\|\s*\n\s*role === 'admin';/);
 });
 
 test('the create form is gated by canSendSpecialCheckRequest; the list itself is visible regardless (backend GET is unauthenticated)', () => {
