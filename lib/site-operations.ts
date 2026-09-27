@@ -27,7 +27,12 @@ export const canManageSiteOperations = (role: UserRole) =>
 export const canTogglePatrolActivation = (role: UserRole) =>
   role === 'supervisor' || role === 'site_admin' || role === 'super_admin';
 
-export const createGuardNdefText = (payload: NfcWriterPayload) =>
+// The Guard app reads only the NDEF JSON payload (ptms-guard-app src/nfc.ts),
+// never the card's hardware UID, so Admin Web issues the NFC ID itself.
+export const generateTagId = (siteId: number, checkpointId: number) =>
+  `PTMS-S${siteId}-C${checkpointId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+
+export const createGuardNdefText =(payload: NfcWriterPayload) =>
   JSON.stringify({ tagUid: payload.tagUid, tagSignature: payload.tagSignature });
 
 export async function writeGuardNfcTag(payload: NfcWriterPayload): Promise<void> {
