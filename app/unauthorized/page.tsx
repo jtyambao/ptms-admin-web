@@ -1,0 +1,30 @@
+'use client';
+import { ShieldX } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { OfficialBrand } from '@/components/portal-shell';
+import { useSession } from '@/lib/session-provider';
+export default function UnauthorizedPage() {
+  const session = useSession();
+  return (
+    <main className="grid min-h-screen place-items-center bg-background p-5">
+      <section className="max-w-md text-center">
+        <div className="mx-auto mb-7 w-fit">
+          <OfficialBrand />
+        </div>
+        <ShieldX className="mx-auto size-12 text-[#f36f0a]" />
+        <h1 className="mt-5 text-3xl font-black">Access not authorized</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Your authenticated role does not have an approved operational portal
+          contract.
+        </p>
+        <Button
+          className="mt-7"
+          onClick={() => void session.logout()}
+          variant="outline"
+        >
+          Log out
+        </Button>
+      </section>
+    </main>
+  );
+}
