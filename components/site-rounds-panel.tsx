@@ -45,6 +45,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   const [name, setName] = useState('');
   const [interval, setInterval_] = useState('30');
   const [selectedCheckpointIds, setSelectedCheckpointIds] = useState<number[]>([]);
+  const [timing, setTiming] = useState<RoundTiming>(emptyTiming);
 
   const refresh = useCallback(async () => {
     if (!canView || session.status !== 'authenticated') return;
@@ -74,13 +75,19 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   }
 
   function openCreate() {
-    setName(''); setInterval_('30'); setSelectedCheckpointIds([]); setError(''); setCreateOpen(true);
+    setName(''); setInterval_('30'); setSelectedCheckpointIds([]); setTiming(emptyTiming); setError(''); setCreateOpen(true);
   }
 
   function openEdit(round: ManagedRound) {
     setName(round.name);
     setInterval_(String(round.due_interval_minutes));
     setSelectedCheckpointIds(round.stops.map((s) => s.checkpoint_id));
+    setTiming({
+      start: round.window_start_time?.slice(0, 5) ?? '',
+      end: round.window_end_time?.slice(0, 5) ?? '',
+      ack: round.ack_window_seconds?.toString() ?? '',
+      tap: round.tap_window_seconds?.toString() ?? '',
+    });
     setError('');
     setEditTarget(round);
   }
@@ -98,6 +105,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
         name: name.trim(),
         dueIntervalMinutes: Number(interval),
         checkpointIds: selectedCheckpointIds,
+        ...timingRequest(timing),
       });
       setCreateOpen(false);
       await refresh();
@@ -115,6 +123,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
         name: name.trim(),
         dueIntervalMinutes: Number(interval),
         checkpointIds: selectedCheckpointIds,
+        ...timingRequest(timing),
       });
       setEditTarget(null);
       await refresh();
@@ -217,6 +226,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                         <p className="font-bold">{round.name}</p>
                         <Badge variant={round.is_active ? 'secondary' : 'outline'}>{round.is_active ? 'Active' : 'Inactive'}</Badge>
                         <Badge variant="outline">Every {round.due_interval_minutes} min</Badge>
+                        {formatTiming(round).map((part) => <Badge key={part} variant="outline">{part}</Badge>)}
                         {hasInactiveStop && (
                           <Badge variant="outline" className="border-red-400 text-red-700 dark:text-red-400">
                             Points at a deactivated checkpoint
@@ -250,7 +260,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
         title="New Round"
         description="Ordered checkpoints define the patrol sequence. Only active checkpoints at this Site can be selected."
         name={name} setName={setName}
-        interval={interval} setInterval={setInterval_}
+        interval={interval} setInterval={setInterval_} timing={timing} setTiming={setTiming}
         activeCheckpoints={activeCheckpoints}
         selectedCheckpointIds={selectedCheckpointIds}
         toggleCheckpoint={toggleCheckpoint}
@@ -265,7 +275,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
         title={`Edit ${editTarget?.name ?? ''}`}
         description="Saving replaces the entire checkpoint sequence for this Round."
         name={name} setName={setName}
-        interval={interval} setInterval={setInterval_}
+        interval={interval} setInterval={setInterval_} timing={timing} setTiming={setTiming}
         activeCheckpoints={activeCheckpoints}
         selectedCheckpointIds={selectedCheckpointIds}
         toggleCheckpoint={toggleCheckpoint}
@@ -293,13 +303,37 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   );
 }
 
+// Round timing form state. Empty = organization default (seconds) or all day.
+type RoundTiming = { start: string; end: string; ack: string; tap: string };
+const emptyTiming: RoundTiming = { start: '', end: '', ack: '', tap: '' };
+
+function timingRequest(timing: RoundTiming) {
+  return {
+    windowStartTime: timing.start || null,
+    windowEndTime: timing.end || null,
+    ackWindowSeconds: timing.ack ? Number(timing.ack) : null,
+    tapWindowSeconds: timing.tap ? Number(timing.tap) : null,
+  };
+}
+
+function formatTiming(round: ManagedRound): string[] {
+  const parts: string[] = [];
+  parts.push(round.window_start_time && round.window_end_time
+    ? `${round.window_start_time.slice(0, 5)}–${round.window_end_time.slice(0, 5)}`
+    : 'All day');
+  if (round.ack_window_seconds) parts.push(`Due Soon ${round.ack_window_seconds}s`);
+  if (round.tap_window_seconds) parts.push(`Tap all ${round.tap_window_seconds}s`);
+  return parts;
+}
+
 function RoundFormDialog({
-  open, title, description, name, setName, interval, setInterval, activeCheckpoints,
+  open, title, description, name, setName, interval, setInterval, timing, setTiming, activeCheckpoints,
   selectedCheckpointIds, toggleCheckpoint, saving, onCancel, onSubmit, submitLabel,
 }: {
   open: boolean; title: string; description: string;
   name: string; setName: (v: string) => void;
   interval: string; setInterval: (v: string) => void;
+  timing: RoundTiming; setTiming: (v: RoundTiming) => void;
   activeCheckpoints: ManagedCheckpoint[];
   selectedCheckpointIds: number[]; toggleCheckpoint: (id: number) => void;
   saving: boolean; onCancel: () => void;
@@ -323,6 +357,27 @@ function RoundFormDialog({
               Due interval (minutes)
               <Input id="round-interval" type="number" min={1} value={interval} onChange={(e) => setInterval(e.target.value)} required />
             </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label htmlFor="round-start" className="grid gap-2 font-bold">
+                Start time
+                <Input id="round-start" type="time" value={timing.start} onChange={(e) => setTiming({ ...timing, start: e.target.value })} />
+              </label>
+              <label htmlFor="round-end" className="grid gap-2 font-bold">
+                End time
+                <Input id="round-end" type="time" value={timing.end} onChange={(e) => setTiming({ ...timing, end: e.target.value })} />
+              </label>
+            </div>
+            <p className="-mt-2 text-xs text-muted-foreground">Leave both empty to run all day. An end time earlier than the start time runs overnight (e.g. 18:00–06:00).</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label htmlFor="round-ack" className="grid gap-2 font-bold">
+                Check Due Soon shows for (seconds)
+                <Input id="round-ack" type="number" min={10} max={3600} placeholder="Default" value={timing.ack} onChange={(e) => setTiming({ ...timing, ack: e.target.value })} />
+              </label>
+              <label htmlFor="round-tap" className="grid gap-2 font-bold">
+                Time to tap all checkpoints (seconds)
+                <Input id="round-tap" type="number" min={10} max={7200} placeholder="Default" value={timing.tap} onChange={(e) => setTiming({ ...timing, tap: e.target.value })} />
+              </label>
+            </div>
             <div>
               <p className="font-bold">Checkpoints (in patrol order)</p>
               {activeCheckpoints.length === 0 ? (

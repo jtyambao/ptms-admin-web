@@ -355,14 +355,23 @@ export type ManagedRound = {
   site_id: number;
   name: string;
   due_interval_minutes: number;
+  ack_window_seconds: number | null;
+  tap_window_seconds: number | null;
+  window_start_time: string | null;
+  window_end_time: string | null;
   is_active: boolean;
   stops: RoundStop[];
 };
 
+// null = organization default (seconds) or all day (window).
 export type SaveRoundRequest = {
   name: string;
   dueIntervalMinutes: number;
   checkpointIds: number[];
+  ackWindowSeconds?: number | null;
+  tapWindowSeconds?: number | null;
+  windowStartTime?: string | null;
+  windowEndTime?: string | null;
 };
 
 // Schedules visibility (branch release/dry-run-ops) — mirrors
