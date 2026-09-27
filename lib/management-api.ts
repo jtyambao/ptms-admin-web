@@ -7,6 +7,7 @@ import type {
   Personnel,
   Site,
   SiteOicAssignment,
+  OicHandoverResult,
   StaffingStatus,
   SiteInformationRequest,
   SiteUserAssignment,
@@ -112,11 +113,15 @@ export const managementApi = {
   // again afterward.
   regeneratePersonnelMpin: (api: AuthenticatedApiClient, id: number) =>
     api.request<PersonnelMpinRegenerated>(`/personnel/${id}/regenerate-mpin`, { method: 'POST' }),
+  // Dry-run fix (branch release/dry-run-ops): the response is the full
+  // OicHandoverResult (assignment + newSiteMpin + credentialGeneration),
+  // not bare SiteOicAssignment — the backend has always sent the rotated
+  // Site MPIN here, it just wasn't typed/surfaced by this client before.
   handoverOic: (
     api: AuthenticatedApiClient,
     siteId: number,
     body: HandoverOicRequest,
-  ) => api.request<SiteOicAssignment>(`/sites/${siteId}/oic-handovers`, {
+  ) => api.request<OicHandoverResult>(`/sites/${siteId}/oic-handovers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

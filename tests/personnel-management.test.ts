@@ -160,3 +160,20 @@ test('regeneratePersonnelMpin sends no request body — the server generates the
   assert.match(call, /method: 'POST'/);
   assert.doesNotMatch(call, /body:/);
 });
+
+// Dry-run fix (branch release/dry-run-ops): the backend has always
+// rotated the Site's own Guard-facing credential on every OIC handover,
+// returning it as newSiteMpin — this client previously typed the response
+// as bare SiteOicAssignment and silently discarded it.
+test('handoverOic is typed for and surfaces the rotated Site MPIN it has always received', () => {
+  const api = readFileSync('lib/management-api.ts', 'utf8');
+  const start = api.indexOf('handoverOic:');
+  const end = api.indexOf('listDevices:', start);
+  const call = api.slice(start, end);
+  assert.match(call, /OicHandoverResult/);
+  assert.doesNotMatch(call, /api\.request<SiteOicAssignment>/);
+
+  const panel = readFileSync('components/site-personnel-panel.tsx', 'utf8');
+  assert.match(panel, /result\.newSiteMpin/);
+  assert.match(panel, /New Site MPIN/);
+});

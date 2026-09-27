@@ -70,6 +70,14 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
   // display dialog is open — never persisted, never re-requested.
   const [regeneratedMpin, setRegeneratedMpin] = useState<string | null>(null);
   const [copyConfirmed, setCopyConfirmed] = useState(false);
+  // Dry-run fix (branch release/dry-run-ops) — every OIC handover also
+  // rotates the Site's own Guard-facing credential in the same backend
+  // transaction; this was always returned by the API but never surfaced
+  // here. Kept as its own state (distinct from regeneratedMpin above,
+  // which is a Personnel's own login MPIN, a different credential
+  // entirely) so the dialog can label which credential just changed.
+  const [newSiteMpin, setNewSiteMpin] = useState<string | null>(null);
+  const [siteMpinCopyConfirmed, setSiteMpinCopyConfirmed] = useState(false);
 
   const allowed = !!session.user && canManagePersonnel(session.user.role);
   // View is independent from manage: canViewPersonnel matches
@@ -225,6 +233,21 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
     }
   }
 
+  function closeSiteMpinDisplay() {
+    setNewSiteMpin(null);
+    setSiteMpinCopyConfirmed(false);
+  }
+
+  async function copySiteMpin() {
+    if (!newSiteMpin) return;
+    try {
+      await navigator.clipboard.writeText(newSiteMpin);
+      setSiteMpinCopyConfirmed(true);
+    } catch {
+      setSiteMpinCopyConfirmed(false);
+    }
+  }
+
   async function changeOic(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const personnelId = Number(selectedOic);
@@ -236,12 +259,13 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
     setError('');
     setSuccess('');
     try {
-      await managementApi.handoverOic(session.api, siteId, { personnelId });
+      const result = await managementApi.handoverOic(session.api, siteId, { personnelId });
       const refreshed = await managementApi.getStaffing(session.api, siteId);
       onStaffingChange(refreshed);
       setOicOpen(false);
       setSelectedOic('');
       setSuccess('Current OIC updated successfully.');
+      setNewSiteMpin(result.newSiteMpin);
     } catch (reason) {
       setError(reason instanceof ApiRequestError ? reason.message : genericError);
     } finally {
@@ -452,6 +476,28 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
           </div>
           <DialogFooter className="mt-5">
             <Button type="button" onClick={closeMpinDisplay}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!newSiteMpin} onOpenChange={(open) => { if (!open) closeSiteMpinDisplay(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Site MPIN — shown once</DialogTitle>
+            <DialogDescription>
+              OIC handover also rotates this Site&apos;s own Guard-facing credential. This MPIN cannot
+              be retrieved again after this dialog is closed — communicate it to Guard staff at this
+              Site now.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2">
+            <Input readOnly value={newSiteMpin ?? ''} className="font-mono text-lg tracking-widest" aria-label="New Site MPIN" />
+            <Button type="button" variant="outline" onClick={() => void copySiteMpin()}>
+              <Copy /> {siteMpinCopyConfirmed ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
+          <DialogFooter className="mt-5">
+            <Button type="button" onClick={closeSiteMpinDisplay}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

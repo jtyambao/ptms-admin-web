@@ -157,6 +157,20 @@ export type SiteOicAssignment = {
 };
 
 export type HandoverOicRequest = { personnelId: number; reason?: string };
+
+// Dry-run fix (branch release/dry-run-ops) — matches the real backend
+// response shape exactly (SiteAssignmentsService.handoverOic's
+// OicHandoverResult): every OIC handover ALSO rotates the Site's
+// Guard-facing credential in the same transaction, returning the new
+// plaintext MPIN exactly once. The frontend previously typed this
+// response as bare SiteOicAssignment and silently discarded newSiteMpin/
+// credentialGeneration — the new MPIN was never shown to the operator
+// even though the backend already sent it.
+export type OicHandoverResult = {
+  assignment: SiteOicAssignment;
+  newSiteMpin: string;
+  credentialGeneration: number;
+};
 export type StaffingStatus = {
   site: Pick<Site, 'id' | 'organization_id' | 'name' | 'status'> & {
     patrol_operations_active: boolean;
