@@ -91,16 +91,17 @@ test('light and dark visual treatment remains represented in the Personnel UI', 
   assert.match(source, /#e86405|#f36f0a/);
 });
 
-test('Regenerate MPIN action only appears where existing Personnel-management permissions already allow it', () => {
+// Dry-run fix (branch release/dry-run-ops): Regenerate MPIN is disabled
+// for tomorrow's dry run — feat/personnel-mpin-regenerate (sql/029) is
+// uncommitted WIP, not reviewed/run yet, so the button stays visible
+// (same allowed/status gate as before — no role check removed) but inert,
+// rather than risk a 404 against prod mid-demo.
+test('Regenerate MPIN is disabled (not wired to a live endpoint) for the dry run', () => {
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
+  assert.match(source, /<Button variant="outline" disabled title="Not available yet">\s*<KeyRound \/> Regenerate MPIN/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => setRegenerateTarget\(person\)\}/);
   // Same gate as Deactivate — `allowed` is unchanged from canManagePersonnel();
-  // this feature does not introduce or widen any role check.
-  assert.match(
-    source,
-    /\{allowed && person\.status === 'active' && \(\s*<div className="flex flex-wrap gap-2">\s*<Button variant="outline" onClick=\{\(\) => setRegenerateTarget\(person\)\}>/,
-  );
-  // Exactly the two pre-existing gates (header actions, row actions) — this
-  // feature introduces no new role check of its own.
+  // disabling this button does not remove or widen any role check.
   const allowedOccurrences = source.match(/allowed &&/g) ?? [];
   assert.equal(allowedOccurrences.length, 2);
 });

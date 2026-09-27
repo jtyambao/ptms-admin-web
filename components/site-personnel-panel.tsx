@@ -346,10 +346,16 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
                     <p className="mt-1 text-xs text-muted-foreground">Personnel record · MPIN protected</p>
                   </div>
                   {allowed && person.status === 'active' && (
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={() => setRegenerateTarget(person)}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Dry-run fix (branch release/dry-run-ops): disabled for
+                          tomorrow's dry run — feat/personnel-mpin-regenerate
+                          (sql/029) is uncommitted WIP, not yet reviewed/run,
+                          so the button is kept visible but inert rather than
+                          risk a 404 against prod mid-demo. */}
+                      <Button variant="outline" disabled title="Not available yet">
                         <KeyRound /> Regenerate MPIN
                       </Button>
+                      <span className="text-xs text-muted-foreground">Not available yet</span>
                       <Button variant="destructive" onClick={() => setDeactivateTarget(person)}>
                         <UserRoundX /> Deactivate
                       </Button>
