@@ -243,6 +243,8 @@ export const managementApi = {
     }),
   deactivateDevice: (api: AuthenticatedApiClient, siteId: number, registrationId: number) =>
     api.request<SiteDevice>(`/sites/${siteId}/devices/${registrationId}/deactivate`, { method: 'PATCH' }),
+  setPrimaryDevice: (api: AuthenticatedApiClient, siteId: number, registrationId: number) =>
+    api.request<SiteDevice>(`/sites/${siteId}/devices/${registrationId}/primary`, { method: 'PATCH' }),
   listCheckpoints: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<ManagedCheckpoint[]>(`/sites/${siteId}/checkpoints`),
   getCheckpoint: (api: AuthenticatedApiClient, siteId: number, checkpointId: number) =>
