@@ -17,6 +17,16 @@ import type { NfcWriterPayload, UserRole } from './ptms-api';
 export const canManageSiteOperations = (role: UserRole) =>
   role === 'supervisor' || role === 'site_admin' || role === 'admin' || role === 'super_admin';
 
+// Patrol activation toggle (P5(c), branch release/dry-run-ops) —
+// verified against SiteAssignmentsService.setPatrolActivation's own
+// requireRole call: exactly supervisor/site_admin/super_admin. Narrower
+// than canManageSiteOperations above (`admin`/org_admin have no
+// authority here today) — a real, current backend limitation to render
+// around, not paper over. Per this task's own instruction, this gate is
+// NOT widened to include `admin` here; only reported.
+export const canTogglePatrolActivation = (role: UserRole) =>
+  role === 'supervisor' || role === 'site_admin' || role === 'super_admin';
+
 export const createGuardNdefText = (payload: NfcWriterPayload) =>
   JSON.stringify({ tagUid: payload.tagUid, tagSignature: payload.tagSignature });
 

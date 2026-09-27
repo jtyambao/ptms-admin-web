@@ -24,6 +24,8 @@ import { SiteHierarchyPanel } from '@/components/site-hierarchy-panel';
 import { SitePersonnelPanel } from '@/components/site-personnel-panel';
 import { SiteOperationsPanel } from '@/components/site-operations-panel';
 import { SiteRoundsPanel } from '@/components/site-rounds-panel';
+import { SitePatrolActivationToggle } from '@/components/site-patrol-activation-toggle';
+import { SiteShiftBriefingPanel } from '@/components/site-shift-briefing-panel';
 import { SiteEmergencyContactsPanel } from '@/components/site-emergency-contacts-panel';
 import { SiteReportsPanel } from '@/components/site-reports-panel';
 import { SiteSpecialCheckRequestsPanel } from '@/components/site-special-check-requests-panel';
@@ -400,8 +402,8 @@ export default function SiteDetailPage() {
                       />
                       <Summary
                         label="Admin"
-                        value={staffing?.siteAdmin?.full_name || 'Needs setup'}
-                        complete={!!staffing?.siteAdmin}
+                        value={staffing?.admin?.full_name || staffing?.siteAdmin?.full_name || 'Needs setup'}
+                        complete={!!(staffing?.admin || staffing?.siteAdmin)}
                       />
                       <Summary
                         label="Current OIC"
@@ -463,6 +465,16 @@ export default function SiteDetailPage() {
                                 signals.activeCheckpoints
                         }
                       />
+                    </div>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      {site && (
+                        <SitePatrolActivationToggle
+                          siteId={siteId}
+                          site={site}
+                          onSiteChange={setSite}
+                        />
+                      )}
+                      <SiteShiftBriefingPanel siteId={siteId} />
                     </div>
                   </section>
                 </TabsContent>

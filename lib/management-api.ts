@@ -28,6 +28,7 @@ import type {
   GovernedMissedCheckpointTap,
   VisitorLogEntry,
   VoluntaryObservationReportEntry,
+  DobEntry,
   SosAlertEntry,
   SpecialCheckRequest,
   CreateSpecialCheckRequest,
@@ -41,6 +42,9 @@ import type {
   DeactivateAdminAccountResult,
   UpdateOwnProfileRequest,
   ChangeOwnPasswordRequest,
+  SetPatrolActivationRequest,
+  ShiftBriefing,
+  CreateShiftBriefingRequest,
 } from './ptms-api';
 export const managementApi = {
   // Not currently deployed (see ptms-api.ts's DashboardSiteRow comment) —
@@ -74,6 +78,11 @@ export const managementApi = {
     api.request<VisitorLogEntry[]>(`/visitor-logs/site/${siteId}`),
   listVoluntaryObservationReports: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<VoluntaryObservationReportEntry[]>(`/voluntary-observation-reports/site/${siteId}`),
+  // Daily Occurrence Book viewer (P5(a), branch release/dry-run-ops) —
+  // read-only, existing endpoint only (Guard-facing/unauthenticated at
+  // the backend, same as the two calls just above).
+  listDailyOccurrenceBook: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<DobEntry[]>(`/daily-occurrence-book/site/${siteId}`),
   // JWT + RESPONDER_ROLES. super_admin/org_admin/site_manager/supervisor
   // get every SOS alert in the org (still filtered to one Site
   // client-side here); admin/site_admin (dry-run fix, P3(a)) are already
@@ -173,6 +182,22 @@ export const managementApi = {
     api.request<AssignmentHistory>(`/sites/${siteId}/assignment-history`),
   getStaffing: (api: AuthenticatedApiClient, id: number) =>
     api.request<StaffingStatus>(`/sites/${id}/staffing-status`),
+  // Patrol activation toggle (P5(c)) — roles per
+  // SiteAssignmentsService.setPatrolActivation exactly: supervisor/
+  // site_admin/super_admin (see canTogglePatrolActivation).
+  setPatrolActivation: (api: AuthenticatedApiClient, siteId: number, body: SetPatrolActivationRequest) =>
+    api.request<Site>(`/sites/${siteId}/patrol-activation`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
+  // Shift Briefing (P5(b)) — GET is Guard-facing/unauthenticated at the
+  // backend; POST is JWT + requireManageAccess (supervisor/site_admin/
+  // admin own Site, org_admin org-wide, super_admin cross-tenant).
+  getLatestShiftBriefing: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<ShiftBriefing | null>(`/sites/${siteId}/shift-briefing`),
+  createShiftBriefing: (api: AuthenticatedApiClient, siteId: number, body: CreateShiftBriefingRequest) =>
+    api.request<ShiftBriefing>(`/sites/${siteId}/shift-briefing`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
   // My Account page (P4(b)) — any authenticated role, self only.
   updateOwnProfile: (api: AuthenticatedApiClient, body: UpdateOwnProfileRequest) =>
     api.request<User>('/users/me', {

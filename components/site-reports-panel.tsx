@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, ClipboardList, Eye, ImageOff, Lock, PhoneCall, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, BookText, ClipboardList, Eye, ImageOff, Lock, PhoneCall, ShieldAlert, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { ApiRequestError } from '@/lib/authenticated-api';
 import { canRespondToSos, canViewIncidents, canViewSos } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
 import type {
+  DobEntry,
   GovernedMissedCheckpointTap,
   Incident,
   MissedCheckpointTap,
@@ -44,6 +45,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
   const [governedMissed, setGovernedMissed] = useState<Widget<GovernedMissedCheckpointTap[]>>({ kind: 'loading' });
   const [visitorLogs, setVisitorLogs] = useState<Widget<VisitorLogEntry[]>>({ kind: 'loading' });
   const [vorReports, setVorReports] = useState<Widget<VoluntaryObservationReportEntry[]>>({ kind: 'loading' });
+  const [dob, setDob] = useState<Widget<DobEntry[]>>({ kind: 'loading' });
   const [sos, setSos] = useState<Widget<SosAlertEntry[]>>({ kind: 'loading' });
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -80,6 +82,11 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
     try {
       setVorReports({ kind: 'loaded', data: await managementApi.listVoluntaryObservationReports(session.api, siteId) });
     } catch (reason) { setVorReports({ kind: 'error', message: errorMessage(reason) }); }
+
+    setDob({ kind: 'loading' });
+    try {
+      setDob({ kind: 'loaded', data: await managementApi.listDailyOccurrenceBook(session.api, siteId) });
+    } catch (reason) { setDob({ kind: 'error', message: errorMessage(reason) }); }
 
     if (role && canViewSos(role)) {
       setSos({ kind: 'loading' });
@@ -214,6 +221,19 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
                 <p className="min-w-0 flex-1 truncate">{report.remarks ?? <span className="italic text-muted-foreground">No remarks</span>}</p>
                 <span className="text-xs text-muted-foreground">{new Date(report.occurred_at).toLocaleString()}</span>
                 <PhotoLink url={report.photo_view_url} />
+              </div>
+            ))}
+          </div>
+        )}
+      </ReportSection>
+
+      <ReportSection title="Daily Occurrence Book" icon={BookText} widget={dob}>
+        {(data) => data.length === 0 ? <EmptyRow text="No Daily Occurrence Book entries at this Site." /> : (
+          <div className="divide-y">
+            {data.map((entry) => (
+              <div key={entry.id} className="py-3 text-sm">
+                <p>{entry.entry_text}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{new Date(entry.occurred_at).toLocaleString()}</p>
               </div>
             ))}
           </div>

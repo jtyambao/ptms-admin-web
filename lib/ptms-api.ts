@@ -86,6 +86,11 @@ export type Site = {
   // a browser/device timezone. NULL means catch-up scheduling is disabled
   // for this site; there is no default, admins must opt in per site.
   duty_end_time: string | null;
+  // P5(c) fix (branch release/dry-run-ops) — a real `sites` column
+  // (used by SiteAssignmentsService.setPatrolActivation/getStaffingStatus,
+  // already present in every `SELECT *`/`RETURNING *` response), just
+  // never added to this type until the toggle needed it.
+  patrol_operations_active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -217,6 +222,25 @@ export type AssignmentHistory = {
   oicAssignments: SiteOicAssignment[];
 };
 export type SetPatrolActivationRequest = { active: boolean };
+
+// Shift Briefing (P5(b), branch release/dry-run-ops) — matches
+// ShiftBriefing/CreateShiftBriefingDto exactly (src/sites/). All three
+// text fields are optional/nullable (sql/021 — no NOT NULL beyond the
+// server-derived organization_id/site_id).
+export type ShiftBriefing = {
+  id: number;
+  organization_id: number;
+  site_id: number;
+  handover_note: string | null;
+  equipment_check_note: string | null;
+  weather_advisory: string | null;
+  created_at: string;
+};
+export type CreateShiftBriefingRequest = {
+  handoverNote?: string;
+  equipmentCheckNote?: string;
+  weatherAdvisory?: string;
+};
 
 export type SiteDevice = {
   id: number;
@@ -574,6 +598,20 @@ export type SosAlertEntry = {
 // GET is Guard-facing/unauthenticated at the backend, filtered by siteId
 // query param; POST is JWT + SENDER_ROLES (super_admin/org_admin/
 // site_manager/supervisor) — `admin`/`site_admin` cannot send one today.
+// daily-occurrence-book/site/:id — Guard-facing/unauthenticated at the
+// backend (DailyOccurrenceBookService.findForSite), same as
+// VisitorLogEntry/VoluntaryObservationReportEntry above. Verified against
+// ptms-guard-app-v1.1-volume-worktree's src/api.ts DobEntry/fetchDobEntries
+// — field names match exactly.
+export type DobEntry = {
+  id: number;
+  organization_id: number;
+  site_id: number;
+  entry_text: string;
+  occurred_at: string;
+  created_at: string;
+};
+
 export type SpecialCheckRequest = {
   id: number;
   organization_id: number;

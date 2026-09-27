@@ -68,5 +68,13 @@ test('every report widget loads independently — one failing report does not bl
   // Each data source has its own try/catch — a rejection in one does not
   // throw out of `load` and skip the rest.
   const tryCount = (loadFnBody.match(/try \{/g) ?? []).length;
-  assert.equal(tryCount, 6); // incidents, missed, governedMissed, visitorLogs, vorReports, sos — each its own try/catch
+  assert.equal(tryCount, 7); // incidents, missed, governedMissed, visitorLogs, vorReports, dob, sos — each its own try/catch
+});
+
+// P5(a) (branch release/dry-run-ops) — read-only, existing endpoint only
+// (Guard-facing/unauthenticated at the backend, no role gate needed here).
+test('Daily Occurrence Book widget uses the real, existing GET endpoint', () => {
+  assert.match(api, /^\s*listDailyOccurrenceBook:/m);
+  assert.match(api, /\/daily-occurrence-book\/site\/\$\{siteId\}/);
+  assert.match(panel, /managementApi\.listDailyOccurrenceBook\(session\.api, siteId\)/);
 });
