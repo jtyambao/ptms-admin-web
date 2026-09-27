@@ -24,6 +24,11 @@ import type {
   ManagedRound,
   SaveRoundRequest,
   RoundStatus,
+  MissedCheckpointTap,
+  GovernedMissedCheckpointTap,
+  VisitorLogEntry,
+  VoluntaryObservationReportEntry,
+  SosAlertEntry,
   PersonnelMpinRegenerated,
   EmergencyContact,
   CreateEmergencyContactRequest,
@@ -45,6 +50,21 @@ export const managementApi = {
   // so this is a single call regardless of how many Sites the org has.
   listIncidents: (api: AuthenticatedApiClient) =>
     api.request<Incident[]>('/incidents'),
+  // Reports page (branch release/dry-run-ops) — read-only, existing
+  // endpoints only, no new backend routes.
+  listMissedCheckpoints: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<MissedCheckpointTap[]>(`/checkpoint-rounds/site/${siteId}/missed`),
+  listGovernedMissedCheckpoints: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<GovernedMissedCheckpointTap[]>(`/checkpoint-rounds/site/${siteId}/missed/governed`),
+  listVisitorLogs: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<VisitorLogEntry[]>(`/visitor-logs/site/${siteId}`),
+  listVoluntaryObservationReports: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<VoluntaryObservationReportEntry[]>(`/voluntary-observation-reports/site/${siteId}`),
+  // Org-wide (JWT + RESPONDER_ROLES: super_admin/org_admin/site_manager/
+  // supervisor only) — filter to one Site client-side; there is no
+  // Site-scoped SOS list route on the backend.
+  listSosAlerts: (api: AuthenticatedApiClient) =>
+    api.request<SosAlertEntry[]>('/sos-alerts'),
   listSites: (api: AuthenticatedApiClient) =>
     api.request<Site[]>('/management/sites'),
   getSite: (api: AuthenticatedApiClient, id: number) =>

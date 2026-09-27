@@ -40,6 +40,19 @@ export const canViewIncidents = (role: UserRole) =>
   role === 'site_admin' ||
   role === 'admin';
 
+// Reports page (branch release/dry-run-ops) — verified against a fresh
+// origin/main read of SosController's RESPONDER_ROLES constant
+// (src/sos/sos.controller.ts): exactly super_admin, org_admin,
+// site_manager, supervisor — the same set as canViewIncidents above,
+// since both controllers happen to share the identical constant name and
+// value today (not guaranteed to stay in lock-step, so kept as its own
+// predicate rather than an alias).
+export const canViewSos = (role: UserRole) =>
+  role === 'super_admin' ||
+  role === 'org_admin' ||
+  role === 'site_manager' ||
+  role === 'supervisor';
+
 // "Today" for a widget that has no server-computed boundary of its own
 // (unlike the old fake summary, which used each Site's own configured
 // timezone) is necessarily the viewer's local calendar day — an honest

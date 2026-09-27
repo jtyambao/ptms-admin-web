@@ -457,6 +457,81 @@ export type Incident = {
   resolved_at: string | null;
 };
 
+// Reports page (branch release/dry-run-ops) — read-only, per-Site,
+// existing backend endpoints only. No new backend routes were added for
+// any of these; each type mirrors its real service's row shape exactly.
+
+// checkpoint-rounds/site/:id/missed — CheckpointRoundsService.listMissed.
+export type MissedCheckpointTap = {
+  id: number;
+  site_id: number;
+  due_event_id: number;
+  checkpoint_id: number;
+  checkpoint_name: string;
+  round_name: string;
+  missed_at: string;
+};
+
+// checkpoint-rounds/site/:id/missed/governed —
+// CheckpointRoundsService.listGovernedNonActiveMisses. Informational
+// only — never implies a completion path (see that method's own comment).
+export type GovernedMissedCheckpointTap = {
+  missedTapId: number;
+  checkpointId: number;
+  checkpointName: string;
+  missedAt: string;
+  catchUpStatus: 'scheduled' | 'expired' | 'unschedulable_today';
+};
+
+// visitor-logs/site/:id — VisitorLogsService.findForSite. Guard-facing,
+// genuinely unauthenticated at the backend (no JwtAuthGuard on this route).
+export type VisitorLogEntry = {
+  id: number;
+  organization_id: number;
+  site_id: number;
+  visitor_name: string;
+  purpose: string;
+  host_name: string;
+  valid_id_checked: boolean;
+  photo_url: string | null;
+  photo_view_url: string | null;
+  occurred_at: string;
+  created_at: string;
+};
+
+// voluntary-observation-reports/site/:id —
+// VoluntaryObservationReportsService.findForSite. Also genuinely
+// unauthenticated at the backend, same Guard-facing shape as above.
+export type VoluntaryObservationReportEntry = {
+  id: number;
+  organization_id: number;
+  site_id: number;
+  photo_url: string;
+  photo_view_url: string | null;
+  remarks: string | null;
+  occurred_at: string;
+  created_at: string;
+};
+
+// sos-alerts (GET, JWT + RESPONDER_ROLES — super_admin/org_admin/
+// site_manager/supervisor only, org-wide) — SosService.findAll. Filtered
+// client-side to this one Site since the endpoint itself is org-wide, not
+// Site-scoped.
+export type SosAlertEntry = {
+  id: number;
+  organization_id: number;
+  personnel_id: number | null;
+  site_id: number | null;
+  status: 'active' | 'acknowledged' | 'cancelled' | 'resolved';
+  triggered_at: string;
+  acknowledged_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  resolved_at: string | null;
+  personnel_name: string | null;
+  site_name: string | null;
+};
+
 export type ApiEnvelope<T> = {
   success: boolean;
   statusCode?: number;
