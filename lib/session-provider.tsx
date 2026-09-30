@@ -20,6 +20,14 @@ type SessionContextValue = {
   api: AuthenticatedApiClient;
   login(credentials: LoginRequest): Promise<void>;
   logout(): Promise<void>;
+  // Voice/video call groundwork (item 4b) — the ONLY reason the raw token
+  // is exposed at all: CallsGateway's `register` socket event takes a
+  // staff JWT directly in its payload (calls.gateway.ts's own
+  // RegisterStaffPayload), not an Authorization header the way every REST
+  // call already goes through `api.request()` — so this can't reuse that
+  // encapsulated path. Not for any other consumer; api.request() remains
+  // the only sanctioned way to call the REST API.
+  getAccessToken(): string | null;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -132,7 +140,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [acceptSession, clearMemory]);
 
   return (
-    <SessionContext.Provider value={{ status, user, api, login, logout }}>
+    <SessionContext.Provider
+      value={{ status, user, api, login, logout, getAccessToken: () => accessToken }}
+    >
       {children}
     </SessionContext.Provider>
   );

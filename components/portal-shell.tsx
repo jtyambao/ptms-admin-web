@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  PhoneCall,
   Settings,
   Sun,
   User,
@@ -52,13 +53,19 @@ const links = [
   // page itself shows a clear "your role cannot manage settings" message
   // for anything other than org_admin/super_admin.
   { href: '/settings', label: 'Settings', icon: Settings, active: 'settings' as const },
+  // Voice/video call groundwork (item 4b) — same always-shown-nav/gate-
+  // inside-page convention as Accounts/Settings above; the page itself
+  // shows "not yet enabled" when NEXT_PUBLIC_CALLS_ENABLED is off (the
+  // default), which it is everywhere until someone deliberately flips it
+  // for testing.
+  { href: '/calls', label: 'Calls', icon: PhoneCall, active: 'calls' as const },
 ];
 export function PortalShell({
   active,
   children,
   siteName,
 }: {
-  active: 'dashboard' | 'sites' | 'accounts' | 'settings' | 'account';
+  active: 'dashboard' | 'sites' | 'accounts' | 'settings' | 'account' | 'calls';
   children: ReactNode;
   siteName?: string;
 }) {
