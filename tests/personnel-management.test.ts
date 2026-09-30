@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
+  canManageOic,
   canManagePersonnel,
   canViewPersonnel,
   generatePersonnelMpin,
@@ -44,6 +45,20 @@ test('management controls are limited to Supervisor, Site Admin, and Admin', () 
   assert.equal(canManagePersonnel('super_admin'), false);
 });
 
+// Policy alignment (user-requested 2026-09-30, PTMS_FINAL_ROLE_
+// PERMISSION_POLICY.md §14): Supervisor is view-only for OIC — matches
+// site-assignments.service.ts's handoverOic/regenerateSiteCredential
+// requireRole exactly. Narrower than canManagePersonnel (Supervisor keeps
+// Personnel create/deactivate, unaffected).
+test('OIC handover/Site MPIN regeneration is limited to Site Admin, Admin, and Super Admin — Supervisor is view-only', () => {
+  assert.equal(canManageOic('site_admin'), true);
+  assert.equal(canManageOic('admin'), true);
+  assert.equal(canManageOic('super_admin'), true);
+  assert.equal(canManageOic('supervisor'), false);
+  assert.equal(canManageOic('manager'), false);
+  assert.equal(canManageOic('engineer'), false);
+});
+
 // Dry-run fix (branch release/dry-run-ops): `admin` is added to
 // findAllForRequester/findOneForRequester's assignment-scoped branch on
 // the backend (read-only — canManagePersonnel above is unchanged).
@@ -55,6 +70,13 @@ test('view matches findAllForRequester exactly — super_admin/engineer/manager 
   assert.equal(canViewPersonnel('site_admin'), true);
   assert.equal(canViewPersonnel('admin'), true);
   assert.equal(canViewPersonnel('org_admin'), false);
+});
+
+test('the Assign/Change OIC button is gated by canManageOic, not the broader canManagePersonnel — Supervisor keeps Register/Delete but loses OIC handover', () => {
+  const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
+  assert.match(source, /canManageOic/);
+  assert.match(source, /const canChangeOic = !!session\.user && canManageOic\(session\.user\.role\);/);
+  assert.match(source, /\{canChangeOic && \(\s*<Button variant="outline" onClick=\{\(\) => setOicOpen\(true\)\}/);
 });
 
 test('Site Personnel UI includes safe list, create, duplicate, delete, and OIC flows', () => {

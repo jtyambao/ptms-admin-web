@@ -36,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { managementApi } from '@/lib/management-api';
 import {
+  canManageOic,
   canManagePersonnel,
   canViewPersonnel,
   generatePersonnelMpin,
@@ -84,9 +85,14 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
   // View is independent from manage: canViewPersonnel matches
   // PersonnelService.findAllForRequester() (super_admin/engineer/manager
   // org-wide, supervisor/site_admin assigned-site — server-scoped either
-  // way), while only canManagePersonnel's narrower supervisor/site_admin
-  // pair gets the create/deactivate/OIC/MPIN actions gated by `allowed`.
+  // way), while canManagePersonnel's narrower supervisor/site_admin/admin
+  // trio gets the create/deactivate actions gated by `allowed`. OIC
+  // handover has its own, narrower gate — canManageOic below — since
+  // Supervisor is view-only for OIC (policy alignment, 2026-09-30):
+  // Supervisor still sees the current OIC (gated by `canView`, unchanged)
+  // but no longer gets the button to change it.
   const canView = !!session.user && canViewPersonnel(session.user.role);
+  const canChangeOic = !!session.user && canManageOic(session.user.role);
   const currentOicId = staffing?.oic?.personnel_id ?? null;
 
   const refreshPersonnel = useCallback(async () => {
@@ -296,15 +302,15 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
           <Button variant="outline" onClick={() => void refreshPersonnel()} disabled={loading}>
             <RefreshCw className={loading ? 'animate-spin' : ''} /> Refresh
           </Button>
+          {canChangeOic && (
+            <Button variant="outline" onClick={() => setOicOpen(true)} disabled={activePersonnel.length === 0}>
+              <ShieldCheck /> {staffing?.oic ? 'Change OIC' : 'Assign OIC'}
+            </Button>
+          )}
           {allowed && (
-            <>
-              <Button variant="outline" onClick={() => setOicOpen(true)} disabled={activePersonnel.length === 0}>
-                <ShieldCheck /> {staffing?.oic ? 'Change OIC' : 'Assign OIC'}
-              </Button>
-              <Button className="bg-[#f36f0a] text-white hover:bg-[#d95e00]" onClick={() => setCreateOpen(true)}>
-                <Plus /> Register Personnel
-              </Button>
-            </>
+            <Button className="bg-[#f36f0a] text-white hover:bg-[#d95e00]" onClick={() => setCreateOpen(true)}>
+              <Plus /> Register Personnel
+            </Button>
           )}
         </div>
       </div>
