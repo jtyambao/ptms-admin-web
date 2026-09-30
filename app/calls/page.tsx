@@ -1,46 +1,96 @@
 'use client';
 
-import { AlertTriangle, PhoneCall, ShieldAlert } from 'lucide-react';
+import {
+  AlertTriangle,
+  Mic,
+  MicOff,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  ShieldAlert,
+  Video,
+  VideoOff,
+  Volume2,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ApiRequestError } from '@/lib/authenticated-api';
 import { callsFeatureEnabled } from '@/lib/calls-feature';
 import { useCallsSocket, type CallsSocketStatus } from '@/lib/calls-socket';
+import { loadCallableSites, type CallableSite } from '@/lib/calls-contacts';
+import { managementApi } from '@/lib/management-api';
+import { describeEndReason } from '@/lib/webrtc/call-session';
+import { useCallSession } from '@/lib/webrtc/use-call-session';
+import { Ringtone } from '@/lib/webrtc/ringtone';
+import type { CallsSignalingClient, CallType, SignalingEvent } from '@/lib/webrtc/signaling-client';
+import { useSession } from '@/lib/session-provider';
 
 /**
- * Voice/video call GROUNDWORK ONLY (item 4b, user-requested 2026-09-30).
+ * Voice/video calls (item A, 2026-09-30 — full build on top of item 4b's
+ * groundwork). Flag still OFF everywhere until a real device test passes
+ * (see lib/calls-feature.ts) — NOTHING in this feature has been run
+ * against a real Guard device, or even against the gateway from a real
+ * browser session. Read every "Registered"/"Connected" status here as
+ * "the handshake completed," never as proof the feature works.
  *
- * DESIGN + ESTIMATE, against the already-merged Socket.IO signaling
- * gateway (src/calls/calls.gateway.ts, PR #1):
+ * PROTOCOL, verified 2026-09-30 directly against BOTH the backend gateway
+ * (src/calls/calls.gateway.ts, PR #1) AND the Guard app's own client
+ * (ptms-guard-app-v1.1-volume-worktree's src/webrtc/signalingClient.ts +
+ * useCallSession.ts) so this interoperates with the real other side, not
+ * just the backend's own types:
  *
- * The gateway already implements the full signaling contract this page
- * would need: `register` (staff, by JWT) / `register:ok` / `register:error`,
- * `call:invite` / `call:accept` / `call:decline` / `call:ringing` /
- * `call:error`, `sdp:offer` / `sdp:answer` / `ice:candidate`,
- * `call:connected` / `call:end`. A staff caller places a call by emitting
- * `call:invite` with a target `siteId` (and, once a contact picker exists,
- * a `targetSiteDeviceId` — see calls.gateway.ts's own comment: today it
- * fans out to every guard device at the site and the first accept wins).
- * WebRTC media (getUserMedia + RTCPeerConnection, STUN-only in Phase 1,
- * per calls.gateway.ts's own header comment) is a BROWSER capability this
- * repo has never exercised at all — the Guard app's own ICE config
- * (public STUN, no TURN) is the only precedent to follow.
+ * - register: { role:'staff', accessToken } -> register:ok/register:error.
+ *   Re-sent on every reconnect (lib/webrtc/signaling-client.ts).
+ * - Outgoing: call:invite({ callType, siteId }) fans out to EVERY
+ *   connected guard device at that site — there is NO per-device staff
+ *   targeting (targetSiteDeviceId is guard-only). The caller gets
+ *   call:ringing{callId,callType} back, then call:accept{callId} once
+ *   any candidate answers (first to accept wins; losers/no-answer
+ *   collapse to the same generic call:error{message} — "busy",
+ *   "no one online", and "unauthorized" are indistinguishable by design,
+ *   see calls.gateway.ts's own comment).
+ * - Incoming: call:invite{callId,callType,from} — `from` is only
+ *   'guard'|'staff', there is NO caller identity (site/device) in this
+ *   payload at all (a real gap in the current backend, not a client bug —
+ *   the server already resolves the caller's siteId/siteDeviceId, it's
+ *   just never included in what gets emitted to candidates).
+ * - Once accepted: sdp:offer/sdp:answer/ice:candidate relay, silently
+ *   dropped server-side before call:accept completes — never send SDP
+ *   before observing accept (lib/webrtc/call-session.ts enforces this).
+ *   ICE candidates arriving before the remote description is set are
+ *   queued and flushed right after, matching the Guard app exactly.
+ * - call:connected is a LOCAL "my WebRTC finished connecting" signal
+ *   relayed for UI purposes only — either side's own ICE connect or the
+ *   peer's relayed signal flips the UI to Connected, whichever is first.
+ * - ICE servers: STUN-only ({ urls:'stun:stun.l.google.com:19302' }), no
+ *   TURN server exists anywhere in this system yet (Phase 1, matches the
+ *   Guard app's own iceConfig.ts exactly — see lib/webrtc/ice-config.ts).
+ *   A call between two clients behind restrictive/symmetric NATs (common
+ *   on mobile carrier networks) can simply fail to connect with nothing
+ *   client-side able to fix it — if that turns out to matter in practice,
+ *   the user would need to provision a TURN server (e.g. coturn) and its
+ *   credentials would need adding on BOTH this client and the Guard app.
+ * - A WebRTC 'disconnected' state gets an 8s grace period before treating
+ *   it as a real end (matches the Guard app), 'failed' ends immediately.
+ * - Call log: call_sessions is written ONLY for the Guard-device side of
+ *   a call (site_device_id-keyed) — there is no staff-facing call-log
+ *   read endpoint and this feature does not add one. A call Admin Web
+ *   places/receives is therefore not recorded anywhere staff can browse
+ *   later; the Guard side of it still shows in that device's own
+ *   Call Log as usual.
  *
- * Rough estimate for the REMAINING work beyond this page (a contact/site
- * picker, WebRTC media + peer connection wiring, a ringing/in-call/ended
- * UI, and a real two-device test — one browser tab, one physical Guard
- * phone): 3-5 focused days, most of it the WebRTC media path and its
- * physical-device verification, not the signaling (already built).
- *
- * WHAT THIS PAGE ACTUALLY IS: only the two lowest-risk, most mechanical
- * pieces of that — a socket CONNECTION using the staff JWT
- * (lib/calls-socket.ts) and this call-state UI SHELL — both behind
- * lib/calls-feature.ts's flag, OFF by default. Nothing here places or
- * receives a call. NEITHER PIECE HAS BEEN RUN AGAINST A REAL GUARD DEVICE,
- * or even against the gateway from a real browser — do not read a
- * "Registered" status below as proof this works end-to-end; it only means
- * the socket handshake itself completed.
+ * WHAT STILL NEEDS A REAL DEVICE TEST (an A72 or similar + a real
+ * browser) before this flag can ever go on for real use: the full
+ * register -> invite -> accept -> SDP/ICE -> connected round trip
+ * end-to-end; whether STUN alone is enough on the actual networks guards
+ * use; audio/video quality and echo; the 8s disconnect grace period
+ * against a real flaky connection; and the incoming-call ringtone/
+ * click-to-enable flow on an actual second monitor or tab a dispatcher
+ * would realistically be watching.
  */
 
 const STATUS_LABEL: Record<CallsSocketStatus, string> = {
@@ -59,9 +109,223 @@ const STATUS_VARIANT: Record<CallsSocketStatus, 'secondary' | 'outline' | 'destr
   error: 'destructive',
 };
 
+type ActiveCall = { callId: string; callType: CallType; direction: 'outgoing' | 'incoming' };
+type IncomingInvite = { callId: string; callType: CallType };
+
+function IncomingCallOverlay({
+  invite,
+  soundEnabled,
+  onEnableSound,
+  onAccept,
+  onDecline,
+}: {
+  invite: IncomingInvite;
+  soundEnabled: boolean;
+  onEnableSound: () => void;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PhoneCall className="size-5 text-[#f36f0a]" />
+            Incoming {invite.callType === 'video' ? 'video' : 'voice'} call
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            From a Guard device. The signaling protocol does not carry which site or device is
+            calling (a known backend gap — see this page&apos;s own design note).
+          </p>
+          {!soundEnabled && (
+            <Button type="button" variant="outline" className="w-full" onClick={onEnableSound}>
+              <Volume2 />Enable ringtone sound
+            </Button>
+          )}
+          <div className="flex gap-3">
+            <Button type="button" variant="destructive" className="flex-1" onClick={onDecline}>
+              <PhoneOff />Decline
+            </Button>
+            <Button type="button" className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700" onClick={onAccept}>
+              <Phone />Accept
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function InCallPanel({
+  call,
+  client,
+  onEnded,
+}: {
+  call: ActiveCall;
+  client: CallsSignalingClient | null;
+  onEnded: () => void;
+}) {
+  const { state, toggleMute, toggleCamera, hangUp } = useCallSession(client, call);
+
+  useEffect(() => {
+    if (state?.phase === 'ended') {
+      const timer = window.setTimeout(onEnded, 2500);
+      return () => window.clearTimeout(timer);
+    }
+  }, [state?.phase, onEnded]);
+
+  if (!state) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <PhoneCall className="size-4 text-[#f36f0a]" />
+          {call.callType === 'video' ? 'Video' : 'Voice'} call — {call.direction}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Badge variant={state.phase === 'connected' ? 'secondary' : 'outline'}>
+          {state.phase === 'ringing' && 'Ringing…'}
+          {state.phase === 'connecting' && 'Connecting…'}
+          {state.phase === 'connected' && 'Connected'}
+          {state.phase === 'ended' && `Ended — ${describeEndReason(state.endReason)}`}
+        </Badge>
+        {state.error && <p className="text-sm text-red-700 dark:text-red-400">{state.error}</p>}
+
+        {call.callType === 'video' && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <video
+              autoPlay
+              playsInline
+              muted
+              ref={(el) => {
+                if (el && state.localStream) el.srcObject = state.localStream;
+              }}
+              className="aspect-video w-full rounded-lg bg-black"
+            />
+            <video
+              autoPlay
+              playsInline
+              ref={(el) => {
+                if (el && state.remoteStream) el.srcObject = state.remoteStream;
+              }}
+              className="aspect-video w-full rounded-lg bg-black"
+            />
+          </div>
+        )}
+
+        {state.phase !== 'ended' && (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={toggleMute}>
+              {state.muted ? <MicOff /> : <Mic />}
+              {state.muted ? 'Unmute' : 'Mute'}
+            </Button>
+            {call.callType === 'video' && (
+              <Button type="button" variant="outline" onClick={toggleCamera}>
+                {state.cameraOff ? <VideoOff /> : <Video />}
+                {state.cameraOff ? 'Camera on' : 'Camera off'}
+              </Button>
+            )}
+            <Button type="button" variant="destructive" onClick={hangUp}>
+              <PhoneOff />End call
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CallsShell() {
   const enabled = callsFeatureEnabled();
-  const { status, error } = useCallsSocket(enabled);
+  const session = useSession();
+  const { status, error, client } = useCallsSocket(enabled);
+
+  const [sites, setSites] = useState<CallableSite[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(false);
+  const [sitesError, setSitesError] = useState('');
+  const [dialSiteId, setDialSiteId] = useState<number | null>(null);
+  const [dialCallType, setDialCallType] = useState<CallType>('voice');
+  const [dialing, setDialing] = useState(false);
+  const [dialError, setDialError] = useState('');
+
+  const [incomingInvite, setIncomingInvite] = useState<IncomingInvite | null>(null);
+  const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  const [ringtone] = useState(() => new Ringtone());
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
+  const refreshSites = useCallback(async () => {
+    if (session.status !== 'authenticated') return;
+    setSitesLoading(true);
+    try {
+      const allSites = await managementApi.listSites(session.api);
+      setSites(await loadCallableSites(session.api, allSites));
+      setSitesError('');
+    } catch (reason) {
+      setSitesError(reason instanceof ApiRequestError ? reason.message : 'Sites could not be loaded.');
+    } finally {
+      setSitesLoading(false);
+    }
+  }, [session.api, session.status]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = window.setTimeout(() => void refreshSites(), 0);
+    return () => window.clearTimeout(timer);
+  }, [enabled, refreshSites]);
+
+  // Top-level signaling events — an incoming invite (only while not
+  // already on a call; the server's own busy backstop means we simply
+  // won't receive a second one otherwise) and the caller-only events for
+  // OUR OWN outgoing dial (call:ringing carries the server-assigned
+  // callId; there is at most one dial in flight at a time, since the
+  // dial button disables itself while dialing).
+  useEffect(() => {
+    if (!client) return;
+    return client.on((event: SignalingEvent) => {
+      if (event.type === 'invite' && !activeCall && !incomingInvite) {
+        setIncomingInvite({ callId: event.callId, callType: event.callType });
+        ringtone.start();
+      } else if (event.type === 'ringing' && dialing && !activeCall) {
+        setActiveCall({ callId: event.callId, callType: event.callType, direction: 'outgoing' });
+        setDialing(false);
+      } else if (event.type === 'error' && dialing && !activeCall) {
+        setDialError(event.message);
+        setDialing(false);
+      }
+    });
+  }, [client, activeCall, incomingInvite, dialing, ringtone]);
+
+  useEffect(() => () => ringtone.dispose(), [ringtone]);
+
+  function enableSound() {
+    void ringtone.enableSound().then(() => setSoundEnabled(true));
+  }
+
+  function acceptIncoming() {
+    if (!incomingInvite || !client) return;
+    ringtone.stop();
+    client.accept(incomingInvite.callId);
+    setActiveCall({ callId: incomingInvite.callId, callType: incomingInvite.callType, direction: 'incoming' });
+    setIncomingInvite(null);
+  }
+
+  function declineIncoming() {
+    if (!incomingInvite || !client) return;
+    ringtone.stop();
+    client.decline(incomingInvite.callId);
+    setIncomingInvite(null);
+  }
+
+  function placeCall() {
+    if (!client || dialSiteId === null) return;
+    setDialError('');
+    setDialing(true);
+    client.invite(dialSiteId, dialCallType);
+  }
 
   if (!enabled) {
     return (
@@ -70,8 +334,8 @@ function CallsShell() {
         <h2 className="mt-1 text-xl font-black">Calls</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
           <ShieldAlert className="size-4 shrink-0" />
-          Not yet enabled. This is untested groundwork only — see the design note in this page&apos;s
-          own source for what exists and what is still missing.
+          Not yet enabled. This is untested groundwork — see the design note in this page&apos;s
+          own source for the full protocol and what still needs a real device test.
         </p>
       </section>
     );
@@ -86,9 +350,8 @@ function CallsShell() {
 
       <p className="flex gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
         <AlertTriangle className="size-4 shrink-0" />
-        Untested groundwork. This connects a socket and completes the staff registration
-        handshake only — it does not place or receive calls, and has never been tried against a
-        real Guard device.
+        Untested against a real device or browser session — see this page&apos;s own design note
+        for exactly what has and hasn&apos;t been verified.
       </p>
 
       <Card>
@@ -105,6 +368,67 @@ function CallsShell() {
           </div>
         </CardContent>
       </Card>
+
+      {activeCall ? (
+        <InCallPanel call={activeCall} client={client} onEnded={() => setActiveCall(null)} />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Call a Site</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              A call fans out to every connected Guard device at the chosen Site — there is no
+              per-device targeting from Admin Web (only a Guard can call a specific device).
+            </p>
+            {sitesError && <p className="text-sm text-red-700 dark:text-red-400">{sitesError}</p>}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <select
+                className="h-10 rounded-lg border bg-background px-3"
+                value={dialSiteId ?? ''}
+                onChange={(e) => setDialSiteId(e.target.value ? Number(e.target.value) : null)}
+                disabled={sitesLoading || dialing}
+              >
+                <option value="">{sitesLoading ? 'Loading Sites…' : 'Select a Site'}</option>
+                {sites.map((site) => (
+                  <option key={site.siteId} value={site.siteId}>
+                    {site.siteName} — {site.onlineDeviceCount}/{site.activeDeviceCount} online
+                    {site.oicName ? ` · OIC: ${site.oicName}` : ''}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="h-10 rounded-lg border bg-background px-3"
+                value={dialCallType}
+                onChange={(e) => setDialCallType(e.target.value as CallType)}
+                disabled={dialing}
+              >
+                <option value="voice">Voice</option>
+                <option value="video">Video</option>
+              </select>
+            </div>
+            {dialError && <p className="text-sm text-red-700 dark:text-red-400">{dialError}</p>}
+            <Button
+              type="button"
+              onClick={placeCall}
+              disabled={dialSiteId === null || dialing || status !== 'registered'}
+              className="bg-[#f36f0a] text-white hover:bg-[#d95e00]"
+            >
+              <Phone />{dialing ? 'Calling…' : 'Call'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {incomingInvite && (
+        <IncomingCallOverlay
+          invite={incomingInvite}
+          soundEnabled={soundEnabled}
+          onEnableSound={enableSound}
+          onAccept={acceptIncoming}
+          onDecline={declineIncoming}
+        />
+      )}
     </section>
   );
 }

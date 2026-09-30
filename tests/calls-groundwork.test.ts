@@ -34,15 +34,15 @@ test('the Calls page shows a plain "not yet enabled" message when the flag is of
   assert.match(source, /Not yet enabled/);
 });
 
-test('the Calls page is honest about being untested groundwork, not a working feature', () => {
+test('the Calls page is honest that nothing here has been run against a real device or browser session', () => {
   const source = readFileSync('app/calls/page.tsx', 'utf8');
-  assert.match(source, /untested groundwork/i);
-  assert.match(source, /never been (tried|run) against a[\s\S]{0,20}real Guard device/i);
+  assert.match(source, /untested (groundwork|against a real device)/i);
+  assert.match(source, /has been run[\s\S]{0,20}against a real Guard device/i);
 });
 
 test('the socket registers as staff using the real access token, matching CallsGateway\'s RegisterStaffPayload contract', () => {
-  const source = readFileSync('lib/calls-socket.ts', 'utf8');
-  assert.match(source, /socket\.emit\('register', \{ role: 'staff', accessToken \}\)/);
+  const source = readFileSync('lib/webrtc/signaling-client.ts', 'utf8');
+  assert.match(source, /this\.socket\.emit\('register', \{ role: 'staff', accessToken \}\)/);
   assert.match(source, /register:ok/);
   assert.match(source, /register:error/);
 });
