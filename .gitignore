@@ -26,8 +26,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# local environment
-.env*
+# local environment — .env.example is intentionally NOT matched here, it
+# documents the required vars for a fresh clone and holds no secrets.
+.env
+.env.local
+.env.*.local
 
 # deployment and generated files
 .vercel
@@ -36,3 +39,12 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# TypeScript incremental build cache — machine-local, regenerated on build.
+*.tsbuildinfo
+
+# Untracked 2026-09-30 (branch feat/remaining-four) — unused, unreferenced
+# by any code or the current README: an early full-source snapshot and a
+# one-off design reference image. Left on disk, just no longer tracked.
+/ptms-admin-web-source.zip
+/public/reference/

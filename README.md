@@ -1,16 +1,61 @@
 # PTMS Admin Web
 
-Isolated browser-based admin portal for PTMS. The existing API and Guard App are references only and are not modified by this project.
+Browser-based admin portal for PTMS — Sites, Personnel, OIC assignment,
+Rounds/schedules, Operational Settings, Incidents/SOS/Reports, and Accounts.
+Talks to the PTMS backend API only; it does not modify the backend or the
+Guard mobile app.
 
-## Current safety posture
+## Requirements
 
-- Live API use is limited to `GET /api/v1/sites`.
-- Owner/Engineer login is implemented as a UI foundation but deliberately blocked because the current login endpoint updates `last_login_at`.
-- All create, assignment, handover, update, and deactivate controls remain disabled.
-- See `BACKEND_GAPS.md` before enabling writes.
+- Node.js >= 22.13.0 (see `package.json` `engines`)
+- The backend API reachable at the URL in `.env` (see below)
 
-## Local use
+## Local development
 
-Copy `.env.example` to `.env.local` only if a different API base URL is needed, then run `npm run dev`.
+```bash
+cp .env.example .env.local   # only if you need a different API base URL
+npm install
+npm run dev                  # vinext dev, http://localhost:3000
+```
 
-The approved Theme Option B reference is stored at `public/reference/theme-option-b.png`.
+`.env.example` documents the two variables the app reads:
+
+- `NEXT_PUBLIC_PTMS_API_BASE_URL` — the backend API's base URL.
+- `NEXT_PUBLIC_PTMS_WRITES_ENABLED` — safety gate for write operations.
+
+## Tests
+
+```bash
+npm test    # node --test --experimental-strip-types tests/*.test.ts
+```
+
+## Build and deploy
+
+```bash
+npm run build   # vinext build
+npm run deploy  # vinext build && wrangler deploy --config dist/server/wrangler.json --name ptms-admin
+```
+
+Deploys to Cloudflare Workers (`wrangler` must already be logged in). The
+deployed instance runs at https://ptms-admin.jtyambao.workers.dev.
+
+## Known framework quirk: vinext client-side routing
+
+vinext 1.0.0-beta.5's production client router throws on `<Link>` clicks
+(`navigateClientSide is not a function`). Worked around in
+[`app/layout.tsx`](app/layout.tsx) with a capture-phase click handler that
+forces a normal full-page `location.assign()` navigation for any same-origin
+link, instead of client-side navigation. If vinext fixes this upstream, that
+handler can be removed.
+
+Relatedly, `next/font/google` bakes the build machine's own absolute
+filesystem path into production output on this framework — fonts use the
+system font stack instead (see `app/layout.tsx`'s own comment) rather than
+`next/font`, to avoid that whole bug class.
+
+## Repository layout notes
+
+- `.openai/hosting.json` — scaffold metadata from this project's initial
+  setup (Cloudflare D1/R2 bindings, both unused/null here). Keep it tracked.
+- `tsconfig.tsbuildinfo` — TypeScript's incremental build cache, gitignored
+  (machine-local, regenerated automatically).
