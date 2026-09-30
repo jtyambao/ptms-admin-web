@@ -32,17 +32,13 @@ test('Generate produces a six-digit MPIN through secure-random architecture', ()
   assert.equal(generatePersonnelMpin.toString().includes('Math.random'), false);
 });
 
-// Batch 3 correction (2026-09-26): reverted a 2026-09-24 edit that assumed
-// the future five-role design (Admin-only) was already live in production.
-// Verified against a fresh origin/main read
-// (personnel.service.ts create/deactivate): still exactly
-// `supervisor || site_admin` — `manager` explicitly forbidden, and the
-// bare `admin` role (migration 034) is NOT yet recognized here at all (a
-// real, current backend gap, not something to paper over).
-test('management controls are limited to Supervisor and Site Admin', () => {
+// P0 fix (branch feat/admin-oic-management, backend commit b361c65) —
+// `admin` added to personnel.service.ts's write authority (own assigned
+// Site), matching PTMS_FINAL_ROLE_PERMISSION_POLICY.md's OIC section.
+test('management controls are limited to Supervisor, Site Admin, and Admin', () => {
   assert.equal(canManagePersonnel('supervisor'), true);
   assert.equal(canManagePersonnel('site_admin'), true);
-  assert.equal(canManagePersonnel('admin'), false);
+  assert.equal(canManagePersonnel('admin'), true);
   assert.equal(canManagePersonnel('manager'), false);
   assert.equal(canManagePersonnel('engineer'), false);
   assert.equal(canManagePersonnel('super_admin'), false);
@@ -61,13 +57,13 @@ test('view matches findAllForRequester exactly — super_admin/engineer/manager 
   assert.equal(canViewPersonnel('org_admin'), false);
 });
 
-test('Site Personnel UI includes safe list, create, duplicate, deactivate, and OIC flows', () => {
+test('Site Personnel UI includes safe list, create, duplicate, delete, and OIC flows', () => {
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
   assert.match(source, /Personnel and OIC/);
   assert.match(source, /Register Personnel/);
   assert.match(source, /This MPIN is already in use at this Site/);
-  assert.match(source, /Deactivate Personnel\?/);
-  assert.match(source, /Complete the OIC handover before deactivating/);
+  assert.match(source, /Delete Personnel\?/);
+  assert.match(source, /Hand over OIC to someone else before deleting/);
   assert.match(source, /Change OIC|Assign OIC/);
   assert.match(source, /person\.status === 'active'/);
   assert.match(source, /setMpin\(''\)/);
@@ -76,9 +72,18 @@ test('Site Personnel UI includes safe list, create, duplicate, deactivate, and O
   assert.doesNotMatch(source, /Math\.random/);
 });
 
+// P0 (branch feat/admin-oic-management) — same "Delete = deactivate +
+// hide behind Show deleted, history kept" pattern as Checkpoints/Devices.
+test('Deleted Personnel are hidden by default behind a Show deleted toggle, same pattern as Checkpoints/Devices', () => {
+  const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
+  assert.match(source, /showDeleted/);
+  assert.match(source, /Show deleted \(\$\{personnel\.filter\(\(p\) => p\.status !== 'active'\)\.length\}\)/);
+  assert.match(source, /\(showDeleted \? personnel : personnel\.filter\(\(p\) => p\.status === 'active'\)\)\.map/);
+});
+
 test('Personnel list never renders an MPIN or hash field', () => {
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
-  const listStart = source.indexOf('personnel.map');
+  const listStart = source.indexOf('const isOic = person.id === currentOicId;');
   const listEnd = source.indexOf('<Dialog open={createOpen}');
   const listSource = source.slice(listStart, listEnd);
   assert.ok(listStart > -1 && listEnd > listStart);

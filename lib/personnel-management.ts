@@ -11,19 +11,13 @@ export function generatePersonnelMpin(
   return String(100000 + (value[0] % 900000));
 }
 
-// Batch 3 correction (2026-09-26): reverted a 2026-09-24 edit that narrowed
-// this to Admin-only on the mistaken premise that the future five-role
-// design (where Admin owns day-to-day Site administration) was already
-// CURRENT PRODUCTION TECHNICAL RBAC. Verified against a fresh origin/main
-// read (personnel.service.ts create/deactivate): still exactly
-// `supervisor || site_admin` — `manager` is explicitly forbidden
-// ("Managers cannot create/deactivate personnel"), and the bare `admin`
-// role (migration 034) is NOT yet recognized by personnel.service.ts at
-// all — a real, current backend gap (only site-operational-access.service.ts
-// and site-assignments.service.ts's createSiteAdminAccount were updated for
-// `admin` so far), not something to paper over here by adding it anyway.
+// P0 fix (branch feat/admin-oic-management, backend commit b361c65) —
+// `admin` added. personnel.service.ts's resolvePersonnelWriteOrganization/
+// deactivateForRequester and site-assignments.service.ts's handoverOic
+// all now recognize `admin`, assignment-scoped to its own Site exactly
+// like supervisor/site_admin. `manager` remains explicitly forbidden.
 export const canManagePersonnel = (role: UserRole) =>
-  role === 'supervisor' || role === 'site_admin';
+  role === 'supervisor' || role === 'site_admin' || role === 'admin';
 
 // View mirrors findAllForRequester's real role branches exactly
 // (personnel.service.ts) — broader than canManagePersonnel's narrower

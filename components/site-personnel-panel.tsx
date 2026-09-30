@@ -65,6 +65,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
   const [selectedOic, setSelectedOic] = useState('');
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<Personnel | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [regenerateTarget, setRegenerateTarget] = useState<Personnel | null>(null);
   // The one-time plaintext MPIN, held only in memory for as long as its
   // display dialog is open — never persisted, never re-requested.
@@ -174,12 +175,12 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
       await managementApi.deactivatePersonnel(session.api, deactivateTarget.id);
       setDeactivateTarget(null);
       await refreshPersonnel();
-      setSuccess('Personnel deactivated. Historical records remain available.');
+      setSuccess('Personnel deleted. Historical records remain available.');
     } catch (reason) {
       setDeactivateTarget(null);
       setError(
         reason instanceof ApiRequestError && reason.status === 409
-          ? 'This Personnel is currently the active OIC. Complete the OIC handover before deactivating this Personnel.'
+          ? 'This Personnel is currently the active OIC. Hand over OIC to someone else before deleting this Personnel.'
           : reason instanceof ApiRequestError
             ? reason.message
             : genericError,
@@ -330,10 +331,21 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
           </div>
         ) : (
           <div className="divide-y">
-            {personnel.map((person) => {
+            {/* Delete = deactivate + hide behind "Show deleted" (P0, branch
+                feat/admin-oic-management) — same pattern as Checkpoints/
+                Devices: full history is kept, this only changes what's
+                visible by default. */}
+            {personnel.some((p) => p.status !== 'active') && (
+              <div className="px-5 py-3 text-right">
+                <Button variant="ghost" size="sm" onClick={() => setShowDeleted((v) => !v)}>
+                  {showDeleted ? 'Hide deleted' : `Show deleted (${personnel.filter((p) => p.status !== 'active').length})`}
+                </Button>
+              </div>
+            )}
+            {(showDeleted ? personnel : personnel.filter((p) => p.status === 'active')).map((person) => {
               const isOic = person.id === currentOicId;
               return (
-                <div key={person.id} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:px-5">
+                <div key={person.id} className={`flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:px-5 ${person.status === 'active' ? '' : 'opacity-60'}`}>
                   <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-orange-100 text-[#e86405] dark:bg-orange-500/15">
                     {isOic ? <ShieldCheck /> : <UserRound />}
                   </div>
@@ -341,7 +353,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-bold">{person.full_name}</p>
                       {isOic && <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200">Current OIC</Badge>}
-                      <Badge variant={person.status === 'active' ? 'secondary' : 'outline'}>{person.status}</Badge>
+                      <Badge variant={person.status === 'active' ? 'secondary' : 'outline'}>{person.status === 'active' ? 'Active' : 'Deleted'}</Badge>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">Personnel record · MPIN protected</p>
                   </div>
@@ -357,7 +369,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
                       </Button>
                       <span className="text-xs text-muted-foreground">Not available yet</span>
                       <Button variant="destructive" onClick={() => setDeactivateTarget(person)}>
-                        <UserRoundX /> Deactivate
+                        <UserRoundX /> Delete
                       </Button>
                     </div>
                   )}
@@ -435,15 +447,17 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
       <AlertDialog open={!!deactivateTarget} onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate Personnel?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Personnel?</AlertDialogTitle>
             <AlertDialogDescription>
-              This Personnel will no longer be able to sign in using the assigned MPIN. Historical records will remain.
+              {deactivateTarget?.full_name} will no longer be able to sign in using the assigned MPIN.
+              It will be hidden from this list by default (turn on &quot;Show deleted&quot; to see it) —
+              historical records are kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
             <AlertDialogAction variant="destructive" disabled={saving} onClick={() => void deactivatePersonnel()}>
-              {saving ? 'Deactivating…' : 'Deactivate'}
+              {saving ? 'Deleting…' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
