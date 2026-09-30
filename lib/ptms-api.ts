@@ -359,6 +359,13 @@ export type ManagedRound = {
   tap_window_seconds: number | null;
   window_start_time: string | null;
   window_end_time: string | null;
+  // P1 weekly/monthly recurrence (branch feat/admin-oic-management,
+  // backend sql/048) — days_of_week bitmask Mon=1 (bit 0) .. Sun=64 (bit
+  // 6); day_of_month 1-31, clamped server-side to a shorter month's last
+  // day. Mutually exclusive; both null means every day (unchanged
+  // behavior for every Round created before this feature existed).
+  days_of_week: number | null;
+  day_of_month: number | null;
   is_active: boolean;
   stops: RoundStop[];
 };
@@ -372,6 +379,8 @@ export type SaveRoundRequest = {
   tapWindowSeconds?: number | null;
   windowStartTime?: string | null;
   windowEndTime?: string | null;
+  daysOfWeek?: number | null;
+  dayOfMonth?: number | null;
 };
 
 // Schedules visibility (branch release/dry-run-ops) — mirrors

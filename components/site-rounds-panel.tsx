@@ -135,6 +135,105 @@ function frequencyBadgeLabel(minutes: number): string {
   return minutes % 60 === 0 ? `Every ${minutes / 60} hour${minutes === 60 ? '' : 's'}` : `Every ${minutes} min`;
 }
 
+// P1 weekly/monthly recurrence (branch feat/admin-oic-management, backend
+// sql/048) — Mon=1 (bit 0) .. Sun=64 (bit 6), matching round-window.util.ts
+// exactly on the backend.
+const WEEKDAYS = [
+  { label: 'Mon', bit: 1 },
+  { label: 'Tue', bit: 2 },
+  { label: 'Wed', bit: 4 },
+  { label: 'Thu', bit: 8 },
+  { label: 'Fri', bit: 16 },
+  { label: 'Sat', bit: 32 },
+  { label: 'Sun', bit: 64 },
+] as const;
+
+type DaysMode = 'every_day' | 'weekdays' | 'monthly';
+
+function daysModeFor(daysOfWeek: string, dayOfMonth: string): DaysMode {
+  if (dayOfMonth.trim() !== '') return 'monthly';
+  if (daysOfWeek.trim() !== '') return 'weekdays';
+  return 'every_day';
+}
+
+function DaysField({ daysOfWeek, dayOfMonth, onChange }: {
+  daysOfWeek: string;
+  dayOfMonth: string;
+  onChange: (v: { daysOfWeek: string; dayOfMonth: string }) => void;
+}) {
+  const mode = daysModeFor(daysOfWeek, dayOfMonth);
+  const mask = Number(daysOfWeek) || 0;
+
+  function setMode(next: DaysMode) {
+    if (next === 'every_day') onChange({ daysOfWeek: '', dayOfMonth: '' });
+    else if (next === 'weekdays') onChange({ daysOfWeek: mask > 0 ? String(mask) : '0', dayOfMonth: '' });
+    else onChange({ daysOfWeek: '', dayOfMonth: dayOfMonth || '1' });
+  }
+
+  function toggleDay(bit: number) {
+    const next = mask & bit ? mask & ~bit : mask | bit;
+    onChange({ daysOfWeek: String(next), dayOfMonth: '' });
+  }
+
+  return (
+    <div className="grid gap-2 lg:col-span-2">
+      <label htmlFor="round-days-mode" className="font-bold">Days</label>
+      <select
+        id="round-days-mode"
+        className="h-10 rounded-lg border bg-background px-3 font-normal"
+        value={mode}
+        onChange={(e) => setMode(e.target.value as DaysMode)}
+      >
+        <option value="every_day">Every day</option>
+        <option value="weekdays">Pick weekdays</option>
+        <option value="monthly">Monthly on a specific day</option>
+      </select>
+
+      {mode === 'weekdays' && (
+        <div className="flex flex-wrap gap-2">
+          {WEEKDAYS.map((d) => (
+            <button
+              key={d.bit}
+              type="button"
+              onClick={() => toggleDay(d.bit)}
+              className={`h-9 rounded-lg border px-3 text-sm font-bold ${mask & d.bit ? 'border-transparent bg-[#f36f0a] text-white' : 'bg-background'}`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {mode === 'weekdays' && mask === 0 && (
+        <p className="text-xs text-red-700 dark:text-red-400">Select at least one day.</p>
+      )}
+
+      {mode === 'monthly' && (
+        <label htmlFor="round-day-of-month" className="grid gap-2 text-sm font-normal text-muted-foreground">
+          Day of month
+          <input
+            id="round-day-of-month"
+            type="number"
+            min={1}
+            max={31}
+            className="h-10 rounded-lg border bg-background px-3 text-foreground"
+            value={dayOfMonth}
+            onChange={(e) => onChange({ daysOfWeek: '', dayOfMonth: e.target.value })}
+          />
+          <span>A shorter month (like February) uses its own last day instead.</span>
+        </label>
+      )}
+    </div>
+  );
+}
+
+function daysBadgeLabel(round: { days_of_week: number | null; day_of_month: number | null }): string | null {
+  if (round.day_of_month) return `Day ${round.day_of_month} of month`;
+  if (round.days_of_week) {
+    return WEEKDAYS.filter((d) => round.days_of_week! & d.bit).map((d) => d.label).join(', ');
+  }
+  return null;
+}
+
 export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   const session = useSession();
   const role = session.user?.role ?? null;
@@ -199,6 +298,8 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
       end: round.window_end_time?.slice(0, 5) ?? '',
       ack: round.ack_window_seconds?.toString() ?? '',
       tap: round.tap_window_seconds?.toString() ?? '',
+      daysOfWeek: round.days_of_week ? String(round.days_of_week) : '',
+      dayOfMonth: round.day_of_month ? String(round.day_of_month) : '',
     });
     setError('');
     setEditTarget(round);
@@ -415,9 +516,10 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   );
 }
 
-// Round timing form state. Empty = organization default (seconds) or all day.
-type RoundTiming = { start: string; end: string; ack: string; tap: string };
-const emptyTiming: RoundTiming = { start: '', end: '', ack: '', tap: '' };
+// Round timing form state. Empty = organization default (seconds), all
+// day (window), or every day (days_of_week/day_of_month).
+type RoundTiming = { start: string; end: string; ack: string; tap: string; daysOfWeek: string; dayOfMonth: string };
+const emptyTiming: RoundTiming = { start: '', end: '', ack: '', tap: '', daysOfWeek: '', dayOfMonth: '' };
 
 function timingRequest(timing: RoundTiming) {
   return {
@@ -425,6 +527,8 @@ function timingRequest(timing: RoundTiming) {
     windowEndTime: timing.end || null,
     ackWindowSeconds: timing.ack ? Number(timing.ack) : null,
     tapWindowSeconds: timing.tap ? Number(timing.tap) : null,
+    daysOfWeek: timing.daysOfWeek ? Number(timing.daysOfWeek) : null,
+    dayOfMonth: timing.dayOfMonth ? Number(timing.dayOfMonth) : null,
   };
 }
 
@@ -435,6 +539,8 @@ function formatTiming(round: ManagedRound): string[] {
     : 'All day');
   if (round.ack_window_seconds) parts.push(`Due Soon ${round.ack_window_seconds}s`);
   if (round.tap_window_seconds) parts.push(`Tap all ${round.tap_window_seconds}s`);
+  const days = daysBadgeLabel(round);
+  if (days) parts.push(days);
   return parts;
 }
 
@@ -477,6 +583,11 @@ function RoundFormDialog({
               </label>
             </div>
             <p className="-mt-2 text-xs text-muted-foreground lg:col-span-2">Leave both empty to run all day. An end time earlier than the start time runs overnight (e.g. 18:00–06:00).</p>
+            <DaysField
+              daysOfWeek={timing.daysOfWeek}
+              dayOfMonth={timing.dayOfMonth}
+              onChange={(v) => setTiming({ ...timing, ...v })}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <SecondsPresetField
                 id="round-ack"
@@ -519,7 +630,12 @@ function RoundFormDialog({
           </div>
           <DialogFooter className="mt-5">
             <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-            <Button type="submit" disabled={saving || !name.trim() || selectedCheckpointIds.length === 0}>{submitLabel}</Button>
+            <Button
+              type="submit"
+              disabled={saving || !name.trim() || selectedCheckpointIds.length === 0 || (daysModeFor(timing.daysOfWeek, timing.dayOfMonth) === 'weekdays' && Number(timing.daysOfWeek) === 0)}
+            >
+              {submitLabel}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -97,3 +97,42 @@ test('the Rounds list badge shows the friendly frequency label, not the raw minu
   assert.doesNotMatch(panel, /Every \{round\.due_interval_minutes\} min/);
   assert.match(panel, /frequencyBadgeLabel\(round\.due_interval_minutes\)/);
 });
+
+// P1 "Days" control (branch feat/admin-oic-management, backend sql/048) —
+// every day / pick weekdays / monthly on day N, matching days_of_week
+// (bitmask)/day_of_month exactly.
+test('Days is a mode select with three plain-language choices, not raw bitmask/day-number inputs', () => {
+  assert.match(panel, /<option value="every_day">Every day<\/option>/);
+  assert.match(panel, /<option value="weekdays">Pick weekdays<\/option>/);
+  assert.match(panel, /<option value="monthly">Monthly on a specific day<\/option>/);
+});
+
+test('weekday picking uses named day chips (Mon..Sun), converting to the bitmask internally', () => {
+  assert.match(panel, /\{ label: 'Mon', bit: 1 \}/);
+  assert.match(panel, /\{ label: 'Sun', bit: 64 \}/);
+  assert.match(panel, /const next = mask & bit \? mask & ~bit : mask \| bit;/);
+});
+
+test('monthly mode explains the shorter-month clamp in plain language', () => {
+  assert.match(panel, /A shorter month \(like February\) uses its own last day instead\./);
+});
+
+test('picking weekdays with none selected blocks submit, matching the checkpoint-selection guard', () => {
+  assert.match(panel, /daysModeFor\(timing\.daysOfWeek, timing\.dayOfMonth\) === 'weekdays' && Number\(timing\.daysOfWeek\) === 0/);
+  assert.match(panel, /Select at least one day\./);
+});
+
+test('editing an existing Round with days_of_week/day_of_month set populates the Days control from it', () => {
+  assert.match(panel, /daysOfWeek: round\.days_of_week \? String\(round\.days_of_week\) : '',/);
+  assert.match(panel, /dayOfMonth: round\.day_of_month \? String\(round\.day_of_month\) : '',/);
+});
+
+test('the Rounds list badge shows the Days setting when one is configured', () => {
+  assert.match(panel, /function daysBadgeLabel/);
+  assert.match(panel, /Day \$\{round\.day_of_month\} of month/);
+});
+
+test('createRound/updateRound requests include daysOfWeek/dayOfMonth (null when unset, matching the timing fields\' own convention)', () => {
+  assert.match(panel, /daysOfWeek: timing\.daysOfWeek \? Number\(timing\.daysOfWeek\) : null,/);
+  assert.match(panel, /dayOfMonth: timing\.dayOfMonth \? Number\(timing\.dayOfMonth\) : null,/);
+});
