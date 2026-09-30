@@ -12,21 +12,35 @@ const siteSetup = readFileSync(new URL('../lib/site-setup.ts', import.meta.url),
 // create/deactivate Admin accounts for a Site, plus a self-service
 // My Account page (profile + change password) for every role.
 
-test('site-hierarchy-panel now creates/assigns the admin tier, not the legacy site_admin one', () => {
+test('site-hierarchy-panel now creates/adds the admin tier, not the legacy site_admin one', () => {
   assert.match(hierarchyPanel, /managementApi\.createAdminAccount/);
-  assert.match(hierarchyPanel, /managementApi\.assignAdmin/);
   assert.doesNotMatch(hierarchyPanel, /managementApi\.createSiteAdminAccount/);
   assert.doesNotMatch(hierarchyPanel, /managementApi\.assignSiteAdmin\(/);
 });
 
-test('an existing legacy site_admin assignment is still shown, read-only, when there is no admin one', () => {
-  assert.match(hierarchyPanel, /legacyName=\{!staffing\?\.admin \? staffing\?\.siteAdmin\?\.full_name : undefined\}/);
+// P4 (branch feat/admin-oic-management, sql/049) — Add Admin is additive
+// (POST via managementApi.addAdmin), never replace (PUT via
+// managementApi.assignAdmin, which still exists as a wrapper but is no
+// longer called from this panel).
+test('Add Admin calls the additive addAdmin endpoint, never the replace-semantics assignAdmin one', () => {
+  assert.match(hierarchyPanel, /managementApi\.addAdmin\(session\.api, siteId,/);
+  assert.doesNotMatch(hierarchyPanel, /managementApi\.assignAdmin\(/);
+});
+
+test('an existing legacy site_admin assignment is still shown, read-only, when there are no admins yet', () => {
+  assert.match(hierarchyPanel, /legacyName=\{\(staffing\?\.admins\?\.length \?\? 0\) === 0 \? staffing\?\.siteAdmin\?\.full_name : undefined\}/);
   assert.match(hierarchyPanel, /Legacy Site Admin assignment \(read-only\)/);
 });
 
-test('Deactivate button on the Admin tier card calls deactivateAdminAccount, gated the same as canSetUpAdmin', () => {
-  assert.match(hierarchyPanel, /managementApi\.deactivateAdminAccount\(session\.api, siteId, staffing\.admin\.user_id/);
-  assert.match(hierarchyPanel, /secondaryAction=\{staffing\?\.admin && canAdmin/);
+test('every active Admin gets its own Deactivate button, gated the same as canSetUpAdmin', () => {
+  assert.match(hierarchyPanel, /managementApi\.deactivateAdminAccount\(session\.api, siteId, deactivateTarget\.user_id/);
+  assert.match(hierarchyPanel, /admins\.map\(\(admin\) => \(/);
+  assert.match(hierarchyPanel, /onClick=\{\(\) => onDeactivate\(admin\)\}/);
+});
+
+test('Admin tier card lists every active admin, not just one', () => {
+  assert.match(hierarchyPanel, /function AdminTierCard\(\{ admins, legacyName, allowed, onAdd, onDeactivate \}/);
+  assert.match(hierarchyPanel, /admins: SiteUserAssignment\[\];/);
 });
 
 test('canSetUpAdmin (renamed from canSetUpSiteAdmin) still gates on supervisor only', () => {
@@ -56,6 +70,17 @@ test('Change Password form validates length, confirmation match, and difference 
 
 test('a wrong current password shows a specific message, not the generic 400 fallback', () => {
   assert.match(accountPage, /reason\.kind === 'validation' \? 'Current password is incorrect\.'/);
+});
+
+// P4 multi-admin (branch feat/admin-oic-management, sql/049) — addAdmin
+// is a genuinely separate wrapper from assignAdmin: same route path, but
+// POST (additive), never PUT (replace).
+test('addAdmin POSTs to the same route assignAdmin PUTs to — additive, not replace', async () => {
+  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const api = { request: async <T>(path: string, init?: RequestInit) => { calls.push({ path, init }); return {} as T; } };
+  await managementApi.addAdmin(api, 4, { userId: 25 });
+  assert.deepEqual(calls.map((call) => call.path), ['/sites/4/assignments/admin']);
+  assert.equal(calls[0].init?.method, 'POST');
 });
 
 test('management-api wrappers hit the real, existing P4 backend routes', async () => {

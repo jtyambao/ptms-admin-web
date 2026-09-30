@@ -402,7 +402,11 @@ export default function SiteDetailPage() {
                       />
                       <Summary
                         label="Admin"
-                        value={staffing?.admin?.full_name || staffing?.siteAdmin?.full_name || 'Needs setup'}
+                        value={
+                          (staffing?.admins.length ?? 0) > 1
+                            ? `${staffing!.admins[0].full_name} +${staffing!.admins.length - 1} more`
+                            : staffing?.admin?.full_name || staffing?.siteAdmin?.full_name || 'Needs setup'
+                        }
                         complete={!!(staffing?.admin || staffing?.siteAdmin)}
                       />
                       <Summary

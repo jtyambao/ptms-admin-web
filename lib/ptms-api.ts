@@ -197,6 +197,11 @@ export type StaffingStatus = {
   supervisor: SiteUserAssignment | null;
   siteAdmin: SiteUserAssignment | null;
   admin: SiteUserAssignment | null;
+  // P4 (branch feat/admin-oic-management, sql/049) — a Site may now have
+  // any number of simultaneously active admins; `admin` above stays as
+  // "the first one" for backward compatibility, `admins` is the full
+  // list for the Add Admin / list-and-deactivate-each UI.
+  admins: SiteUserAssignment[];
   oic: SiteOicAssignment | null;
   staffingComplete: boolean;
 };

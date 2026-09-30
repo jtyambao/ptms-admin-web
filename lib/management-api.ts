@@ -163,6 +163,14 @@ export const managementApi = {
     api.request<SiteUserAssignment>(`/sites/${siteId}/assignments/admin`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
+  // Add Admin (P4, branch feat/admin-oic-management, sql/049) — additive,
+  // same route path as assignAdmin above but POST, not PUT: never closes
+  // an existing active admin. A Site may now have any number of
+  // simultaneously active admins.
+  addAdmin: (api: AuthenticatedApiClient, siteId: number, body: ReplaceSiteAssignmentRequest) =>
+    api.request<SiteUserAssignment>(`/sites/${siteId}/assignments/admin`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
   // P4(a) (branch release/dry-run-ops backend commit 06cb63e) —
   // Supervisor only, own assigned Site only; target must be an active
   // 'admin' with an active assignment at that exact Site.

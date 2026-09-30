@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BadgeCheck, History, ShieldCheck, UserCog, UserX } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, History, Plus, ShieldCheck, UserCog, UserX } from 'lucide-react';
 import { useEffect, useState, type SyntheticEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { managementApi } from '@/lib/management-api';
 import { canSetUpAdmin, canSetUpSupervisor } from '@/lib/site-setup';
-import type { AssignmentHistory, StaffingStatus } from '@/lib/ptms-api';
+import type { AssignmentHistory, SiteUserAssignment, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
 type Tier = 'supervisor' | 'admin';
@@ -42,7 +42,7 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<SiteUserAssignment | null>(null);
   const [deactivateReason, setDeactivateReason] = useState('');
   const [deactivating, setDeactivating] = useState(false);
 
@@ -65,7 +65,10 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
       if (tier === 'supervisor') {
         await managementApi.assignSupervisor(session.api, siteId, { userId: assignmentUserId, ...(reason.trim() ? { reason: reason.trim() } : {}) });
       } else {
-        await managementApi.assignAdmin(session.api, siteId, { userId: assignmentUserId, ...(reason.trim() ? { reason: reason.trim() } : {}) });
+        // Add Admin (P4, sql/049) — additive, never closes an existing
+        // active admin. This dialog is now always "Add", never "Change/
+        // Replace", for the Admin tier.
+        await managementApi.addAdmin(session.api, siteId, { userId: assignmentUserId, ...(reason.trim() ? { reason: reason.trim() } : {}) });
       }
       setPassword('');
       onStaffingChange(await managementApi.getStaffing(session.api, siteId));
@@ -77,18 +80,18 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
     } finally { setSaving(false); }
   }
 
-  function openDeactivate() {
-    setDeactivateReason(''); setError(''); setDeactivateOpen(true);
+  function openDeactivate(target: SiteUserAssignment) {
+    setDeactivateReason(''); setError(''); setDeactivateTarget(target);
   }
 
   async function confirmDeactivate() {
-    if (!staffing?.admin) return;
+    if (!deactivateTarget) return;
     setDeactivating(true); setError('');
     try {
-      await managementApi.deactivateAdminAccount(session.api, siteId, staffing.admin.user_id, deactivateReason.trim() || undefined);
+      await managementApi.deactivateAdminAccount(session.api, siteId, deactivateTarget.user_id, deactivateReason.trim() || undefined);
       onStaffingChange(await managementApi.getStaffing(session.api, siteId));
       setSuccess('Admin account deactivated.');
-      setDeactivateOpen(false);
+      setDeactivateTarget(null);
     } catch (cause) {
       setError(cause instanceof ApiRequestError ? cause.message : 'The Admin account could not be deactivated.');
     } finally { setDeactivating(false); }
@@ -114,20 +117,25 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
       {success && <p className="mt-4 flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"><BadgeCheck className="size-4" />{success}</p>}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <TierCard icon={<ShieldCheck />} title="Supervisor" name={staffing?.supervisor?.full_name} allowed={canSupervisor} action={() => setTier('supervisor')} />
-        <TierCard
-          icon={<UserCog />}
-          title="Admin"
-          name={staffing?.admin?.full_name}
-          legacyName={!staffing?.admin ? staffing?.siteAdmin?.full_name : undefined}
+        <AdminTierCard
+          admins={staffing?.admins ?? []}
+          legacyName={(staffing?.admins?.length ?? 0) === 0 ? staffing?.siteAdmin?.full_name : undefined}
           allowed={canAdmin}
-          action={() => setTier('admin')}
-          secondaryAction={staffing?.admin && canAdmin ? { label: 'Deactivate', icon: <UserX />, onClick: openDeactivate } : undefined}
+          onAdd={() => setTier('admin')}
+          onDeactivate={openDeactivate}
         />
       </div>
 
       <Dialog open={tier !== null} onOpenChange={(open) => { if (!open) close(); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{staffing?.[tier === 'supervisor' ? 'supervisor' : 'admin'] ? 'Change' : 'Assign'} {tier === 'supervisor' ? 'Supervisor' : 'Admin'}</DialogTitle><DialogDescription>Create the authorized account and assign it to this Site. Any previous assignment is closed and retained in history.</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{tier === 'supervisor' ? (staffing?.supervisor ? 'Change Supervisor' : 'Assign Supervisor') : 'Add Admin'}</DialogTitle>
+            <DialogDescription>
+              {tier === 'supervisor'
+                ? 'Create the authorized account and assign it to this Site. Any previous assignment is closed and retained in history.'
+                : 'Create the authorized account and add it as an Admin for this Site — existing Admins are unaffected.'}
+            </DialogDescription>
+          </DialogHeader>
           <form onSubmit={createAndAssign}>
             <div className="grid gap-4">
               <label htmlFor="hierarchy-full-name" className="grid gap-2 font-bold">Full name<Input id="hierarchy-full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={pendingUserId !== null} required /></label>
@@ -150,13 +158,13 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deactivateOpen} onOpenChange={(open) => { if (!open) setDeactivateOpen(false); }}>
+      <Dialog open={!!deactivateTarget} onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Deactivate Admin account</DialogTitle>
             <DialogDescription>
-              {staffing?.admin?.full_name} will no longer be able to sign in, and their assignment to this
-              Site ends immediately. This cannot be undone from here — a new Admin would need to be set up again.
+              {deactivateTarget?.full_name} will no longer be able to sign in, and their assignment to this
+              Site ends immediately. This cannot be undone from here — a new Admin would need to be added again.
             </DialogDescription>
           </DialogHeader>
           <label htmlFor="deactivate-reason" className="grid gap-2 text-sm font-bold">
@@ -164,7 +172,7 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
             <Input id="deactivate-reason" value={deactivateReason} onChange={(e) => setDeactivateReason(e.target.value)} maxLength={500} />
           </label>
           <DialogFooter className="mt-5">
-            <Button type="button" variant="outline" onClick={() => setDeactivateOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setDeactivateTarget(null)}>Cancel</Button>
             <Button type="button" variant="destructive" disabled={deactivating} onClick={() => void confirmDeactivate()}>
               {deactivating ? 'Deactivating…' : 'Deactivate account'}
             </Button>
@@ -201,6 +209,53 @@ function TierCard({ icon, title, name, legacyName, allowed, action, secondaryAct
       {secondaryAction && (
         <Button className="mt-2 w-full" variant="outline" onClick={secondaryAction.onClick}>
           {secondaryAction.icon}{secondaryAction.label}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// Multi-Admin per Site (P4, branch feat/admin-oic-management, sql/049) —
+// a Site may now have any number of simultaneously active Admins, so this
+// replaces the single-name TierCard for the Admin tier with a list + an
+// always-additive "Add Admin" action (never "Change assignment" — that
+// replace-semantics flow still exists on the backend via assignAdmin, but
+// nothing in this panel calls it anymore).
+function AdminTierCard({ admins, legacyName, allowed, onAdd, onDeactivate }: {
+  admins: SiteUserAssignment[];
+  legacyName?: string;
+  allowed: boolean;
+  onAdd: () => void;
+  onDeactivate: (admin: SiteUserAssignment) => void;
+}) {
+  return (
+    <div className="rounded-2xl border bg-card p-5">
+      <div className="flex items-start gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-orange-100 text-[#e86405] dark:bg-orange-500/15"><UserCog /></div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Admin</p>
+          {admins.length === 0 && !legacyName && <p className="mt-1 font-black">Needs setup</p>}
+          {admins.length === 0 && legacyName && (
+            <>
+              <p className="mt-1 truncate font-black">{legacyName}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Legacy Site Admin assignment (read-only)</p>
+            </>
+          )}
+          {admins.map((admin) => (
+            <div key={admin.id} className="mt-2 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 first:mt-1">
+              <p className="min-w-0 truncate font-black">{admin.full_name}</p>
+              {allowed && (
+                <Button size="sm" variant="outline" onClick={() => onDeactivate(admin)}>
+                  <UserX className="size-3.5" />Deactivate
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      {allowed && (
+        <Button className="mt-4 w-full" variant="outline" onClick={onAdd}>
+          <Plus className="size-4" />Add Admin
         </Button>
       )}
     </div>
