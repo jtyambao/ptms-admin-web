@@ -371,11 +371,17 @@ export type ManagedRound = {
   // behavior for every Round created before this feature existed).
   days_of_week: number | null;
   day_of_month: number | null;
+  // Date From / Date Thru (P1 follow-up, backend sql/051) — 'YYYY-MM-DD',
+  // inclusive both ends, independent of days_of_week/day_of_month. The
+  // Admin Web form no longer writes day_of_month (replaced by this), but
+  // a Round created before this change keeps working unchanged.
+  active_from: string | null;
+  active_thru: string | null;
   is_active: boolean;
   stops: RoundStop[];
 };
 
-// null = organization default (seconds) or all day (window).
+// null = organization default (seconds) or all day (window) or no date limit.
 export type SaveRoundRequest = {
   name: string;
   dueIntervalMinutes: number;
@@ -386,6 +392,8 @@ export type SaveRoundRequest = {
   windowEndTime?: string | null;
   daysOfWeek?: number | null;
   dayOfMonth?: number | null;
+  activeFrom?: string | null;
+  activeThru?: string | null;
 };
 
 // Schedules visibility (branch release/dry-run-ops) — mirrors

@@ -148,35 +148,34 @@ const WEEKDAYS = [
   { label: 'Sun', bit: 64 },
 ] as const;
 
-type DaysMode = 'every_day' | 'weekdays' | 'monthly';
+type DaysMode = 'every_day' | 'weekdays';
 
+// dayOfMonth is no longer settable from this form (replaced by DateRangeField
+// below) — kept as a parameter only so a Round created before this change,
+// which may still carry it, doesn't get silently treated as "weekdays" here.
 function daysModeFor(daysOfWeek: string, dayOfMonth: string): DaysMode {
-  if (dayOfMonth.trim() !== '') return 'monthly';
-  if (daysOfWeek.trim() !== '') return 'weekdays';
+  if (daysOfWeek.trim() !== '' || dayOfMonth.trim() !== '') return 'weekdays';
   return 'every_day';
 }
 
-function DaysField({ daysOfWeek, dayOfMonth, onChange }: {
+function DaysField({ daysOfWeek, onChange }: {
   daysOfWeek: string;
-  dayOfMonth: string;
-  onChange: (v: { daysOfWeek: string; dayOfMonth: string }) => void;
+  onChange: (v: { daysOfWeek: string }) => void;
 }) {
-  const mode = daysModeFor(daysOfWeek, dayOfMonth);
+  const mode = daysModeFor(daysOfWeek, '');
   const mask = Number(daysOfWeek) || 0;
 
   function setMode(next: DaysMode) {
-    if (next === 'every_day') onChange({ daysOfWeek: '', dayOfMonth: '' });
-    else if (next === 'weekdays') onChange({ daysOfWeek: mask > 0 ? String(mask) : '0', dayOfMonth: '' });
-    else onChange({ daysOfWeek: '', dayOfMonth: dayOfMonth || '1' });
+    onChange({ daysOfWeek: next === 'every_day' ? '' : mask > 0 ? String(mask) : '0' });
   }
 
   function toggleDay(bit: number) {
     const next = mask & bit ? mask & ~bit : mask | bit;
-    onChange({ daysOfWeek: String(next), dayOfMonth: '' });
+    onChange({ daysOfWeek: String(next) });
   }
 
   return (
-    <div className="grid gap-2 lg:col-span-2">
+    <div className="grid gap-2">
       <label htmlFor="round-days-mode" className="font-bold">Days</label>
       <select
         id="round-days-mode"
@@ -186,7 +185,6 @@ function DaysField({ daysOfWeek, dayOfMonth, onChange }: {
       >
         <option value="every_day">Every day</option>
         <option value="weekdays">Pick weekdays</option>
-        <option value="monthly">Monthly on a specific day</option>
       </select>
 
       {mode === 'weekdays' && (
@@ -206,27 +204,69 @@ function DaysField({ daysOfWeek, dayOfMonth, onChange }: {
       {mode === 'weekdays' && mask === 0 && (
         <p className="text-xs text-red-700 dark:text-red-400">Select at least one day.</p>
       )}
-
-      {mode === 'monthly' && (
-        <label htmlFor="round-day-of-month" className="grid gap-2 text-sm font-normal text-muted-foreground">
-          Day of month
-          <input
-            id="round-day-of-month"
-            type="number"
-            min={1}
-            max={31}
-            className="h-10 rounded-lg border bg-background px-3 text-foreground"
-            value={dayOfMonth}
-            onChange={(e) => onChange({ daysOfWeek: '', dayOfMonth: e.target.value })}
-          />
-          <span>A shorter month (like February) uses its own last day instead.</span>
-        </label>
-      )}
     </div>
   );
 }
 
+// "Date From"/"Date Thru" (P1 follow-up, user-requested 2026-09-30) —
+// replaces the prior "Monthly on a specific day" control, which the user
+// found confusing. Independent of the Days control above: this bounds
+// which calendar days the Round runs across AT ALL (e.g. "only during
+// October"), not which of those days each week.
+function DateRangeField({ activeFrom, activeThru, onChange }: {
+  activeFrom: string;
+  activeThru: string;
+  onChange: (v: { activeFrom: string; activeThru: string }) => void;
+}) {
+  const invalid = activeFrom !== '' && activeThru !== '' && activeThru < activeFrom;
+  return (
+    <div className="grid gap-2">
+      <p className="font-bold">Active dates</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label htmlFor="round-active-from" className="grid gap-2 text-sm font-normal text-muted-foreground">
+          Date From
+          <input
+            id="round-active-from"
+            type="date"
+            className="h-10 rounded-lg border bg-background px-3 text-foreground"
+            value={activeFrom}
+            onChange={(e) => onChange({ activeFrom: e.target.value, activeThru })}
+          />
+        </label>
+        <label htmlFor="round-active-thru" className="grid gap-2 text-sm font-normal text-muted-foreground">
+          Date Thru
+          <input
+            id="round-active-thru"
+            type="date"
+            className="h-10 rounded-lg border bg-background px-3 text-foreground"
+            value={activeThru}
+            onChange={(e) => onChange({ activeFrom, activeThru: e.target.value })}
+          />
+        </label>
+      </div>
+      <p className="text-xs text-muted-foreground">Leave both empty to run with no date limit. Inclusive of both dates.</p>
+      {invalid && <p className="text-xs text-red-700 dark:text-red-400">Date Thru must be on or after Date From.</p>}
+    </div>
+  );
+}
+
+function formatBadgeDate(dateStr: string): string {
+  // 'YYYY-MM-DD' parsed as a plain calendar date, not a UTC instant — new
+  // Date('YYYY-MM-DD') would shift a day off in timezones behind UTC.
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function dateRangeBadgeLabel(round: { active_from: string | null; active_thru: string | null }): string | null {
+  if (round.active_from && round.active_thru) return `${formatBadgeDate(round.active_from)} – ${formatBadgeDate(round.active_thru)}`;
+  if (round.active_from) return `From ${formatBadgeDate(round.active_from)}`;
+  if (round.active_thru) return `Until ${formatBadgeDate(round.active_thru)}`;
+  return null;
+}
+
 function daysBadgeLabel(round: { days_of_week: number | null; day_of_month: number | null }): string | null {
+  // day_of_month display only — a Round created before this form change may
+  // still carry it; this form no longer writes it (see DateRangeField).
   if (round.day_of_month) return `Day ${round.day_of_month} of month`;
   if (round.days_of_week) {
     return WEEKDAYS.filter((d) => round.days_of_week! & d.bit).map((d) => d.label).join(', ');
@@ -298,8 +338,15 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
       end: round.window_end_time?.slice(0, 5) ?? '',
       ack: round.ack_window_seconds?.toString() ?? '',
       tap: round.tap_window_seconds?.toString() ?? '',
-      daysOfWeek: round.days_of_week ? String(round.days_of_week) : '',
-      dayOfMonth: round.day_of_month ? String(round.day_of_month) : '',
+      // A Round with a legacy day_of_month (this form no longer writes it —
+      // see DateRangeField) has no "monthly" mode to reopen into; forcing
+      // the weekdays picker open with none selected surfaces the ambiguity
+      // and blocks Save (existing "select at least one day" validation)
+      // until the admin makes an explicit choice, rather than silently
+      // discarding day_of_month the moment they save any other change.
+      daysOfWeek: round.days_of_week ? String(round.days_of_week) : round.day_of_month ? '0' : '',
+      activeFrom: round.active_from ?? '',
+      activeThru: round.active_thru ?? '',
     });
     setError('');
     setEditTarget(round);
@@ -517,9 +564,11 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
 }
 
 // Round timing form state. Empty = organization default (seconds), all
-// day (window), or every day (days_of_week/day_of_month).
-type RoundTiming = { start: string; end: string; ack: string; tap: string; daysOfWeek: string; dayOfMonth: string };
-const emptyTiming: RoundTiming = { start: '', end: '', ack: '', tap: '', daysOfWeek: '', dayOfMonth: '' };
+// day (window), every day (days_of_week), or no date limit (active
+// range). dayOfMonth is deliberately not form state — see openEdit's own
+// comment; this form never writes it.
+type RoundTiming = { start: string; end: string; ack: string; tap: string; daysOfWeek: string; activeFrom: string; activeThru: string };
+const emptyTiming: RoundTiming = { start: '', end: '', ack: '', tap: '', daysOfWeek: '', activeFrom: '', activeThru: '' };
 
 function timingRequest(timing: RoundTiming) {
   return {
@@ -528,7 +577,9 @@ function timingRequest(timing: RoundTiming) {
     ackWindowSeconds: timing.ack ? Number(timing.ack) : null,
     tapWindowSeconds: timing.tap ? Number(timing.tap) : null,
     daysOfWeek: timing.daysOfWeek ? Number(timing.daysOfWeek) : null,
-    dayOfMonth: timing.dayOfMonth ? Number(timing.dayOfMonth) : null,
+    dayOfMonth: null,
+    activeFrom: timing.activeFrom || null,
+    activeThru: timing.activeThru || null,
   };
 }
 
@@ -541,6 +592,8 @@ function formatTiming(round: ManagedRound): string[] {
   if (round.tap_window_seconds) parts.push(`Tap all ${round.tap_window_seconds}s`);
   const days = daysBadgeLabel(round);
   if (days) parts.push(days);
+  const dateRange = dateRangeBadgeLabel(round);
+  if (dateRange) parts.push(dateRange);
   return parts;
 }
 
@@ -585,7 +638,11 @@ function RoundFormDialog({
             <p className="-mt-2 text-xs text-muted-foreground lg:col-span-2">Leave both empty to run all day. An end time earlier than the start time runs overnight (e.g. 18:00–06:00).</p>
             <DaysField
               daysOfWeek={timing.daysOfWeek}
-              dayOfMonth={timing.dayOfMonth}
+              onChange={(v) => setTiming({ ...timing, ...v })}
+            />
+            <DateRangeField
+              activeFrom={timing.activeFrom}
+              activeThru={timing.activeThru}
               onChange={(v) => setTiming({ ...timing, ...v })}
             />
             <div className="grid gap-3 sm:grid-cols-2">
@@ -632,7 +689,13 @@ function RoundFormDialog({
             <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
             <Button
               type="submit"
-              disabled={saving || !name.trim() || selectedCheckpointIds.length === 0 || (daysModeFor(timing.daysOfWeek, timing.dayOfMonth) === 'weekdays' && Number(timing.daysOfWeek) === 0)}
+              disabled={
+                saving ||
+                !name.trim() ||
+                selectedCheckpointIds.length === 0 ||
+                (daysModeFor(timing.daysOfWeek, '') === 'weekdays' && Number(timing.daysOfWeek) === 0) ||
+                (timing.activeFrom !== '' && timing.activeThru !== '' && timing.activeThru < timing.activeFrom)
+              }
             >
               {submitLabel}
             </Button>

@@ -99,12 +99,14 @@ test('the Rounds list badge shows the friendly frequency label, not the raw minu
 });
 
 // P1 "Days" control (branch feat/admin-oic-management, backend sql/048) —
-// every day / pick weekdays / monthly on day N, matching days_of_week
-// (bitmask)/day_of_month exactly.
-test('Days is a mode select with three plain-language choices, not raw bitmask/day-number inputs', () => {
+// every day / pick weekdays, matching days_of_week (bitmask) exactly.
+// "Monthly on a specific day" was replaced 2026-09-30 by the Date From/
+// Date Thru range below — the user found the monthly option confusing.
+test('Days is a mode select with two plain-language choices, not raw bitmask/day-number inputs; the confusing Monthly option is gone', () => {
   assert.match(panel, /<option value="every_day">Every day<\/option>/);
   assert.match(panel, /<option value="weekdays">Pick weekdays<\/option>/);
-  assert.match(panel, /<option value="monthly">Monthly on a specific day<\/option>/);
+  assert.doesNotMatch(panel, /<option value="monthly">/);
+  assert.doesNotMatch(panel, /round-day-of-month/);
 });
 
 test('weekday picking uses named day chips (Mon..Sun), converting to the bitmask internally', () => {
@@ -113,26 +115,54 @@ test('weekday picking uses named day chips (Mon..Sun), converting to the bitmask
   assert.match(panel, /const next = mask & bit \? mask & ~bit : mask \| bit;/);
 });
 
-test('monthly mode explains the shorter-month clamp in plain language', () => {
-  assert.match(panel, /A shorter month \(like February\) uses its own last day instead\./);
-});
-
 test('picking weekdays with none selected blocks submit, matching the checkpoint-selection guard', () => {
-  assert.match(panel, /daysModeFor\(timing\.daysOfWeek, timing\.dayOfMonth\) === 'weekdays' && Number\(timing\.daysOfWeek\) === 0/);
+  assert.match(panel, /daysModeFor\(timing\.daysOfWeek, ''\) === 'weekdays' && Number\(timing\.daysOfWeek\) === 0/);
   assert.match(panel, /Select at least one day\./);
 });
 
-test('editing an existing Round with days_of_week/day_of_month set populates the Days control from it', () => {
-  assert.match(panel, /daysOfWeek: round\.days_of_week \? String\(round\.days_of_week\) : '',/);
-  assert.match(panel, /dayOfMonth: round\.day_of_month \? String\(round\.day_of_month\) : '',/);
+test('editing an existing Round with days_of_week set populates the Days control from it; this form never writes dayOfMonth', () => {
+  assert.match(panel, /daysOfWeek: round\.days_of_week \? String\(round\.days_of_week\) : round\.day_of_month \? '0' : '',/);
+  assert.match(panel, /dayOfMonth: null,/);
 });
 
-test('the Rounds list badge shows the Days setting when one is configured', () => {
+test('the Rounds list badge still shows a legacy day_of_month, display-only, for a Round created before this form change', () => {
   assert.match(panel, /function daysBadgeLabel/);
   assert.match(panel, /Day \$\{round\.day_of_month\} of month/);
 });
 
-test('createRound/updateRound requests include daysOfWeek/dayOfMonth (null when unset, matching the timing fields\' own convention)', () => {
+test('createRound/updateRound requests include daysOfWeek (null when unset) and always send dayOfMonth: null', () => {
   assert.match(panel, /daysOfWeek: timing\.daysOfWeek \? Number\(timing\.daysOfWeek\) : null,/);
-  assert.match(panel, /dayOfMonth: timing\.dayOfMonth \? Number\(timing\.dayOfMonth\) : null,/);
+  assert.match(panel, /dayOfMonth: null,/);
+});
+
+// "Date From"/"Date Thru" (P1 follow-up, user-requested 2026-09-30, backend
+// sql/051) — replaces the confusing "Monthly on day N" option with two
+// plain date pickers, independent of the Days control.
+test('Round form has Date From / Date Thru date pickers, inclusive, no date limit when both empty', () => {
+  assert.match(panel, /function DateRangeField/);
+  assert.match(panel, /Date From/);
+  assert.match(panel, /Date Thru/);
+  assert.match(panel, /type="date"/);
+  assert.match(panel, /Leave both empty to run with no date limit\. Inclusive of both dates\./);
+});
+
+test('Date Thru before Date From shows an inline error and blocks submit', () => {
+  assert.match(panel, /Date Thru must be on or after Date From\./);
+  assert.match(panel, /timing\.activeThru < timing\.activeFrom/);
+});
+
+test('createRound/updateRound requests include activeFrom/activeThru (null when unset)', () => {
+  assert.match(panel, /activeFrom: timing\.activeFrom \|\| null,/);
+  assert.match(panel, /activeThru: timing\.activeThru \|\| null,/);
+});
+
+test('editing an existing Round populates Date From/Date Thru from it', () => {
+  assert.match(panel, /activeFrom: round\.active_from \?\? '',/);
+  assert.match(panel, /activeThru: round\.active_thru \?\? '',/);
+});
+
+test('the Rounds list badge shows the active date range when one is configured', () => {
+  assert.match(panel, /function dateRangeBadgeLabel/);
+  assert.match(panel, /From \$\{formatBadgeDate\(round\.active_from\)\}/);
+  assert.match(panel, /Until \$\{formatBadgeDate\(round\.active_thru\)\}/);
 });
