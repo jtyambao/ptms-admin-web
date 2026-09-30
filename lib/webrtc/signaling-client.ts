@@ -12,6 +12,16 @@
 
 export type CallType = 'voice' | 'video';
 
+// Caller identity on call:invite (owner-authorized 2026-09-30, follow-up
+// to items A/B) — additive fields the backend now resolves fresh at
+// invite time (site-assignments... no, calls.service.ts's
+// resolveInviteCallerContext) and spreads onto the existing payload.
+// Absent (both undefined) when the backend hasn't sent it (an older
+// deployment, or the lookup found nothing) — never assume it's there.
+export type CallerContext =
+  | { kind: 'guard'; siteId: number; siteName: string; deviceLabel: string; oicName: string | null }
+  | { kind: 'staff'; userName: string; role: string };
+
 export interface SocketLike {
   readonly connected: boolean;
   on(event: string, handler: (...args: unknown[]) => void): void;
@@ -26,7 +36,7 @@ export interface SocketLike {
 export type SignalingEvent =
   | { type: 'registered' }
   | { type: 'register-error'; message: string }
-  | { type: 'invite'; callId: string; callType: CallType; from: 'guard' | 'staff' }
+  | { type: 'invite'; callId: string; callType: CallType; from: 'guard' | 'staff'; callerContext: CallerContext | null }
   | { type: 'ringing'; callId: string; callType: CallType }
   | { type: 'accept'; callId: string }
   | { type: 'decline'; callId: string }
@@ -57,8 +67,24 @@ export class CallsSignalingClient {
       'register:ok': () => this.dispatch({ type: 'registered' }),
       'register:error': (payload) => this.dispatch({ type: 'register-error', message: (payload as { message?: string })?.message ?? 'Registration was denied.' }),
       'call:invite': (payload) => {
-        const p = payload as { callId: string; callType: CallType; from?: 'guard' | 'staff' };
-        this.dispatch({ type: 'invite', callId: p.callId, callType: p.callType, from: p.from ?? 'guard' });
+        const p = payload as {
+          callId: string;
+          callType: CallType;
+          from?: 'guard' | 'staff';
+          siteId?: number;
+          siteName?: string;
+          deviceLabel?: string;
+          oicName?: string | null;
+          userName?: string;
+          role?: string;
+        };
+        let callerContext: CallerContext | null = null;
+        if (p.siteName !== undefined && p.deviceLabel !== undefined) {
+          callerContext = { kind: 'guard', siteId: p.siteId!, siteName: p.siteName, deviceLabel: p.deviceLabel, oicName: p.oicName ?? null };
+        } else if (p.userName !== undefined && p.role !== undefined) {
+          callerContext = { kind: 'staff', userName: p.userName, role: p.role };
+        }
+        this.dispatch({ type: 'invite', callId: p.callId, callType: p.callType, from: p.from ?? 'guard', callerContext });
       },
       'call:ringing': (payload) => {
         const p = payload as { callId: string; callType: CallType };

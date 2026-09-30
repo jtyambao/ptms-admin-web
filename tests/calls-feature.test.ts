@@ -100,6 +100,19 @@ test('the incoming-call overlay offers accept/decline and a click-to-enable ring
   assert.match(source, /onDecline/);
 });
 
+// Caller identity (owner-authorized 2026-09-30, follow-up to items A/B —
+// closes gap 1: the invite payload used to carry only from:'guard'|
+// 'staff', no site/device/name at all).
+test('the incoming-call overlay shows the caller\'s site/device/OIC when the backend provides it, a plain fallback when it doesn\'t', () => {
+  const source = readFileSync('app/calls/page.tsx', 'utf8');
+  assert.match(source, /function CallerIdentityLine/);
+  assert.match(source, /callerContext\.siteName/);
+  assert.match(source, /callerContext\.deviceLabel/);
+  assert.match(source, /callerContext\.oicName/);
+  assert.match(source, /callerContext\.userName/);
+  assert.match(source, /if \(!callerContext\)/);
+});
+
 test('the ringtone requires a user gesture before it can play (browser autoplay policy)', () => {
   const source = readFileSync('lib/webrtc/ringtone.ts', 'utf8');
   assert.match(source, /must be called from within a user gesture/i);

@@ -26,7 +26,7 @@ import { managementApi } from '@/lib/management-api';
 import { describeEndReason } from '@/lib/webrtc/call-session';
 import { useCallSession } from '@/lib/webrtc/use-call-session';
 import { Ringtone } from '@/lib/webrtc/ringtone';
-import type { CallsSignalingClient, CallType, SignalingEvent } from '@/lib/webrtc/signaling-client';
+import type { CallerContext, CallsSignalingClient, CallType, SignalingEvent } from '@/lib/webrtc/signaling-client';
 import { useSession } from '@/lib/session-provider';
 
 /**
@@ -53,11 +53,15 @@ import { useSession } from '@/lib/session-provider';
  *   collapse to the same generic call:error{message} — "busy",
  *   "no one online", and "unauthorized" are indistinguishable by design,
  *   see calls.gateway.ts's own comment).
- * - Incoming: call:invite{callId,callType,from} — `from` is only
- *   'guard'|'staff', there is NO caller identity (site/device) in this
- *   payload at all (a real gap in the current backend, not a client bug —
- *   the server already resolves the caller's siteId/siteDeviceId, it's
- *   just never included in what gets emitted to candidates).
+ * - Incoming: call:invite{callId,callType,from,...callerContext}. `from`
+ *   is 'guard'|'staff'. Caller identity (fixed 2026-09-30, backend
+ *   commit 150cd03 — was a real gap, not a client bug: the server always
+ *   resolved the caller's identity internally, it just never included it
+ *   in the emitted payload) is spread additively: a Guard caller adds
+ *   {siteId,siteName,deviceLabel,oicName}, a staff caller adds
+ *   {userName,role}. lib/webrtc/signaling-client.ts folds these into a
+ *   typed `callerContext` (null when the backend didn't send them —
+ *   an older deployment, or its own lookup found nothing).
  * - Once accepted: sdp:offer/sdp:answer/ice:candidate relay, silently
  *   dropped server-side before call:accept completes — never send SDP
  *   before observing accept (lib/webrtc/call-session.ts enforces this).
@@ -110,7 +114,33 @@ const STATUS_VARIANT: Record<CallsSocketStatus, 'secondary' | 'outline' | 'destr
 };
 
 type ActiveCall = { callId: string; callType: CallType; direction: 'outgoing' | 'incoming' };
-type IncomingInvite = { callId: string; callType: CallType };
+type IncomingInvite = { callId: string; callType: CallType; callerContext: CallerContext | null };
+
+// Caller identity (owner-authorized 2026-09-30, follow-up to items A/B —
+// closes gap 1) — e.g. "Guanzon Corporate Center · Galaxy A72" for a
+// Guard caller, with the current OIC's name when one is on record.
+// `callerContext` is null when the backend didn't send it (an older
+// deployment, or its own lookup found nothing) — shown as a plain
+// "From a Guard device" fallback in that case, never a blank/broken UI.
+function CallerIdentityLine({ callerContext }: { callerContext: CallerContext | null }) {
+  if (!callerContext) {
+    return <>From a Guard device. The caller&apos;s identity was not provided by the backend.</>;
+  }
+  if (callerContext.kind === 'guard') {
+    return (
+      <>
+        From <span className="font-bold text-foreground">{callerContext.siteName}</span> ·{' '}
+        {callerContext.deviceLabel}
+        {callerContext.oicName ? ` · OIC: ${callerContext.oicName}` : ''}
+      </>
+    );
+  }
+  return (
+    <>
+      From <span className="font-bold text-foreground">{callerContext.userName}</span> ({callerContext.role})
+    </>
+  );
+}
 
 function IncomingCallOverlay({
   invite,
@@ -136,8 +166,7 @@ function IncomingCallOverlay({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            From a Guard device. The signaling protocol does not carry which site or device is
-            calling (a known backend gap — see this page&apos;s own design note).
+            <CallerIdentityLine callerContext={invite.callerContext} />
           </p>
           {!soundEnabled && (
             <Button type="button" variant="outline" className="w-full" onClick={onEnableSound}>
@@ -287,7 +316,7 @@ function CallsShell() {
     if (!client) return;
     return client.on((event: SignalingEvent) => {
       if (event.type === 'invite' && !activeCall && !incomingInvite) {
-        setIncomingInvite({ callId: event.callId, callType: event.callType });
+        setIncomingInvite({ callId: event.callId, callType: event.callType, callerContext: event.callerContext });
         ringtone.start();
       } else if (event.type === 'ringing' && dialing && !activeCall) {
         setActiveCall({ callId: event.callId, callType: event.callType, direction: 'outgoing' });

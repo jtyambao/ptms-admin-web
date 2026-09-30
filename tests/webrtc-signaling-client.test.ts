@@ -75,13 +75,53 @@ test('dispatches register:error with the server message, or a fallback if absent
   ]);
 });
 
-test('call:invite defaults `from` to guard when the server omits it (matches the Guard app never relying on it)', () => {
+test('call:invite defaults `from` to guard and callerContext to null when the server omits both', () => {
   const socket = makeFakeSocket();
   const client = new CallsSignalingClient(socket, () => 'token');
   const events: unknown[] = [];
   client.on((e) => events.push(e));
   socket.fire('call:invite', { callId: 'c1', callType: 'voice' });
-  assert.deepEqual(events, [{ type: 'invite', callId: 'c1', callType: 'voice', from: 'guard' }]);
+  assert.deepEqual(events, [{ type: 'invite', callId: 'c1', callType: 'voice', from: 'guard', callerContext: null }]);
+});
+
+// Caller identity (owner-authorized 2026-09-30, follow-up to items A/B —
+// closes gap 1) — additive fields the backend spreads onto call:invite,
+// verified byte-for-byte against calls.service.ts's own
+// resolveInviteCallerContext output shape.
+test('call:invite folds a Guard caller\'s additive fields into a typed callerContext', () => {
+  const socket = makeFakeSocket();
+  const client = new CallsSignalingClient(socket, () => 'token');
+  const events: unknown[] = [];
+  client.on((e) => events.push(e));
+  socket.fire('call:invite', {
+    callId: 'c1', callType: 'voice', from: 'guard',
+    siteId: 3, siteName: 'Guanzon Corporate Center', deviceLabel: 'Galaxy A72', oicName: 'Juan Dela Cruz',
+  });
+  assert.deepEqual(events, [{
+    type: 'invite', callId: 'c1', callType: 'voice', from: 'guard',
+    callerContext: { kind: 'guard', siteId: 3, siteName: 'Guanzon Corporate Center', deviceLabel: 'Galaxy A72', oicName: 'Juan Dela Cruz' },
+  }]);
+});
+
+test('call:invite folds a staff caller\'s additive fields into a typed callerContext', () => {
+  const socket = makeFakeSocket();
+  const client = new CallsSignalingClient(socket, () => 'token');
+  const events: unknown[] = [];
+  client.on((e) => events.push(e));
+  socket.fire('call:invite', { callId: 'c1', callType: 'voice', from: 'staff', userName: 'Maria Santos', role: 'org_admin' });
+  assert.deepEqual(events, [{
+    type: 'invite', callId: 'c1', callType: 'voice', from: 'staff',
+    callerContext: { kind: 'staff', userName: 'Maria Santos', role: 'org_admin' },
+  }]);
+});
+
+test('a Guard caller with no current OIC gets oicName: null in callerContext, not undefined', () => {
+  const socket = makeFakeSocket();
+  const client = new CallsSignalingClient(socket, () => 'token');
+  const events: unknown[] = [];
+  client.on((e) => events.push(e));
+  socket.fire('call:invite', { callId: 'c1', callType: 'voice', siteId: 3, siteName: 'Site X', deviceLabel: 'Device X' });
+  assert.deepEqual((events[0] as { callerContext: { oicName: unknown } }).callerContext.oicName, null);
 });
 
 test('invite() emits call:invite with siteId (staff -> site fan-out) never targetSiteDeviceId (guard-only)', () => {
