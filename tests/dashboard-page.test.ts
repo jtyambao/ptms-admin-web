@@ -2,76 +2,78 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-// P1 Dashboard (2026-09-26) — source-inspection tests matching this repo's
-// established convention (page/component logic is plain functions +
-// readable JSX, not exercised via a DOM-rendering test runner anywhere
-// else in this suite).
+// P2 Dashboard redesign (branch feat/admin-oic-management) — source-
+// inspection tests matching this repo's established convention (page/
+// component logic is plain functions + readable JSX, not exercised via a
+// DOM-rendering test runner anywhere else in this suite). Supersedes the
+// P1 Dashboard's tests: the abstract org-wide Sites/Personnel/Incidents
+// counts are replaced by one big per-Site status card (patrol/next due,
+// missed today, active SOS, incidents today, OIC on duty, devices).
 const source = readFileSync('app/dashboard/page.tsx', 'utf8');
 
 test('1. Dashboard no longer depends on the undeployed summary endpoint', () => {
   assert.doesNotMatch(source, /getDashboardSummary/);
-  // The comment explaining why it's not used legitimately names the route;
-  // check only that it's never actually called.
   assert.doesNotMatch(source, /managementApi\.[a-zA-Z]*[Ss]ummary/);
 });
 
-test('2. Each widget renders its own loaded data independently', () => {
-  assert.match(source, /widget\.kind === 'loaded'/);
+test('2. Each per-Site metric loads and renders independently — one failing metric never blocks the others', () => {
   assert.match(source, /managementApi\.listSites\(session\.api\)/);
-  assert.match(source, /managementApi\.listPersonnel\(session\.api\)/);
+  assert.match(source, /managementApi\.getStaffing\(session\.api, siteId\)/);
+  assert.match(source, /managementApi\.getRoundStatus\(session\.api, siteId\)/);
+  assert.match(source, /managementApi\.listMissedCheckpoints\(session\.api, siteId\)/);
+  assert.match(source, /managementApi\.listDevices\(session\.api, siteId\)/);
   assert.match(source, /managementApi\.listIncidents\(session\.api\)/);
+  assert.match(source, /managementApi\.listSosAlerts\(session\.api\)/);
+  // Six independent .then/.catch chains inside SiteStatusCard's effect —
+  // a rejection in one can never throw out of the effect and skip the rest.
+  const cardStart = source.indexOf('function SiteStatusCard');
+  const cardEnd = source.indexOf('\nfunction Tile');
+  const cardBody = source.slice(cardStart, cardEnd);
+  const catchCount = (cardBody.match(/\.catch\(\(reason\) => \{/g) ?? []).length;
+  assert.equal(catchCount, 6);
 });
 
-test('3. An unavailable/skipped widget never renders a fabricated zero', () => {
-  const skippedStart = source.indexOf("function Skipped(");
-  const skippedEnd = source.indexOf('\n}', skippedStart);
-  const skippedBody = source.slice(skippedStart, skippedEnd);
-  assert.doesNotMatch(skippedBody, />0</);
-  assert.match(skippedBody, /Unavailable for this role/);
+test('3. An unavailable/skipped metric never renders a fabricated zero — shows a plain role note instead', () => {
+  assert.match(source, /skipped\?/);
+  assert.match(source, /Not available to your role\./);
+  assert.doesNotMatch(source, /kind: 'loaded', data: 0/);
 });
 
-test('4. Widgets load via Promise.allSettled, not Promise.all — one rejection cannot block the others', () => {
-  assert.match(source, /Promise\.allSettled\(\[loadSites\(\), loadPersonnel\(\), loadIncidents\(\)\]\)/);
-});
-
-test('5/6. Errors render the real ApiRequestError message (401/403/network/etc. all distinguishable), separately from the skipped (403-preempted) and empty states', () => {
+test('4/5. Errors render the real ApiRequestError message, distinct from skipped/empty', () => {
   assert.match(source, /reason instanceof ApiRequestError \? reason\.message/);
   assert.match(source, /function Failed/);
-  assert.match(source, /function Skipped/);
-  assert.match(source, /widget\.kind === 'error'/);
+  assert.match(source, /function SkippedCard/);
 });
 
-test('7. No polling exists, and the undeployed summary endpoint is never called', () => {
-  assert.doesNotMatch(source, /setInterval/);
-  assert.doesNotMatch(source, /managementApi\.[a-zA-Z]*[Ss]ummary/);
-});
-
-test('8. A valid empty result is rendered as an explicit empty message, not an error', () => {
+test('6. A Site with no Sites assigned renders an explicit empty message, not an error', () => {
   assert.match(source, /No Sites are assigned to your account yet\./);
-  assert.match(source, /No Personnel records visible to your role yet\./);
-  assert.match(source, /No Incidents reported yet\./);
 });
 
-test('9. Site scope comes only from what the backend actually returns — no client-side combining, organizationId, or site-selector override', () => {
+test('7. Site scope comes only from what the backend actually returns — no client-side organizationId or siteId override', () => {
   assert.doesNotMatch(source, /organizationId/);
-  assert.doesNotMatch(source, /\?siteId=/);
-  assert.doesNotMatch(source, /managementApi\.\w+\([^)]*,\s*\d/);
   assert.match(source, /canViewSitesOverview\(role\)/);
-  assert.match(source, /canViewPersonnel\(role\)/);
-  assert.match(source, /canViewIncidents\(role\)/);
 });
 
-test('10. No hardcoded/fabricated operational numbers exist — every rendered count is derived from widget.data', () => {
-  assert.doesNotMatch(source, /= 0;/);
-  assert.match(source, /widget\.data\.length/);
-  assert.match(source, /widget\.data\.filter/);
+test('8. Incidents/SOS "today"/"active" counts are derived from real widget data, never hardcoded', () => {
+  assert.match(source, /data\.filter\(\(i\) => i\.site_id === siteId && isToday\(i\.occurred_at\)\)\.length/);
+  assert.match(source, /data\.filter\(\(a\) => a\.site_id === siteId && \(a\.status === 'active' \|\| a\.status === 'acknowledged'\)\)\.length/);
 });
 
-test('"Today" is explicitly labelled as the viewer\'s own local time, not a per-Site-timezone backend boundary', () => {
-  assert.match(source, /today \(your local time\)/);
+test('9. Missed-today count is computed client-side from missed_at, same "today = viewer\'s local day" convention as isToday elsewhere', () => {
+  assert.match(source, /missed\.data\.filter\(\(m\) => isToday\(m\.missed_at\)\)\.length/);
 });
 
-test('Incident rows never attempt to render a photo — findAll() does not provide photo_view_url', () => {
+test('10. Patrol status reads patrol_operations_active straight off the already-fetched Site row, not a second redundant call', () => {
+  assert.match(source, /site\.patrol_operations_active \? 'Active' : 'Inactive'/);
+});
+
+test('11. Device presence uses the honest "Last active" wording (formatLastActive), never claims Online/Offline', () => {
+  assert.match(source, /formatLastActive\(mostRecentDeviceActivity\)/);
+  assert.doesNotMatch(source, /['"]Online['"]/);
+  assert.doesNotMatch(source, /['"]Offline['"]/);
+});
+
+test('12. Incident rows never attempt to render a photo — Incident has no photo_view_url', () => {
   assert.doesNotMatch(source, /photo_view_url/);
   assert.doesNotMatch(source, /<img/);
 });

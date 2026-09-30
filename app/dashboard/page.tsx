@@ -2,10 +2,14 @@
 import {
   AlertTriangle,
   Building2,
-  ClipboardList,
+  Clock,
   Lock,
+  PhoneCall,
   RefreshCw,
-  Users,
+  ShieldAlert,
+  ShieldCheck,
+  Smartphone,
+  UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,32 +20,29 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { ApiRequestError } from '@/lib/authenticated-api';
-import { canViewIncidents, canViewSitesOverview, isToday } from '@/lib/dashboard';
+import { canRespondToSos, canViewIncidents, canViewSitesOverview, formatLastActive, isToday } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
-import { canViewPersonnel } from '@/lib/personnel-management';
-import type { Incident, Personnel, Site } from '@/lib/ptms-api';
+import type { MissedCheckpointTap, RoundStatus, Site, SiteDevice, StaffingStatus, UserRole } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
-// P1 Dashboard (2026-09-26) — replaces the prior page, which depended
-// entirely on `GET /management/dashboard/summary`. That endpoint is not
-// deployed on `origin/main` or current production (see ptms-api.ts's
-// DashboardSiteRow comment and BACKEND_GAPS.md's "P1 Dashboard" section).
-// This page instead sources three widgets independently from real,
-// currently-deployed endpoints (Sites, Personnel, Incidents), each with its
-// own loading/empty/unavailable/error state — a role lacking access to one
-// widget, or a network failure on one, never blocks the others. No metric
-// here is fabricated: an unavailable value is shown as unavailable, never
-// as zero. "Today" is the viewer's own local calendar day (client-computed
-// from `occurred_at`), not a per-Site-timezone boundary the way a real
-// backend summary endpoint would compute it — stated as such in the UI.
+// P2 Dashboard redesign (branch feat/admin-oic-management) — replaces
+// the P1 Dashboard's abstract org-wide counts (Sites/Personnel/Incidents
+// cards) with one big, plain-language status card PER accessible Site —
+// patrol status/next due, missed today, active SOS, incidents today,
+// current OIC, and device presence — matching what an admin actually
+// needs to see "at a glance" for the Site(s) they run, not a directory.
+// Each metric loads independently per Site (same "one failing widget
+// never blocks the others" convention as the Reports tab); a metric a
+// role can't see shows a plain "not available to your role" note
+// instead of a blocking error.
 type Widget<T> =
-  | { kind: 'skipped' }
+  | { kind: 'skipped'; reason: string }
   | { kind: 'loading' }
   | { kind: 'loaded'; data: T }
   | { kind: 'error'; message: string };
 
 function errorMessage(reason: unknown): string {
-  return reason instanceof ApiRequestError ? reason.message : 'This widget could not be loaded.';
+  return reason instanceof ApiRequestError ? reason.message : 'This could not be loaded.';
 }
 
 export default function DashboardPage() {
@@ -49,13 +50,12 @@ export default function DashboardPage() {
   const role = session.user?.role ?? null;
 
   const [sites, setSites] = useState<Widget<Site[]>>({ kind: 'loading' });
-  const [personnel, setPersonnel] = useState<Widget<Personnel[]>>({ kind: 'loading' });
-  const [incidents, setIncidents] = useState<Widget<Incident[]>>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const loadSites = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!role || !canViewSitesOverview(role)) {
-      setSites({ kind: 'skipped' });
+      setSites({ kind: 'skipped', reason: 'Your role does not have a Site listing endpoint under the current production access model.' });
       return;
     }
     setSites({ kind: 'loading' });
@@ -66,49 +66,19 @@ export default function DashboardPage() {
     }
   }, [role, session.api]);
 
-  const loadPersonnel = useCallback(async () => {
-    if (!role || !canViewPersonnel(role)) {
-      setPersonnel({ kind: 'skipped' });
-      return;
-    }
-    setPersonnel({ kind: 'loading' });
-    try {
-      setPersonnel({ kind: 'loaded', data: await managementApi.listPersonnel(session.api) });
-    } catch (reason) {
-      setPersonnel({ kind: 'error', message: errorMessage(reason) });
-    }
-  }, [role, session.api]);
-
-  const loadIncidents = useCallback(async () => {
-    if (!role || !canViewIncidents(role)) {
-      setIncidents({ kind: 'skipped' });
-      return;
-    }
-    setIncidents({ kind: 'loading' });
-    try {
-      setIncidents({ kind: 'loaded', data: await managementApi.listIncidents(session.api) });
-    } catch (reason) {
-      setIncidents({ kind: 'error', message: errorMessage(reason) });
-    }
-  }, [role, session.api]);
-
   const refresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.allSettled([loadSites(), loadPersonnel(), loadIncidents()]);
+    await load();
+    setRefreshKey((k) => k + 1);
     setRefreshing(false);
-  }, [loadSites, loadPersonnel, loadIncidents]);
+  }, [load]);
 
   useEffect(() => {
     if (session.status !== 'authenticated') return;
     const timer = window.setTimeout(() => void refresh(), 0);
     return () => window.clearTimeout(timer);
-  }, [session.status, refresh]);
-
-  const siteNameFor = (siteId: number | null): string | null => {
-    if (siteId === null) return null;
-    if (sites.kind !== 'loaded') return null;
-    return sites.data.find((s) => s.id === siteId)?.name ?? null;
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.status]);
 
   return (
     <ProtectedPortal>
@@ -124,15 +94,17 @@ export default function DashboardPage() {
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Each card below loads independently from a real, currently-deployed endpoint. A card
-            unavailable for your role, or a card that fails to load, does not affect the others.
-          </p>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            <SitesCard widget={sites} />
-            <PersonnelCard widget={personnel} />
-            <IncidentsCard widget={incidents} siteNameFor={siteNameFor} />
+          <div className="mt-6 space-y-5">
+            {sites.kind === 'skipped' && <SkippedCard reason={sites.reason} />}
+            {sites.kind === 'loading' && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {sites.kind === 'error' && <Failed message={sites.message} />}
+            {sites.kind === 'loaded' && sites.data.length === 0 && (
+              <p className="text-sm text-muted-foreground">No Sites are assigned to your account yet.</p>
+            )}
+            {sites.kind === 'loaded' && sites.data.map((site) => (
+              <SiteStatusCard key={`${site.id}-${refreshKey}`} site={site} role={role} />
+            ))}
           </div>
         </div>
       </PortalShell>
@@ -140,34 +112,10 @@ export default function DashboardPage() {
   );
 }
 
-function CardShell({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  children: React.ReactNode;
-}) {
+function SkippedCard({ reason }: { reason: string }) {
   return (
-    <Card className="lg:col-span-1">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-          <Icon className="size-4 text-[#f36f0a]" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-
-function Skipped({ reason }: { reason: string }) {
-  return (
-    <Empty className="rounded-xl border border-dashed py-6">
-      <EmptyMedia variant="icon">
-        <Lock className="size-4" />
-      </EmptyMedia>
+    <Empty className="rounded-2xl border border-dashed py-8">
+      <EmptyMedia variant="icon"><Lock className="size-4" /></EmptyMedia>
       <EmptyContent>
         <EmptyTitle>Unavailable for this role</EmptyTitle>
         <EmptyDescription>{reason}</EmptyDescription>
@@ -185,133 +133,155 @@ function Failed({ message }: { message: string }) {
   );
 }
 
-function Loading() {
-  return <p className="text-sm text-muted-foreground">Loading…</p>;
-}
+function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
+  const session = useSession();
 
-function SitesCard({ widget }: { widget: Widget<Site[]> }) {
+  const [staffing, setStaffing] = useState<Widget<StaffingStatus>>({ kind: 'loading' });
+  const [roundStatus, setRoundStatus] = useState<Widget<RoundStatus>>({ kind: 'loading' });
+  const [missed, setMissed] = useState<Widget<MissedCheckpointTap[]>>({ kind: 'loading' });
+  const [devices, setDevices] = useState<Widget<SiteDevice[]>>({ kind: 'loading' });
+  const [incidentsToday, setIncidentsToday] = useState<Widget<number>>({ kind: 'loading' });
+  const [activeSos, setActiveSos] = useState<Widget<number>>({ kind: 'loading' });
+
+  useEffect(() => {
+    let active = true;
+    const siteId = site.id;
+
+    managementApi.getStaffing(session.api, siteId)
+      .then((data) => { if (active) setStaffing({ kind: 'loaded', data }); })
+      .catch((reason) => { if (active) setStaffing({ kind: 'error', message: errorMessage(reason) }); });
+
+    managementApi.getRoundStatus(session.api, siteId)
+      .then((data) => { if (active) setRoundStatus({ kind: 'loaded', data }); })
+      .catch((reason) => { if (active) setRoundStatus({ kind: 'error', message: errorMessage(reason) }); });
+
+    managementApi.listMissedCheckpoints(session.api, siteId)
+      .then((data) => { if (active) setMissed({ kind: 'loaded', data }); })
+      .catch((reason) => { if (active) setMissed({ kind: 'error', message: errorMessage(reason) }); });
+
+    managementApi.listDevices(session.api, siteId)
+      .then((data) => { if (active) setDevices({ kind: 'loaded', data }); })
+      .catch((reason) => { if (active) setDevices({ kind: 'error', message: errorMessage(reason) }); });
+
+    if (role && canViewIncidents(role)) {
+      managementApi.listIncidents(session.api)
+        .then((data) => { if (active) setIncidentsToday({ kind: 'loaded', data: data.filter((i) => i.site_id === siteId && isToday(i.occurred_at)).length }); })
+        .catch((reason) => { if (active) setIncidentsToday({ kind: 'error', message: errorMessage(reason) }); });
+    } else {
+      setIncidentsToday({ kind: 'skipped', reason: 'Not available to your role.' });
+    }
+
+    if (role && canRespondToSos(role)) {
+      managementApi.listSosAlerts(session.api)
+        .then((data) => { if (active) setActiveSos({ kind: 'loaded', data: data.filter((a) => a.site_id === siteId && (a.status === 'active' || a.status === 'acknowledged')).length }); })
+        .catch((reason) => { if (active) setActiveSos({ kind: 'error', message: errorMessage(reason) }); });
+    } else {
+      setActiveSos({ kind: 'skipped', reason: 'Not available to your role.' });
+    }
+
+    return () => { active = false; };
+  }, [session.api, site.id, role]);
+
+  const activeDevices = devices.kind === 'loaded' ? devices.data.filter((d) => d.is_active) : [];
+  const mostRecentDeviceActivity = activeDevices
+    .map((d) => d.last_seen_at)
+    .filter((v): v is string => v !== null)
+    .sort()
+    .at(-1) ?? null;
+
   return (
-    <CardShell icon={Building2} title="Accessible Sites">
-      {widget.kind === 'skipped' && (
-        <Skipped reason="Your role does not have a Site listing endpoint under the current production access model." />
-      )}
-      {widget.kind === 'loading' && <Loading />}
-      {widget.kind === 'error' && <Failed message={widget.message} />}
-      {widget.kind === 'loaded' && (
-        widget.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No Sites are assigned to your account yet.</p>
-        ) : (
-          <div className="grid gap-3">
-            <p className="text-3xl font-black">{widget.data.length}</p>
-            <div className="grid gap-1.5">
-              {widget.data.slice(0, 6).map((site) => (
-                <Link
-                  key={site.id}
-                  href={`/sites/${site.id}`}
-                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted/40"
-                >
-                  <span className="truncate font-bold">{site.name}</span>
-                  <Badge variant={site.status === 'active' ? 'secondary' : 'outline'}>{site.status}</Badge>
-                </Link>
-              ))}
-            </div>
-            {widget.data.length > 6 && (
-              <Link href="/sites" className="text-xs font-bold text-[#e86405] hover:underline">
-                View all {widget.data.length} Sites →
-              </Link>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Per-Site patrol status, staffing, and checkpoint detail are on each Site&apos;s own page —
-              showing them here for every Site would require one extra request per Site.
-            </p>
-          </div>
-        )
-      )}
-    </CardShell>
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Building2 className="size-4 text-[#f36f0a]" />
+            <Link href={`/sites/${site.id}`} className="hover:underline">{site.name}</Link>
+          </CardTitle>
+          <Badge variant={site.status === 'active' ? 'secondary' : 'outline'}>{site.status}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <Tile
+            icon={ShieldCheck}
+            label="Patrol"
+            value={site.patrol_operations_active ? 'Active' : 'Inactive'}
+            valueClassName={site.patrol_operations_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}
+            detail={
+              roundStatus.kind === 'loaded'
+                ? roundStatus.data.nextDueAt
+                  ? `Next due ${new Date(roundStatus.data.nextDueAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
+                  : 'No round scheduled'
+                : roundStatus.kind === 'loading' ? 'Loading…' : null
+            }
+          />
+          <Tile
+            icon={ShieldAlert}
+            label="Missed today"
+            value={missed.kind === 'loaded' ? String(missed.data.filter((m) => isToday(m.missed_at)).length) : missed.kind === 'loading' ? '…' : '—'}
+            valueClassName={missed.kind === 'loaded' && missed.data.some((m) => isToday(m.missed_at)) ? 'text-amber-700 dark:text-amber-400' : undefined}
+            error={missed.kind === 'error' ? missed.message : undefined}
+          />
+          <Tile
+            icon={PhoneCall}
+            label="Active SOS"
+            value={activeSos.kind === 'loaded' ? String(activeSos.data) : activeSos.kind === 'skipped' ? '—' : activeSos.kind === 'loading' ? '…' : '—'}
+            valueClassName={activeSos.kind === 'loaded' && activeSos.data > 0 ? 'text-red-700 dark:text-red-400' : undefined}
+            skipped={activeSos.kind === 'skipped' ? activeSos.reason : undefined}
+            error={activeSos.kind === 'error' ? activeSos.message : undefined}
+          />
+          <Tile
+            icon={AlertTriangle}
+            label="Incidents today"
+            value={incidentsToday.kind === 'loaded' ? String(incidentsToday.data) : incidentsToday.kind === 'skipped' ? '—' : incidentsToday.kind === 'loading' ? '…' : '—'}
+            valueClassName={incidentsToday.kind === 'loaded' && incidentsToday.data > 0 ? 'text-amber-700 dark:text-amber-400' : undefined}
+            skipped={incidentsToday.kind === 'skipped' ? incidentsToday.reason : undefined}
+            error={incidentsToday.kind === 'error' ? incidentsToday.message : undefined}
+          />
+          <Tile
+            icon={UserRound}
+            label="On duty (OIC)"
+            value={staffing.kind === 'loaded' ? (staffing.data.oic?.full_name ?? 'None assigned') : staffing.kind === 'loading' ? '…' : '—'}
+            error={staffing.kind === 'error' ? staffing.message : undefined}
+          />
+          <Tile
+            icon={Smartphone}
+            label="Devices"
+            value={devices.kind === 'loaded' ? `${activeDevices.length} active` : devices.kind === 'loading' ? '…' : '—'}
+            detail={devices.kind === 'loaded' ? formatLastActive(mostRecentDeviceActivity) : undefined}
+            error={devices.kind === 'error' ? devices.message : undefined}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-function PersonnelCard({ widget }: { widget: Widget<Personnel[]> }) {
-  return (
-    <CardShell icon={Users} title="Personnel">
-      {widget.kind === 'skipped' && (
-        <Skipped reason="Your role does not have a Personnel listing endpoint under the current production access model." />
-      )}
-      {widget.kind === 'loading' && <Loading />}
-      {widget.kind === 'error' && <Failed message={widget.message} />}
-      {widget.kind === 'loaded' && (
-        widget.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No Personnel records visible to your role yet.</p>
-        ) : (
-          (() => {
-            const active = widget.data.filter((p) => p.status === 'active').length;
-            return (
-              <div className="grid gap-1">
-                <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400">{active}</p>
-                <p className="text-sm text-muted-foreground">
-                  active of {widget.data.length} total visible to your role
-                </p>
-              </div>
-            );
-          })()
-        )
-      )}
-    </CardShell>
-  );
-}
-
-function IncidentsCard({
-  widget,
-  siteNameFor,
-}: {
-  widget: Widget<Incident[]>;
-  siteNameFor: (siteId: number | null) => string | null;
+function Tile({ icon: Icon, label, value, detail, valueClassName, skipped, error }: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  detail?: string | null;
+  valueClassName?: string;
+  skipped?: string;
+  error?: string;
 }) {
   return (
-    <CardShell icon={ClipboardList} title="Incidents">
-      {widget.kind === 'skipped' && (
-        <Skipped reason="Incident visibility is limited to Super Admin, Organization Admin, Site Manager, and Supervisor under current production RBAC." />
+    <div className="rounded-xl border p-3">
+      <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        <Icon className="size-3.5" />
+        {label}
+      </p>
+      {skipped ? (
+        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Lock className="size-3" />{skipped}</p>
+      ) : error ? (
+        <p className="mt-1 flex items-center gap-1 text-xs text-red-700 dark:text-red-400"><AlertTriangle className="size-3" />{error}</p>
+      ) : (
+        <>
+          <p className={`mt-1 truncate text-xl font-black ${valueClassName ?? ''}`}>{value}</p>
+          {detail && <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"><Clock className="size-3 shrink-0" />{detail}</p>}
+        </>
       )}
-      {widget.kind === 'loading' && <Loading />}
-      {widget.kind === 'error' && <Failed message={widget.message} />}
-      {widget.kind === 'loaded' && (
-        widget.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No Incidents reported yet.</p>
-        ) : (
-          <div className="grid gap-3">
-            <div className="flex items-baseline gap-4">
-              <div>
-                <p className={`text-3xl font-black ${widget.data.some((i) => isToday(i.occurred_at) && i.status !== 'resolved') ? 'text-amber-700 dark:text-amber-400' : ''}`}>
-                  {widget.data.filter((i) => isToday(i.occurred_at)).length}
-                </p>
-                <p className="text-xs text-muted-foreground">today (your local time)</p>
-              </div>
-              <div>
-                <p className="text-lg font-bold text-muted-foreground">{widget.data.length}</p>
-                <p className="text-xs text-muted-foreground">total visible to your role</p>
-              </div>
-            </div>
-            <div className="grid gap-1.5">
-              {widget.data.slice(0, 5).map((incident) => (
-                <div key={incident.id} className="rounded-lg border px-3 py-2 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="min-w-0 flex-1 truncate font-bold">{incident.title}</p>
-                    <Badge variant="outline" className="uppercase">{incident.severity}</Badge>
-                    <Badge variant={incident.status === 'resolved' ? 'outline' : 'secondary'} className="uppercase">
-                      {incident.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {siteNameFor(incident.site_id) ?? (incident.site_id ? `Site #${incident.site_id}` : 'No Site on record')}
-                    {' · '}
-                    {new Date(incident.occurred_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      )}
-    </CardShell>
+    </div>
   );
 }

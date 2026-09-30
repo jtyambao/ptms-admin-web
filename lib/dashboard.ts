@@ -91,3 +91,22 @@ export function isToday(iso: string): boolean {
     occurred.getDate() === now.getDate()
   );
 }
+
+// Device presence (P2, branch feat/admin-oic-management) — deliberately
+// "Last active: X ago", never "Online"/"Offline". site_devices.last_seen_at
+// is only touched at Guard-app site login and (once the Guard app ships
+// the deviceId-carrying change) on its existing 5s round-status poll —
+// there is no real-time heartbeat here, so a live online/offline claim
+// would be dishonest. A null last_seen_at means the device has never
+// logged in since being registered.
+export function formatLastActive(lastSeenAt: string | null): string {
+  if (!lastSeenAt) return 'Never logged in';
+  const seconds = Math.max(0, (Date.now() - new Date(lastSeenAt).getTime()) / 1000);
+  if (seconds < 90) return 'Last active moments ago';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `Last active ${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `Last active ${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return `Last active ${days} d ago`;
+}
