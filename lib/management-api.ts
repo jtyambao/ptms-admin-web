@@ -196,6 +196,11 @@ export const managementApi = {
     }),
   getAssignmentHistory: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<AssignmentHistory>(`/sites/${siteId}/assignment-history`),
+  // Attendance (item 4c follow-up, user-authorized 2026-09-30) — a
+  // dedicated, date-range-scoped read over site_oic_assignments; from/to
+  // are 'YYYY-MM-DD', inclusive both ends.
+  getAttendance: (api: AuthenticatedApiClient, siteId: number, from: string, to: string) =>
+    api.request<SiteOicAssignment[]>(`/sites/${siteId}/attendance?from=${from}&to=${to}`),
   getStaffing: (api: AuthenticatedApiClient, id: number) =>
     api.request<StaffingStatus>(`/sites/${id}/staffing-status`),
   // Patrol activation toggle (P5(c)) — roles per
