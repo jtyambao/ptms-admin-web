@@ -47,3 +47,53 @@ test('Rounds panel surfaces Schedules visibility from the existing status endpoi
   assert.match(panel, /managementApi\.getRoundStatus/);
   assert.match(panel, /Schedule status/);
 });
+
+// P1 friendly scheduling (branch feat/admin-oic-management) — the user's
+// own rule: never make a non-technical admin compute seconds/minutes or
+// enter a raw magic number (a bare "1440" was explicitly rejected).
+// "Due interval (minutes)" and the raw ack/tap-seconds number inputs are
+// replaced with plain-language presets; a raw number only ever appears
+// under an explicit "Custom" choice.
+test('Frequency is a plain-language preset dropdown, not a raw minutes input', () => {
+  assert.doesNotMatch(panel, /Due interval \(minutes\)/);
+  assert.match(panel, /Once per window\/day/);
+  assert.match(panel, /Every 15 minutes/);
+  assert.match(panel, /Every 30 minutes/);
+  assert.match(panel, /Every 1 hour/);
+  assert.match(panel, /Every 2 hours/);
+  assert.match(panel, /Every 3 hours/);
+  assert.match(panel, /Every 4 hours/);
+  assert.match(panel, /<option value="custom">Custom<\/option>/);
+});
+
+test('"Once per window/day" maps to 1440 minutes — one reveal per day, or per window if one is set', () => {
+  assert.match(panel, /\{ label: 'Once per window\/day', minutes: 1440 \}/);
+});
+
+test('Check Due Soon / tap-all seconds use presets (30s/1min/2min/5min) with a Default option, not raw seconds inputs', () => {
+  assert.doesNotMatch(panel, /Check Due Soon shows for \(seconds\)/);
+  assert.doesNotMatch(panel, /Time to tap all checkpoints \(seconds\)/);
+  assert.match(panel, /30 seconds/);
+  assert.match(panel, /1 minute/);
+  assert.match(panel, /2 minutes/);
+  assert.match(panel, /5 minutes/);
+  assert.match(panel, /<option value="default">Default<\/option>/);
+});
+
+test('a legacy/non-preset value (e.g. editing an existing Round) falls back to a visible Custom field instead of being silently changed', () => {
+  const frequencyFieldStart = panel.indexOf('function FrequencyField');
+  const frequencyFieldEnd = panel.indexOf('\n}', frequencyFieldStart);
+  const frequencyField = panel.slice(frequencyFieldStart, frequencyFieldEnd);
+  assert.match(frequencyField, /const isCustom = value\.trim\(\) !== '' && !preset;/);
+  assert.match(frequencyField, /\{\(isCustom \|\| !preset\) && \(/);
+
+  const secondsFieldStart = panel.indexOf('function SecondsPresetField');
+  const secondsFieldEnd = panel.indexOf('function frequencyBadgeLabel');
+  const secondsField = panel.slice(secondsFieldStart, secondsFieldEnd);
+  assert.match(secondsField, /const isCustom = !isDefault && !preset;/);
+});
+
+test('the Rounds list badge shows the friendly frequency label, not the raw minutes number', () => {
+  assert.doesNotMatch(panel, /Every \{round\.due_interval_minutes\} min/);
+  assert.match(panel, /frequencyBadgeLabel\(round\.due_interval_minutes\)/);
+});

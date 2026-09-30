@@ -23,6 +23,118 @@ import { useSession } from '@/lib/session-provider';
 // create/edit/deactivate controls when canManageSiteOperations is true.
 const operationError = 'The Round could not be saved. Please try again.';
 
+// P1 friendly scheduling (branch feat/admin-oic-management) — the user's
+// own explicit rule: never make a non-technical admin compute seconds or
+// minutes, or enter a "magic number" (a raw 1440 rejected as meaningless
+// on sight). Every preset here maps a plain-language label to the exact
+// wire value the backend already accepts (dueIntervalMinutes / ack+tap
+// seconds) — Custom is the only place a bare number ever appears, and
+// only as a last resort so editing a pre-existing non-preset value never
+// silently mangles it.
+//
+// "Once per window/day" = 1440 minutes (24h) is not arbitrary: with a
+// daily window set, the next candidate (lastRevealedAt + 1440min) always
+// lands exactly at the FOLLOWING day's window opening (see
+// checkpoint-rounds.service.ts's getStatus, which takes
+// min(adjustToWindow(candidate), nextWindowStart)) — i.e. exactly once
+// per window, every day. With no window set, it's simply once every 24h
+// from the last reveal. Same number, both correct "friendly" meanings.
+const FREQUENCY_PRESETS = [
+  { label: 'Once per window/day', minutes: 1440 },
+  { label: 'Every 15 minutes', minutes: 15 },
+  { label: 'Every 30 minutes', minutes: 30 },
+  { label: 'Every 1 hour', minutes: 60 },
+  { label: 'Every 2 hours', minutes: 120 },
+  { label: 'Every 3 hours', minutes: 180 },
+  { label: 'Every 4 hours', minutes: 240 },
+] as const;
+
+const SECONDS_PRESETS = [
+  { label: '30 seconds', seconds: 30 },
+  { label: '1 minute', seconds: 60 },
+  { label: '2 minutes', seconds: 120 },
+  { label: '5 minutes', seconds: 300 },
+] as const;
+
+function FrequencyField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const preset = FREQUENCY_PRESETS.find((p) => String(p.minutes) === value);
+  const isCustom = value.trim() !== '' && !preset;
+  return (
+    <div className="grid gap-2">
+      <label htmlFor="round-frequency" className="font-bold">How often</label>
+      <select
+        id="round-frequency"
+        className="h-10 rounded-lg border bg-background px-3 font-normal"
+        value={preset ? String(preset.minutes) : 'custom'}
+        onChange={(e) => onChange(e.target.value === 'custom' ? (isCustom ? value : '10') : e.target.value)}
+      >
+        {FREQUENCY_PRESETS.map((p) => <option key={p.minutes} value={p.minutes}>{p.label}</option>)}
+        <option value="custom">Custom</option>
+      </select>
+      {(isCustom || !preset) && (
+        <label htmlFor="round-frequency-custom" className="grid gap-2 text-sm font-normal text-muted-foreground">
+          Every this many minutes
+          <input
+            id="round-frequency-custom"
+            type="number"
+            min={1}
+            className="h-10 rounded-lg border bg-background px-3 text-foreground"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            required
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+function SecondsPresetField({ id, label, value, onChange }: {
+  id: string; label: string; value: string; onChange: (v: string) => void;
+}) {
+  const preset = SECONDS_PRESETS.find((p) => String(p.seconds) === value);
+  const isDefault = value.trim() === '';
+  const isCustom = !isDefault && !preset;
+  return (
+    <div className="grid gap-2">
+      <label htmlFor={id} className="font-bold">{label}</label>
+      <select
+        id={id}
+        className="h-10 rounded-lg border bg-background px-3 font-normal"
+        value={isDefault ? 'default' : preset ? String(preset.seconds) : 'custom'}
+        onChange={(e) => {
+          if (e.target.value === 'default') onChange('');
+          else if (e.target.value === 'custom') onChange(isCustom ? value : '90');
+          else onChange(e.target.value);
+        }}
+      >
+        <option value="default">Default</option>
+        {SECONDS_PRESETS.map((p) => <option key={p.seconds} value={p.seconds}>{p.label}</option>)}
+        <option value="custom">Custom</option>
+      </select>
+      {isCustom && (
+        <label htmlFor={`${id}-custom`} className="grid gap-2 text-sm font-normal text-muted-foreground">
+          Exact seconds
+          <input
+            id={`${id}-custom`}
+            type="number"
+            min={10}
+            className="h-10 rounded-lg border bg-background px-3 text-foreground"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+function frequencyBadgeLabel(minutes: number): string {
+  const preset = FREQUENCY_PRESETS.find((p) => p.minutes === minutes);
+  if (preset) return preset.label;
+  return minutes % 60 === 0 ? `Every ${minutes / 60} hour${minutes === 60 ? '' : 's'}` : `Every ${minutes} min`;
+}
+
 export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   const session = useSession();
   const role = session.user?.role ?? null;
@@ -225,7 +337,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-bold">{round.name}</p>
                         <Badge variant={round.is_active ? 'secondary' : 'outline'}>{round.is_active ? 'Active' : 'Inactive'}</Badge>
-                        <Badge variant="outline">Every {round.due_interval_minutes} min</Badge>
+                        <Badge variant="outline">{frequencyBadgeLabel(round.due_interval_minutes)}</Badge>
                         {formatTiming(round).map((part) => <Badge key={part} variant="outline">{part}</Badge>)}
                         {hasInactiveStop && (
                           <Badge variant="outline" className="border-red-400 text-red-700 dark:text-red-400">
@@ -353,10 +465,7 @@ function RoundFormDialog({
               Round name
               <Input id="round-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={150} required />
             </label>
-            <label htmlFor="round-interval" className="grid gap-2 font-bold">
-              Due interval (minutes)
-              <Input id="round-interval" type="number" min={1} value={interval} onChange={(e) => setInterval(e.target.value)} required />
-            </label>
+            <FrequencyField value={interval} onChange={setInterval} />
             <div className="grid gap-3 sm:grid-cols-2">
               <label htmlFor="round-start" className="grid gap-2 font-bold">
                 Start time
@@ -369,14 +478,18 @@ function RoundFormDialog({
             </div>
             <p className="-mt-2 text-xs text-muted-foreground lg:col-span-2">Leave both empty to run all day. An end time earlier than the start time runs overnight (e.g. 18:00–06:00).</p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label htmlFor="round-ack" className="grid gap-2 font-bold">
-                Check Due Soon shows for (seconds)
-                <Input id="round-ack" type="number" min={10} max={3600} placeholder="Default" value={timing.ack} onChange={(e) => setTiming({ ...timing, ack: e.target.value })} />
-              </label>
-              <label htmlFor="round-tap" className="grid gap-2 font-bold">
-                Time to tap all checkpoints (seconds)
-                <Input id="round-tap" type="number" min={10} max={7200} placeholder="Default" value={timing.tap} onChange={(e) => setTiming({ ...timing, tap: e.target.value })} />
-              </label>
+              <SecondsPresetField
+                id="round-ack"
+                label="Check Due Soon shows for"
+                value={timing.ack}
+                onChange={(v) => setTiming({ ...timing, ack: v })}
+              />
+              <SecondsPresetField
+                id="round-tap"
+                label="Time to tap all checkpoints"
+                value={timing.tap}
+                onChange={(v) => setTiming({ ...timing, tap: v })}
+              />
             </div>
             <div className="lg:col-span-2">
               <p className="font-bold">Checkpoints (in patrol order)</p>
