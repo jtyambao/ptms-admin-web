@@ -67,10 +67,9 @@ test('10. Patrol status reads patrol_operations_active straight off the already-
   assert.match(source, /site\.patrol_operations_active \? 'Active' : 'Inactive'/);
 });
 
-test('11. Device presence uses the honest "Last active" wording (formatLastActive), never claims Online/Offline', () => {
-  assert.match(source, /formatLastActive\(mostRecentDeviceActivity\)/);
-  assert.doesNotMatch(source, /['"]Online['"]/);
-  assert.doesNotMatch(source, /['"]Offline['"]/);
+test('11. Device tile shows a real Online/Offline claim (deviceOnlineStatus), counting devices proven online in the last 60s', () => {
+  assert.match(source, /deviceOnlineStatus\(mostRecentDeviceActivity\)\.label/);
+  assert.match(source, /onlineDeviceCount/);
 });
 
 test('12. Incident rows never attempt to render a photo — Incident has no photo_view_url', () => {

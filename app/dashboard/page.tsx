@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { ApiRequestError } from '@/lib/authenticated-api';
-import { canRespondToSos, canViewIncidents, canViewSitesOverview, formatLastActive, isToday } from '@/lib/dashboard';
+import { canRespondToSos, canViewIncidents, canViewSitesOverview, deviceOnlineStatus, isToday } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
 import type { MissedCheckpointTap, RoundStatus, Site, SiteDevice, StaffingStatus, UserRole } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
@@ -188,6 +188,7 @@ function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
     .filter((v): v is string => v !== null)
     .sort()
     .at(-1) ?? null;
+  const onlineDeviceCount = activeDevices.filter((d) => deviceOnlineStatus(d.last_seen_at).online).length;
 
   return (
     <Card>
@@ -247,8 +248,9 @@ function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
           <Tile
             icon={Smartphone}
             label="Devices"
-            value={devices.kind === 'loaded' ? `${activeDevices.length} active` : devices.kind === 'loading' ? '…' : '—'}
-            detail={devices.kind === 'loaded' ? formatLastActive(mostRecentDeviceActivity) : undefined}
+            value={devices.kind === 'loaded' ? `${onlineDeviceCount}/${activeDevices.length} online` : devices.kind === 'loading' ? '…' : '—'}
+            valueClassName={devices.kind === 'loaded' && onlineDeviceCount > 0 ? 'text-emerald-700 dark:text-emerald-400' : undefined}
+            detail={devices.kind === 'loaded' ? deviceOnlineStatus(mostRecentDeviceActivity).label : undefined}
             error={devices.kind === 'error' ? devices.message : undefined}
           />
         </div>

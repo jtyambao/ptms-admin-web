@@ -92,21 +92,40 @@ export function isToday(iso: string): boolean {
   );
 }
 
-// Device presence (P2, branch feat/admin-oic-management) — deliberately
-// "Last active: X ago", never "Online"/"Offline". site_devices.last_seen_at
-// is only touched at Guard-app site login and (once the Guard app ships
-// the deviceId-carrying change) on its existing 5s round-status poll —
-// there is no real-time heartbeat here, so a live online/offline claim
-// would be dishonest. A null last_seen_at means the device has never
-// logged in since being registered.
-export function formatLastActive(lastSeenAt: string | null): string {
-  if (!lastSeenAt) return 'Never logged in';
-  const seconds = Math.max(0, (Date.now() - new Date(lastSeenAt).getTime()) / 1000);
-  if (seconds < 90) return 'Last active moments ago';
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `Last active ${minutes} min ago`;
+// Device presence — ONLINE/OFFLINE (branch feat/remaining-four, chosen
+// design documented here). The backend now genuinely touches
+// site_devices.last_seen_at on the Guard app's existing 5s round-status
+// poll (PR #9, live in production) whenever the Guard app itself sends
+// its deviceId on that poll. That Guard app change is QUEUED, not yet
+// shipped to real devices as of this writing.
+//
+// Chosen tradeoff (option (b) from this task's own brief): switch
+// straight to a real Online/Offline claim rather than inventing a
+// "heartbeat-capable" detection heuristic (that would need a NEW column
+// to reliably distinguish a login-caused last_seen_at advance from a
+// heartbeat-caused one — real scope, not justified for a threshold
+// choice). A device still on the OLD Guard build will show "Offline"
+// here even while actively in use, because its last_seen_at only ever
+// advances at login (rare), not every 5 seconds — that's fine: "Offline"
+// only ever means "not proven online in the last 60 seconds", never
+// "proven offline", so this never OVERclaims. Once every fielded Guard
+// device has the updated app, every device correctly shows Online/
+// Offline in real time with no further Admin Web change needed.
+const ONLINE_THRESHOLD_SECONDS = 60;
+
+function relativeTimeAgo(secondsAgo: number): string {
+  if (secondsAgo < 90) return 'moments ago';
+  const minutes = Math.round(secondsAgo / 60);
+  if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
-  if (hours < 48) return `Last active ${hours} h ago`;
+  if (hours < 48) return `${hours} h ago`;
   const days = Math.round(hours / 24);
-  return `Last active ${days} d ago`;
+  return `${days} d ago`;
+}
+
+export function deviceOnlineStatus(lastSeenAt: string | null): { online: boolean; label: string } {
+  if (!lastSeenAt) return { online: false, label: 'Offline · never logged in' };
+  const seconds = Math.max(0, (Date.now() - new Date(lastSeenAt).getTime()) / 1000);
+  if (seconds < ONLINE_THRESHOLD_SECONDS) return { online: true, label: 'Online' };
+  return { online: false, label: `Offline · last seen ${relativeTimeAgo(seconds)}` };
 }
