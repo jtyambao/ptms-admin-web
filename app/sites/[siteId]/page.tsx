@@ -29,6 +29,7 @@ import { SiteShiftBriefingPanel } from '@/components/site-shift-briefing-panel';
 import { SiteEmergencyContactsPanel } from '@/components/site-emergency-contacts-panel';
 import { SiteReportsPanel } from '@/components/site-reports-panel';
 import { SiteSpecialCheckRequestsPanel } from '@/components/site-special-check-requests-panel';
+import { SiteAttendancePanel } from '@/components/site-attendance-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,7 +55,7 @@ import {
 import type { Site, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
-type Section = 'overview' | 'people' | 'devices' | 'checkpoints' | 'rounds' | 'emergency-contacts' | 'reports' | 'requests';
+type Section = 'overview' | 'people' | 'devices' | 'checkpoints' | 'rounds' | 'emergency-contacts' | 'reports' | 'requests' | 'attendance';
 
 export default function SiteDetailPage() {
   const params = useParams<{ siteId: string }>();
@@ -324,6 +325,9 @@ export default function SiteDetailPage() {
                   <TabsTrigger className="min-h-10 px-4" value="requests">
                     Requests
                   </TabsTrigger>
+                  <TabsTrigger className="min-h-10 px-4" value="attendance">
+                    Attendance
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview" className="mt-6 space-y-7">
                   <section>
@@ -514,6 +518,9 @@ export default function SiteDetailPage() {
                 </TabsContent>
                 <TabsContent value="requests">
                   <SiteSpecialCheckRequestsPanel siteId={siteId} />
+                </TabsContent>
+                <TabsContent value="attendance">
+                  <SiteAttendancePanel siteId={siteId} />
                 </TabsContent>
               </Tabs>
             </>
