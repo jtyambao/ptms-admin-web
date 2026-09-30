@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BookText, ClipboardList, Eye, ImageOff, Lock, PhoneCall, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, BookText, ClipboardList, Eye, ImageOff, Lock, PhoneCall, ShieldAlert, UserCheck, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import type {
   DobEntry,
   GovernedMissedCheckpointTap,
   Incident,
+  LoneWorkerCheckin,
   MissedCheckpointTap,
   SosAlertEntry,
   VisitorLogEntry,
@@ -46,6 +47,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
   const [visitorLogs, setVisitorLogs] = useState<Widget<VisitorLogEntry[]>>({ kind: 'loading' });
   const [vorReports, setVorReports] = useState<Widget<VoluntaryObservationReportEntry[]>>({ kind: 'loading' });
   const [dob, setDob] = useState<Widget<DobEntry[]>>({ kind: 'loading' });
+  const [lastCheckin, setLastCheckin] = useState<Widget<LoneWorkerCheckin | null>>({ kind: 'loading' });
   const [sos, setSos] = useState<Widget<SosAlertEntry[]>>({ kind: 'loading' });
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -87,6 +89,11 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
     try {
       setDob({ kind: 'loaded', data: await managementApi.listDailyOccurrenceBook(session.api, siteId) });
     } catch (reason) { setDob({ kind: 'error', message: errorMessage(reason) }); }
+
+    setLastCheckin({ kind: 'loading' });
+    try {
+      setLastCheckin({ kind: 'loaded', data: await managementApi.getLastLoneWorkerCheckin(session.api, siteId) });
+    } catch (reason) { setLastCheckin({ kind: 'error', message: errorMessage(reason) }); }
 
     if (role && canViewSos(role)) {
       setSos({ kind: 'loading' });
@@ -236,6 +243,18 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
                 <p className="mt-1 text-xs text-muted-foreground">{new Date(entry.occurred_at).toLocaleString()}</p>
               </div>
             ))}
+          </div>
+        )}
+      </ReportSection>
+
+      <ReportSection title="Lone Worker Check-In" icon={UserCheck} widget={lastCheckin}>
+        {(data) => !data ? <EmptyRow text="No Lone Worker Check-In recorded yet at this Site." /> : (
+          <div className="text-sm">
+            <p>{new Date(data.checked_in_at).toLocaleString()}</p>
+            <PhotoLink url={data.selfie_url} />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Only the most recent Check-In is available — the backend has no history-list endpoint yet.
+            </p>
           </div>
         )}
       </ReportSection>

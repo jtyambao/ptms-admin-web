@@ -29,6 +29,7 @@ import type {
   VisitorLogEntry,
   VoluntaryObservationReportEntry,
   DobEntry,
+  LoneWorkerCheckin,
   SosAlertEntry,
   SpecialCheckRequest,
   CreateSpecialCheckRequest,
@@ -85,6 +86,11 @@ export const managementApi = {
   // the backend, same as the two calls just above).
   listDailyOccurrenceBook: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<DobEntry[]>(`/daily-occurrence-book/site/${siteId}`),
+  // Lone Worker Check-In (P5) — read-only, existing endpoint only
+  // (Guard-facing/unauthenticated at the backend). Only the single most
+  // recent check-in — there is no history-list endpoint today.
+  getLastLoneWorkerCheckin: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<LoneWorkerCheckin | null>(`/lone-worker-checkins/last?siteId=${siteId}`),
   // JWT + RESPONDER_ROLES. super_admin/org_admin/site_manager/supervisor
   // get every SOS alert in the org (still filtered to one Site
   // client-side here); admin/site_admin (dry-run fix, P3(a)) are already

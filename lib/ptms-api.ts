@@ -643,6 +643,20 @@ export type DobEntry = {
   created_at: string;
 };
 
+// lone-worker-checkins/last?siteId= (P5, branch feat/admin-oic-management)
+// — Guard-facing/unauthenticated at the backend, same as DobEntry above.
+// Only the SINGLE most recent check-in — there is no history-list
+// endpoint on the backend today, so this widget can only ever show the
+// latest one, not a log.
+export type LoneWorkerCheckin = {
+  id: number;
+  organization_id: number;
+  personnel_id: number | null;
+  site_id: number | null;
+  selfie_url: string | null;
+  checked_in_at: string;
+};
+
 export type SpecialCheckRequest = {
   id: number;
   organization_id: number;

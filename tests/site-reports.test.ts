@@ -68,7 +68,17 @@ test('every report widget loads independently — one failing report does not bl
   // Each data source has its own try/catch — a rejection in one does not
   // throw out of `load` and skip the rest.
   const tryCount = (loadFnBody.match(/try \{/g) ?? []).length;
-  assert.equal(tryCount, 7); // incidents, missed, governedMissed, visitorLogs, vorReports, dob, sos — each its own try/catch
+  assert.equal(tryCount, 8); // incidents, missed, governedMissed, visitorLogs, vorReports, dob, lastCheckin, sos — each its own try/catch
+});
+
+// P5 (branch feat/admin-oic-management) — read-only, existing endpoint
+// only (Guard-facing/unauthenticated at the backend). Only the single
+// most recent check-in — there is no history-list endpoint yet.
+test('Lone Worker Check-In widget shows only the latest check-in and says so plainly', () => {
+  assert.match(api, /^\s*getLastLoneWorkerCheckin:/m);
+  assert.match(api, /\/lone-worker-checkins\/last\?siteId=\$\{siteId\}/);
+  assert.match(panel, /managementApi\.getLastLoneWorkerCheckin\(session\.api, siteId\)/);
+  assert.match(panel, /the backend has no history-list endpoint yet/);
 });
 
 // P5(a) (branch release/dry-run-ops) — read-only, existing endpoint only
