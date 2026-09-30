@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SiteOperationalSettingsPanel } from '@/components/site-operational-settings-panel';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { managementApi } from '@/lib/management-api';
-import { canViewOperationalSettings, requiresOrganizationIdForSettings } from '@/lib/operational-settings';
+import { canViewOperationalSettings, canViewSiteOperationalSettings, requiresOrganizationIdForSettings } from '@/lib/operational-settings';
 import type { OperationalSettings } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
@@ -113,6 +114,7 @@ export default function OperationalSettingsPage() {
   const session = useSession();
   const role = session.user?.role;
   const canView = !!role && canViewOperationalSettings(role);
+  const canViewSite = !!role && canViewSiteOperationalSettings(role);
   const needsOrganizationId = !!role && requiresOrganizationIdForSettings(role);
 
   const [organizationId, setOrganizationId] = useState('');
@@ -203,7 +205,7 @@ export default function OperationalSettingsPage() {
     }
   }
 
-  if (!canView) {
+  if (!canView && !canViewSite) {
     return (
       <ProtectedPortal>
         <PortalShell active="settings">
@@ -225,19 +227,20 @@ export default function OperationalSettingsPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="settings">
-        <div className="mx-auto max-w-2xl p-5 sm:p-8">
+        <div className="mx-auto max-w-2xl space-y-8 p-5 sm:p-8">
           <div>
             <p className="text-sm font-bold text-[#e86405]">Configuration</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight">Operational Settings</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              These values control Guard App timing behavior for your organization. This is an
-              organization-wide resource, not a per-Site one. Technical/safety timers (network
-              timeouts, animations, hardware safety limits) are not shown here — they remain
-              code-controlled.
+              Guard App timing behavior, either for one Site or for your whole organization.
+              Technical/safety timers (network timeouts, animations, hardware safety limits) are
+              not shown here — they remain code-controlled.
             </p>
           </div>
 
-          {needsOrganizationId && (
+          {canViewSite && <SiteOperationalSettingsPanel />}
+
+          {canView && needsOrganizationId && (
             <label htmlFor="settings-organization-id" className="mt-6 grid gap-2 text-sm font-bold">
               Organization ID
               <div className="flex gap-2">
@@ -258,67 +261,75 @@ export default function OperationalSettingsPage() {
             </label>
           )}
 
-          {!needsOrganizationId && !settings && !loading && !error && (
-            <Button type="button" variant="outline" className="mt-6" onClick={() => void load()}>
-              <RefreshCw /> Load Operational Settings
-            </Button>
-          )}
+          {canView && (
+            <div>
+              {canViewSite && (
+                <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Organization-wide</p>
+              )}
 
-          {error && (
-            <p role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100">
-              <AlertTriangle className="size-4 shrink-0" />
-              {error}
-            </p>
-          )}
-
-          {loading && !settings && (
-            <p className="mt-8 text-sm text-muted-foreground">Loading Operational Settings…</p>
-          )}
-
-          {settings && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Clock className="size-4 text-[#f36f0a]" />
-                  Guard App Timing
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-5">
-                {FIELDS.map((f) => (
-                  <div key={f.key} className="grid gap-1.5">
-                    <Label htmlFor={f.key}>
-                      {f.label} <span className="font-normal text-muted-foreground">({f.unit})</span>
-                    </Label>
-                    <Input
-                      id={f.key}
-                      type="number"
-                      value={formValues[f.key] ?? ''}
-                      onChange={(e) => handleChange(f.key, e.target.value)}
-                      disabled={saving}
-                    />
-                    <p className="text-xs text-muted-foreground">{f.helper}</p>
-                  </div>
-                ))}
-
-                {fieldError && (
-                  <p role="alert" className="flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100">
-                    <AlertTriangle className="size-4 shrink-0" />
-                    {fieldError}
-                  </p>
-                )}
-                {success && !fieldError && (
-                  <p className="flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-                    <CheckCircle2 className="size-4 shrink-0" />
-                    Operational settings saved.
-                  </p>
-                )}
-
-                <Button onClick={() => void handleSave()} disabled={saving} className="w-fit gap-2">
-                  <Save className="size-4" />
-                  {saving ? 'Saving…' : 'Save changes'}
+              {!needsOrganizationId && !settings && !loading && !error && (
+                <Button type="button" variant="outline" onClick={() => void load()}>
+                  <RefreshCw /> Load Operational Settings
                 </Button>
-              </CardContent>
-            </Card>
+              )}
+
+              {error && (
+                <p role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {error}
+                </p>
+              )}
+
+              {loading && !settings && (
+                <p className="mt-8 text-sm text-muted-foreground">Loading Operational Settings…</p>
+              )}
+
+              {settings && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Clock className="size-4 text-[#f36f0a]" />
+                      Guard App Timing
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-5">
+                    {FIELDS.map((f) => (
+                      <div key={f.key} className="grid gap-1.5">
+                        <Label htmlFor={f.key}>
+                          {f.label} <span className="font-normal text-muted-foreground">({f.unit})</span>
+                        </Label>
+                        <Input
+                          id={f.key}
+                          type="number"
+                          value={formValues[f.key] ?? ''}
+                          onChange={(e) => handleChange(f.key, e.target.value)}
+                          disabled={saving}
+                        />
+                        <p className="text-xs text-muted-foreground">{f.helper}</p>
+                      </div>
+                    ))}
+
+                    {fieldError && (
+                      <p role="alert" className="flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100">
+                        <AlertTriangle className="size-4 shrink-0" />
+                        {fieldError}
+                      </p>
+                    )}
+                    {success && !fieldError && (
+                      <p className="flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                        <CheckCircle2 className="size-4 shrink-0" />
+                        Operational settings saved.
+                      </p>
+                    )}
+
+                    <Button onClick={() => void handleSave()} disabled={saving} className="w-fit gap-2">
+                      <Save className="size-4" />
+                      {saving ? 'Saving…' : 'Save changes'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </div>
       </PortalShell>

@@ -155,3 +155,27 @@ test('Operational Settings uses the organization-scoped management contract, not
   assert.equal(calls[3].init?.method, 'PATCH');
   assert.deepEqual(JSON.parse(String(calls[3].init?.body)), { catchupWindowSeconds: 1800, organizationId: 9 });
 });
+
+// P3 Per-Site Operational Settings (branch feat/admin-oic-management,
+// backend sql/050) — a genuinely SEPARATE, site-scoped management
+// contract from the org-wide one just above.
+test('Per-Site Operational Settings uses sites/:siteId/operational-settings, distinct from the org-wide contract', async () => {
+  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const api = { request: async <T>(path: string, init?: RequestInit) => {
+    calls.push({ path, init });
+    return {} as T;
+  } };
+  await managementApi.getSiteOperationalSettings(api, 4);
+  await managementApi.updateSiteOperationalSettings(api, 4, { guardIdleTimeoutSeconds: 30 });
+  await managementApi.resetSiteOperationalSettings(api, 4);
+
+  assert.deepEqual(calls.map((call) => call.path), [
+    '/sites/4/operational-settings',
+    '/sites/4/operational-settings',
+    '/sites/4/operational-settings',
+  ]);
+  assert.equal(calls[0].init, undefined);
+  assert.equal(calls[1].init?.method, 'PATCH');
+  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), { guardIdleTimeoutSeconds: 30 });
+  assert.equal(calls[2].init?.method, 'DELETE');
+});

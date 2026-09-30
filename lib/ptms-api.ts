@@ -495,6 +495,14 @@ export type OperationalSettings = {
 // merged result (e.g. warning-must-be-less-than-timeout) before writing.
 export type UpdateOperationalSettingsRequest = Partial<OperationalSettings> & { organizationId?: number };
 
+// Per-Site Operational Settings (P3, branch feat/admin-oic-management,
+// backend sql/050) — matches SiteOperationalSettingsResult exactly.
+// hasOverride tells the UI whether this Site currently has its own
+// override row (show "Custom" + a Reset action) or is still tracking
+// the organization's default (show "Organization default").
+export type SiteOperationalSettings = OperationalSettings & { hasOverride: boolean };
+export type UpdateSiteOperationalSettingsRequest = Partial<OperationalSettings>;
+
 export type DashboardSummary = {
   totals: {
     activeSites: number;

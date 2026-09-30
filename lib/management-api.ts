@@ -38,6 +38,8 @@ import type {
   CreateUserRequest,
   OperationalSettings,
   UpdateOperationalSettingsRequest,
+  SiteOperationalSettings,
+  UpdateSiteOperationalSettingsRequest,
   SiteCredentialRegenerationResult,
   DeactivateAdminAccountResult,
   UpdateOwnProfileRequest,
@@ -341,4 +343,16 @@ export const managementApi = {
     api.request<OperationalSettings>('/management/operational-settings', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
+  // Per-Site Operational Settings (P3) — Owner/Engineer/Manager view any
+  // authorized Site, Supervisor/Admin view+edit their own assigned Site
+  // (requireReadAccess/requireManageAccess, same as every other
+  // assigned-Site capability).
+  getSiteOperationalSettings: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<SiteOperationalSettings>(`/sites/${siteId}/operational-settings`),
+  updateSiteOperationalSettings: (api: AuthenticatedApiClient, siteId: number, body: UpdateSiteOperationalSettingsRequest) =>
+    api.request<SiteOperationalSettings>(`/sites/${siteId}/operational-settings`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
+  resetSiteOperationalSettings: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<SiteOperationalSettings>(`/sites/${siteId}/operational-settings`, { method: 'DELETE' }),
 };
