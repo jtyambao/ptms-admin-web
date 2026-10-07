@@ -38,9 +38,9 @@ test('management API uses exact Site-scoped Migration 028 contracts', async () =
 test('Site Operations UI clears and never persists or renders the signing value', () => {
   const source=readFileSync('components/site-operations-panel.tsx','utf8');
   assert.match(source,/setWriterPayload\(null\)/);
-  assert.match(source,/Close and clear/);
+  assert.match(source,/It is not saved after you close this window/);
   assert.doesNotMatch(source,/localStorage|sessionStorage/);
   assert.doesNotMatch(source,/writerPayload\.tagSignature|tag_signature/);
-  assert.match(source,/old physical tag becomes invalid/i);
-  assert.match(source,/physical tag will stop validating/i);
+  assert.match(source,/old tag stops working/i);
+  assert.match(source,/tag stops working right away/i);
 });
