@@ -523,6 +523,9 @@ function CallsShell() {
   // device from the alert and rings only that phone.
   async function placeSosCall(alert: SosAlertEntry) {
     if (!canCallSosSender(alert) || alert.site_id === null) return;
+    // Calling the sender IS responding: acknowledge a still-new SOS so the
+    // alarm stops and the card moves on to Resolve / False alarm.
+    if (alert.status === 'active' && canRespond) void sosActions.acknowledge(alert);
     await dial(alert.site_id, 'voice', {
       sosAlertId: alert.id,
       targetSiteDeviceId: alert.triggering_site_device_id ?? undefined,
