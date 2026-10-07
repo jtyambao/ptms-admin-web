@@ -99,11 +99,11 @@ import { useSession } from '@/lib/session-provider';
  */
 
 const STATUS_LABEL: Record<CallsSocketStatus, string> = {
-  disabled: 'Disabled',
+  disabled: 'Turned off',
   connecting: 'Connecting…',
-  connected: 'Connected — registering…',
-  registered: 'Registered',
-  error: 'Error',
+  connected: 'Almost ready…',
+  registered: 'Ready to call',
+  error: 'Not connected',
 };
 
 const STATUS_VARIANT: Record<CallsSocketStatus, 'secondary' | 'outline' | 'destructive'> = {
@@ -395,12 +395,11 @@ function CallsShell() {
   if (!enabled) {
     return (
       <section className="mt-8 rounded-2xl border bg-muted/20 p-5">
-        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Voice / Video</p>
+        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Voice and video</p>
         <h2 className="mt-1 text-xl font-black">Calls</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
           <ShieldAlert className="size-4 shrink-0" />
-          Not yet enabled. This is untested groundwork — see the design note in this page&apos;s
-          own source for the full protocol and what still needs a real device test.
+          Calls are not turned on yet. They still need to be switched on and tried with real phones first.
         </p>
       </section>
     );
@@ -409,21 +408,20 @@ function CallsShell() {
   return (
     <section className="mt-8 space-y-4">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Voice / Video</p>
+        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Voice and video</p>
         <h2 className="mt-1 text-xl font-black">Calls</h2>
       </div>
 
       <p className="flex gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
         <AlertTriangle className="size-4 shrink-0" />
-        Untested against a real device or browser session — see this page&apos;s own design note
-        for exactly what has and hasn&apos;t been verified.
+        Calls are still being tested with real phones. If a call does not connect, phone the guards the normal way.
       </p>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <PhoneCall className="size-4 text-[#f36f0a]" />
-            Signaling connection
+            Call connection
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -443,8 +441,8 @@ function CallsShell() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              A call fans out to every connected Guard device at the chosen Site — there is no
-              per-device targeting from Admin Web (only a Guard can call a specific device).
+              The call rings every Guard phone that is online at the chosen Site. You cannot pick
+              one phone from here (only a guard can call one specific phone).
             </p>
             {sitesError && <p className="text-sm text-red-700 dark:text-red-400">{sitesError}</p>}
             <div className="grid gap-3 sm:grid-cols-2">

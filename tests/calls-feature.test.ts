@@ -89,7 +89,7 @@ test('only ACTIVE devices count toward online/active totals', async () => {
 
 test('the contact picker is honest that a call fans out to the whole Site, not a specific device', () => {
   const source = readFileSync('app/calls/page.tsx', 'utf8');
-  assert.match(source, /no[\s\S]{0,60}per-device targeting from Admin Web/i);
+  assert.match(source, /rings every Guard phone that is online[\s\S]{0,120}cannot pick/i);
 });
 
 test('the incoming-call overlay offers accept/decline and a click-to-enable ringtone control', () => {

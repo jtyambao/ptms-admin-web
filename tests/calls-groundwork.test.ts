@@ -31,12 +31,12 @@ test('the feature flag defaults OFF and only NEXT_PUBLIC_CALLS_ENABLED="true" tu
 test('the Calls page shows a plain "not yet enabled" message when the flag is off, not the connection shell', () => {
   const source = readFileSync('app/calls/page.tsx', 'utf8');
   assert.match(source, /if \(!enabled\)/);
-  assert.match(source, /Not yet enabled/);
+  assert.match(source, /Calls are not turned on yet/);
 });
 
 test('the Calls page is honest that nothing here has been run against a real device or browser session', () => {
   const source = readFileSync('app/calls/page.tsx', 'utf8');
-  assert.match(source, /untested (groundwork|against a real device)/i);
+  assert.match(source, /still being tested with real phones/i);
   assert.match(source, /has been run[\s\S]{0,20}against a real Guard device/i);
 });
 
