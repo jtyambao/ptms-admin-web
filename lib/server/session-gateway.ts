@@ -17,7 +17,9 @@ function runtime(runtime?: GatewayRuntime) {
       process.env.PTMS_API_BASE_URL ??
       process.env.NEXT_PUBLIC_PTMS_API_BASE_URL ??
       'https://ptms-api.onrender.com/api/v1',
-    fetcher: runtime?.fetcher ?? fetch,
+    // Wrapped, not stored bare: options.fetcher(...) would call fetch with `this` set
+    // to this object, which browsers/workers reject as "Illegal invocation".
+    fetcher: runtime?.fetcher ?? ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => fetch(input, init)),
     production: runtime?.production ?? process.env.NODE_ENV === 'production',
   };
 }
