@@ -19,7 +19,7 @@ test('canTogglePatrolActivation matches setPatrolActivation\'s requireRole exact
 test('Patrol toggle is rendered for every role but only enabled for canTogglePatrolActivation', () => {
   assert.match(patrolToggle, /canTogglePatrolActivation\(role\)/);
   assert.match(patrolToggle, /disabled=\{!canToggle \|\| saving\}/);
-  assert.match(patrolToggle, /Your role cannot change this under current production RBAC\./);
+  assert.match(patrolToggle, /Ask the Site Supervisor to turn patrols on or off\./);
 });
 
 test('Patrol toggle calls the real, existing PUT endpoint', () => {
