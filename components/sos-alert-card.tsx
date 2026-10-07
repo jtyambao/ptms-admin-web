@@ -20,7 +20,13 @@ function errorMessage(reason: unknown): string {
   return reason instanceof ApiRequestError ? reason.message : 'The action could not be completed.';
 }
 
-export function useSosActions(api: AuthenticatedApiClient, onChanged: () => Promise<void> | void) {
+export function useSosActions(
+  api: AuthenticatedApiClient,
+  onChanged: () => Promise<void> | void,
+  // Called after an SOS is resolved or cancelled (the Calls page ends the
+  // call to the SOS phone at that point).
+  onClosed?: (alert: SosAlertEntry) => void,
+) {
   const [actingOn, setActingOn] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -49,6 +55,7 @@ export function useSosActions(api: AuthenticatedApiClient, onChanged: () => Prom
       if (action.kind === 'resolve') await managementApi.resolveSos(api, action.alert.id, note.trim() || undefined);
       else await managementApi.cancelSos(api, action.alert.id, note.trim() || undefined);
       setSuccess(action.kind === 'resolve' ? 'Marked resolved.' : 'Cancelled as a false alarm.');
+      onClosed?.(action.alert);
       setAction(null);
       await onChanged();
     } catch (reason) { setError(errorMessage(reason)); }

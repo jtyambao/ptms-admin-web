@@ -198,14 +198,24 @@ function InCallPanel({
   call,
   client,
   iceConfiguration,
+  endRequest = 0,
   onEnded,
 }: {
   call: ActiveCall;
   client: CallsSignalingClient | null;
   iceConfiguration: RTCConfiguration;
+  endRequest?: number;
   onEnded: () => void;
 }) {
   const { state, toggleMute, toggleCamera, hangUp, getAudioStats, turnOnCamera } = useCallSession(client, call, iceConfiguration);
+  // A bump of endRequest (the SOS was resolved/cancelled) hangs up.
+  const lastEndRequest = useRef(endRequest);
+  useEffect(() => {
+    if (endRequest === lastEndRequest.current) return;
+    lastEndRequest.current = endRequest;
+    if (state && state.phase !== 'ended') hangUp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endRequest]);
   const showVideo = call.callType === 'video' || !!state?.remoteHasVideo || !!state?.localHasVideo;
   // Live audio check while connected: shows whether this browser's mic is
   // picking up sound and whether audio is actually flowing each way, so a
@@ -456,7 +466,10 @@ function CallsShell() {
     return () => { window.clearInterval(poll); window.clearInterval(tick); };
   }, [enabled, sosCtx, pollSos]);
 
-  const sosActions = useSosActions(session.api, pollSos);
+  // Resolving or cancelling the SOS from this page also ends the call to
+  // the SOS phone - the emergency is closed, so is the line.
+  const [endCallRequest, setEndCallRequest] = useState(0);
+  const sosActions = useSosActions(session.api, pollSos, () => setEndCallRequest((n) => n + 1));
 
   // /calls?siteId=N (the SOS console's "Call the Site" button) preselects
   // that Site once the list has loaded - once only, so it never fights the
@@ -625,7 +638,7 @@ function CallsShell() {
       </Card>
 
       {activeCall ? (
-        <InCallPanel call={activeCall} client={client} iceConfiguration={iceConfiguration} onEnded={() => setActiveCall(null)} />
+        <InCallPanel call={activeCall} client={client} iceConfiguration={iceConfiguration} endRequest={endCallRequest} onEnded={() => setActiveCall(null)} />
       ) : (
         <Card>
           <CardHeader>
