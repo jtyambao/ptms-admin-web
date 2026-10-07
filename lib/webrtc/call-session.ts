@@ -63,6 +63,11 @@ export interface CallSessionState {
   direction: CallDirection;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  // True once the other side is sending video — including a voice call
+  // the Guard upgrades to video mid-call (it renegotiates with a new offer).
+  remoteHasVideo: boolean;
+  // True once this browser is sending its camera.
+  localHasVideo: boolean;
   muted: boolean;
   cameraOff: boolean;
   endReason: string | null;
@@ -122,6 +127,8 @@ export class CallSession {
       direction: params.direction,
       localStream: null,
       remoteStream: null,
+      remoteHasVideo: false,
+      localHasVideo: params.callType === 'video',
       muted: false,
       cameraOff: false,
       endReason: null,
@@ -196,12 +203,14 @@ export class CallSession {
       // Some senders add a track without an associated stream; build one
       // from the bare track so its audio still plays.
       const [stream] = event.streams;
-      if (stream) {
-        this.setState({ remoteStream: stream });
-      } else if (event.track && typeof MediaStream !== 'undefined') {
-        const current = this.state.remoteStream ?? new MediaStream();
-        current.addTrack(event.track);
-        this.setState({ remoteStream: current });
+      let remote = stream ?? null;
+      if (!remote && event.track && typeof MediaStream !== 'undefined') {
+        remote = this.state.remoteStream ?? new MediaStream();
+        remote.addTrack(event.track);
+      }
+      if (remote) {
+        const hasVideo = event.track?.kind === 'video' || remote.getVideoTracks().length > 0;
+        this.setState({ remoteStream: remote, remoteHasVideo: this.state.remoteHasVideo || hasVideo });
       }
     };
     pc.onconnectionstatechange = () => this.handleConnectionStateChange(pc.connectionState);
@@ -371,6 +380,25 @@ export class CallSession {
 
   hangUp(): void {
     this.endLocally('ended', true);
+  }
+
+  // Voice -> video upgrade from this side: add the camera to the live
+  // connection and renegotiate with a fresh offer, the same way the Guard
+  // app's own upgradeToVideo does (it answers a mid-call offer).
+  async turnOnCamera(): Promise<void> {
+    if (this.state.localHasVideo || this.state.phase !== 'connected' || !this.pc) return;
+    try {
+      const videoStream = await this.getUserMedia({ audio: false, video: true });
+      const [videoTrack] = videoStream.getVideoTracks();
+      if (!videoTrack) return;
+      const local = this.state.localStream ?? videoStream;
+      if (local !== videoStream) local.addTrack(videoTrack);
+      this.pc.addTrack(videoTrack, local);
+      this.setState({ localStream: local, localHasVideo: true, cameraOff: false });
+      await this.createAndSendOffer();
+    } catch (err) {
+      this.setState({ error: (err as Error).message || 'Could not turn on the camera.' });
+    }
   }
 
   async getAudioStats(): Promise<CallAudioStats | null> {

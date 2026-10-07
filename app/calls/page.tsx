@@ -201,7 +201,8 @@ function InCallPanel({
   iceConfiguration: RTCConfiguration;
   onEnded: () => void;
 }) {
-  const { state, toggleMute, toggleCamera, hangUp, getAudioStats } = useCallSession(client, call, iceConfiguration);
+  const { state, toggleMute, toggleCamera, hangUp, getAudioStats, turnOnCamera } = useCallSession(client, call, iceConfiguration);
+  const showVideo = call.callType === 'video' || !!state?.remoteHasVideo || !!state?.localHasVideo;
   // Live audio check while connected: shows whether this browser's mic is
   // picking up sound and whether audio is actually flowing each way, so a
   // one-way-audio problem can be pinned to this side or the Guard phone.
@@ -274,7 +275,7 @@ function InCallPanel({
         {/* Voice calls had no media element at all, so the remote voice was
             never played. The video element below carries audio for video
             calls; this hidden audio element does it for voice calls. */}
-        {call.callType !== 'video' && (
+        {!showVideo && (
           <audio
             autoPlay
             ref={(el) => {
@@ -285,25 +286,32 @@ function InCallPanel({
             }}
           />
         )}
-        {call.callType === 'video' && (
+        {/* Shown for video calls and also when either side turns a voice
+            call into video mid-call. The remote video carries the audio. */}
+        {showVideo && (
           <div className="grid gap-3 sm:grid-cols-2">
             <video
               autoPlay
               playsInline
-              muted
               ref={(el) => {
-                if (el && state.localStream) el.srcObject = state.localStream;
+                if (el && state.remoteStream && el.srcObject !== state.remoteStream) {
+                  el.srcObject = state.remoteStream;
+                  void el.play().catch(() => undefined);
+                }
               }}
               className="aspect-video w-full rounded-lg bg-black"
             />
-            <video
-              autoPlay
-              playsInline
-              ref={(el) => {
-                if (el && state.remoteStream) el.srcObject = state.remoteStream;
-              }}
-              className="aspect-video w-full rounded-lg bg-black"
-            />
+            {state.localHasVideo && (
+              <video
+                autoPlay
+                playsInline
+                muted
+                ref={(el) => {
+                  if (el && state.localStream && el.srcObject !== state.localStream) el.srcObject = state.localStream;
+                }}
+                className="aspect-video w-full rounded-lg bg-black"
+              />
+            )}
           </div>
         )}
 
@@ -313,11 +321,17 @@ function InCallPanel({
               {state.muted ? <MicOff /> : <Mic />}
               {state.muted ? 'Unmute' : 'Mute'}
             </Button>
-            {call.callType === 'video' && (
+            {state.localHasVideo ? (
               <Button type="button" variant="outline" onClick={toggleCamera}>
                 {state.cameraOff ? <VideoOff /> : <Video />}
                 {state.cameraOff ? 'Camera on' : 'Camera off'}
               </Button>
+            ) : (
+              state.phase === 'connected' && (
+                <Button type="button" variant="outline" onClick={() => void turnOnCamera()}>
+                  <Video />Turn on my camera
+                </Button>
+              )
             )}
             <Button type="button" variant="destructive" onClick={hangUp}>
               <PhoneOff />End call

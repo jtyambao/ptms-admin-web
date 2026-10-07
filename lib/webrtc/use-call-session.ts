@@ -11,6 +11,7 @@ export interface UseCallSessionResult {
   toggleCamera(): void;
   hangUp(): void;
   getAudioStats(): Promise<CallAudioStats | null>;
+  turnOnCamera(): Promise<void>;
 }
 
 // Thin React binding over CallSession — the state machine itself
@@ -68,5 +69,6 @@ export function useCallSession(
     toggleCamera: () => sessionRef.current?.toggleCamera(),
     hangUp: () => sessionRef.current?.hangUp(),
     getAudioStats: async () => (sessionRef.current ? sessionRef.current.getAudioStats() : null),
+    turnOnCamera: async () => sessionRef.current?.turnOnCamera(),
   };
 }
