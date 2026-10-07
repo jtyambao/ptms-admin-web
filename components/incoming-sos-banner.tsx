@@ -11,6 +11,7 @@ import { managementApi } from '@/lib/management-api';
 import { callSenderUrl, canCallSosSender } from '@/lib/sos-console';
 import type { SosAlertEntry } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
+import { describeSosSender, useSosSenderInfo } from '@/lib/sos-sender-info';
 
 // Incoming SOS banner (P3(d), branch release/dry-run-ops) — global, lives
 // in PortalShell so it's visible from any authenticated page, not just the
@@ -40,6 +41,7 @@ export function IncomingSosBanner() {
   const enabled = session.status === 'authenticated' && !!role && canRespondToSos(role);
 
   const [alerts, setAlerts] = useState<SosAlertEntry[]>([]);
+  const senderInfo = useSosSenderInfo(session.api, alerts);
   const [actingOn, setActingOn] = useState<number | null>(null);
   // Inline "Resolve" for an SOS someone is already responding to.
   const [resolvingId, setResolvingId] = useState<number | null>(null);
@@ -187,7 +189,7 @@ export function IncomingSosBanner() {
         {alerts.map((alert) => (
           <div key={alert.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-black/20 px-3 py-2 text-sm">
             <span className="font-bold">{alert.site_name ?? 'Unknown Site'}</span>
-            <span>{alert.personnel_name ?? 'Guard not identified'}</span>
+            <span>{describeSosSender(alert, senderInfo[alert.id])}</span>
             <span className="text-white/80">{new Date(alert.triggered_at).toLocaleTimeString()}</span>
             {alert.latitude !== null && alert.longitude !== null && (
               <a

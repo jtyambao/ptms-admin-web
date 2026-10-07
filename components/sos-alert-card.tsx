@@ -10,6 +10,8 @@ import { ApiRequestError, type AuthenticatedApiClient } from '@/lib/authenticate
 import { managementApi } from '@/lib/management-api';
 import { formatElapsed, mapsUrl } from '@/lib/sos-console';
 import type { SosAlertEntry } from '@/lib/ptms-api';
+import { useSession } from '@/lib/session-provider';
+import { describeSosSender, useSosSenderInfo } from '@/lib/sos-sender-info';
 
 // One open SOS alert and the actions on it (Acknowledge -> Resolve / False
 // alarm). Shared by the SOS page and by the Calls page, which keeps the
@@ -78,6 +80,8 @@ export function SosAlertCard({
   /** The call button(s): "Call sender now", or "Call the Site" when the alert names no phone. */
   callSlot?: ReactNode;
 }) {
+  const session = useSession();
+  const senderInfo = useSosSenderInfo(session.api, [alert]);
   const isNew = alert.status === 'active';
   const hasLocation = alert.latitude !== null && alert.longitude !== null;
   return (
@@ -89,7 +93,7 @@ export function SosAlertCard({
         <p className="ml-auto text-2xl font-black tabular-nums">{formatElapsed(alert.triggered_at, now)}</p>
       </div>
       <dl className="mt-3 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
-        <div><dt className="inline font-bold">Guard: </dt><dd className="inline">{alert.personnel_name ?? 'The Site’s guard device (no individual named)'}</dd></div>
+        <div><dt className="inline font-bold">Sent by: </dt><dd className="inline">{describeSosSender(alert, senderInfo[alert.id])}</dd></div>
         <div><dt className="inline font-bold">Triggered: </dt><dd className="inline">{new Date(alert.triggered_at).toLocaleString()}</dd></div>
         {alert.acknowledged_at && (
           <div><dt className="inline font-bold">Acknowledged: </dt><dd className="inline">{new Date(alert.acknowledged_at).toLocaleTimeString()}{alert.acknowledged_by_name ? ` by ${alert.acknowledged_by_name}` : ''}</dd></div>
