@@ -68,7 +68,7 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
         <h2 className="mt-1 text-xl font-black">OIC Time In / Time Out</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
           <ShieldAlert className="size-4 shrink-0" />
-          Attendance is unavailable for this role. The backend remains authoritative.
+          Your role cannot see Attendance for this Site.
         </p>
       </section>
     );

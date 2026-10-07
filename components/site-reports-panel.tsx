@@ -102,7 +102,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
         setSos({ kind: 'loaded', data: all.filter((a) => a.site_id === siteId) });
       } catch (reason) { setSos({ kind: 'error', message: errorMessage(reason) }); }
     } else {
-      setSos({ kind: 'skipped', reason: 'SOS visibility is limited to Super Admin, Organization Admin, Site Manager, and Supervisor under current production RBAC.' });
+      setSos({ kind: 'skipped', reason: 'SOS alerts are only visible to some roles. Your role does not include them.' });
     }
   }, [role, session.api, session.status, siteId]);
 
@@ -142,10 +142,10 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
   return (
     <section className="mt-8 space-y-6" aria-labelledby="reports-heading">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Read-only</p>
+        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">View only</p>
         <h2 id="reports-heading" className="mt-1 text-xl font-black">Reports</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Each report below loads independently from a real, currently-deployed endpoint.
+          Each report loads on its own, so one problem will not hide the others.
         </p>
       </div>
 
@@ -253,7 +253,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
             <p>{new Date(data.checked_in_at).toLocaleString()}</p>
             <PhotoLink url={data.selfie_url} />
             <p className="mt-2 text-xs text-muted-foreground">
-              Only the most recent Check-In is available — the backend has no history-list endpoint yet.
+              Only the most recent Check-In is shown for now.
             </p>
           </div>
         )}
@@ -284,7 +284,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
       </ReportSection>
 
       <div className="rounded-2xl border border-dashed bg-muted/20 p-4 text-xs text-muted-foreground">
-        Checkpoint visit/scan history has no listing endpoint on the current backend yet — not shown here.
+        A list of past checkpoint scans is not available yet.
       </div>
     </section>
   );

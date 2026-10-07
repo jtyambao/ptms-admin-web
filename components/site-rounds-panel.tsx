@@ -411,7 +411,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
         <h2 className="mt-1 text-xl font-black">Rounds</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
           <ShieldAlert className="size-4 shrink-0" />
-          Round controls are unavailable for this role. The backend remains authoritative.
+          Your role cannot manage Rounds for this Site.
         </p>
       </section>
     );

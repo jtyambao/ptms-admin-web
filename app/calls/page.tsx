@@ -126,7 +126,7 @@ type MissedCall = IncomingInvite & { at: number };
 // "From a Guard device" fallback in that case, never a blank/broken UI.
 function CallerIdentityLine({ callerContext }: { callerContext: CallerContext | null }) {
   if (!callerContext) {
-    return <>From a Guard device. The caller&apos;s identity was not provided by the backend.</>;
+    return <>From a Guard phone. We could not tell which Site it is calling from.</>;
   }
   if (callerContext.kind === 'guard') {
     return (

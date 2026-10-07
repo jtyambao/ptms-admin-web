@@ -88,12 +88,12 @@ export default function AccountsPage() {
       return;
     }
     if (!selectedRole) {
-      setError('Select a role.');
+      setError('Choose a role.');
       return;
     }
     const parsedOrganizationId = needsOrganizationId ? Number(organizationId) : undefined;
     if (needsOrganizationId && (!organizationId.trim() || !Number.isInteger(parsedOrganizationId) || parsedOrganizationId! < 1)) {
-      setError('Enter a valid Organization ID. There is no Organization directory yet — this must be a known numeric id.');
+      setError('Enter the Organization ID (a number). Ask the platform team if you do not have it.');
       return;
     }
     setSaving(true);
@@ -107,12 +107,12 @@ export default function AccountsPage() {
       });
       closeCreate();
       await refresh();
-      setSuccess('Account created.');
+      setSuccess('Account added.');
     } catch (reason) {
       setPassword('');
       setError(
         reason instanceof ApiRequestError && reason.status === 409
-          ? 'A user with this email already exists.'
+          ? 'An account with this email already exists.'
           : reason instanceof ApiRequestError
             ? reason.message
             : genericError,
@@ -132,7 +132,7 @@ export default function AccountsPage() {
               <h1 className="mt-1 text-xl font-black">Accounts</h1>
               <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
                 <ShieldAlert className="size-4 shrink-0" />
-                Account management is unavailable for this role.
+                Your role cannot manage accounts. Ask the Owner or Engineer.
               </p>
             </section>
           </div>
@@ -147,12 +147,12 @@ export default function AccountsPage() {
         <div className="mx-auto max-w-6xl p-5 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-[#e86405]">Platform accounts</p>
+              <p className="text-sm font-bold text-[#e86405]">Who can sign in</p>
               <h1 className="mt-1 text-3xl font-black">Accounts</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Generic organization/platform accounts — distinct from the Supervisor and Admin
-                hierarchy accounts managed from a Site&apos;s People tab. There is no edit or
-                deactivate action yet; the backend does not expose one.
+                Everyone who can sign in to this portal. A Site&apos;s Supervisor and Admins are
+                added from that Site&apos;s People tab instead. To change or turn off an account,
+                ask the platform team.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -161,7 +161,7 @@ export default function AccountsPage() {
               </Button>
               {canCreate && (
                 <Button className="bg-[#f36f0a] text-white hover:bg-[#d95e00]" onClick={() => setShowCreate(true)}>
-                  <Plus /> Create Account
+                  <Plus /> Add account
                 </Button>
               )}
             </div>
@@ -183,9 +183,9 @@ export default function AccountsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">New account</p>
-                  <h2 className="mt-1 font-black">Create Account</h2>
+                  <h2 className="mt-1 font-black">Add an account</h2>
                 </div>
-                <Button aria-label="Close create form" onClick={closeCreate} size="icon" type="button" variant="ghost">
+                <Button aria-label="Close" onClick={closeCreate} size="icon" type="button" variant="ghost">
                   <X />
                 </Button>
               </div>
@@ -202,7 +202,7 @@ export default function AccountsPage() {
                       required
                     />
                     <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                      No Organization directory exists yet — enter a known numeric id.
+                      A number that identifies the company. Ask the platform team if you do not know it.
                     </span>
                   </label>
                 )}
@@ -217,7 +217,7 @@ export default function AccountsPage() {
                 <label htmlFor="account-password" className="text-sm font-bold">
                   Temporary password
                   <Input id="account-password" className="mt-2" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
-                  <span className="mt-1 block text-xs font-normal text-muted-foreground">At least 8 characters. Never saved by the portal.</span>
+                  <span className="mt-1 block text-xs font-normal text-muted-foreground">At least 8 characters. The person can change it from My Account after signing in.</span>
                 </label>
                 <label htmlFor="account-role" className="text-sm font-bold">
                   Role
@@ -228,7 +228,7 @@ export default function AccountsPage() {
                     onChange={(event) => setSelectedRole(event.target.value as UserRole)}
                     required
                   >
-                    <option value="">Select role</option>
+                    <option value="">Choose a role</option>
                     {assignableRoles.map((candidateRole) => (
                       <option key={candidateRole} value={candidateRole}>{roleLabel(candidateRole)}</option>
                     ))}
@@ -236,7 +236,7 @@ export default function AccountsPage() {
                 </label>
               </div>
               <Button className="mt-5 bg-[#f36f0a] text-white" disabled={saving} type="submit">
-                {saving ? 'Creating…' : 'Create Account'}
+                {saving ? 'Adding…' : 'Add account'}
               </Button>
             </form>
           )}
@@ -247,7 +247,7 @@ export default function AccountsPage() {
             ) : !error && users.length === 0 ? (
               <div className="p-10 text-center">
                 <UserRound className="mx-auto size-9 text-muted-foreground" />
-                <p className="mt-4 font-bold">No accounts found</p>
+                <p className="mt-4 font-bold">No accounts yet</p>
               </div>
             ) : !error ? (
               <div className="divide-y">
@@ -257,7 +257,7 @@ export default function AccountsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate font-bold">{user.full_name}</p>
                         <Badge variant="outline">{roleLabel(user.role)}</Badge>
-                        <Badge variant={user.status === 'active' ? 'secondary' : 'outline'}>{user.status}</Badge>
+                        <Badge variant={user.status === 'active' ? 'secondary' : 'outline'}>{user.status === 'active' ? 'Active' : 'Inactive'}</Badge>
                       </div>
                       <p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>
                     </div>

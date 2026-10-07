@@ -68,13 +68,13 @@ test('Accounts: email/password validation mirrors CreateUserDto', () => {
 test('Accounts page: no edit/deactivate UI exists — the backend has no such endpoint', () => {
   const source = readFileSync('app/accounts/page.tsx', 'utf8');
   assert.doesNotMatch(source, /updateUser|deactivateUser|editUser/i);
-  assert.match(source, /no edit or\s+deactivate action yet/i);
+  assert.match(source, /To change or turn off an account,\s+ask the platform team/i);
 });
 
 test('Accounts page: handles loading, empty, and error states, and never renders a password back', () => {
   const source = readFileSync('app/accounts/page.tsx', 'utf8');
   assert.match(source, /Loading accounts/);
-  assert.match(source, /No accounts found/);
+  assert.match(source, /No accounts yet/);
   assert.match(source, /role="alert"/);
   assert.doesNotMatch(source, /user\.password|password_hash/);
 });
@@ -95,7 +95,7 @@ test('Accounts page: restores the Organization ID field for super_admin', () => 
   const source = readFileSync('app/accounts/page.tsx', 'utf8');
   assert.match(source, /needsOrganizationId/);
   assert.match(source, /account-organization-id/);
-  assert.match(source, /No Organization directory exists yet/);
+  assert.match(source, /A number that identifies the company/);
 });
 
 test('Accounts nav link exists and role-gates the page content, not the navigation itself', () => {
@@ -103,5 +103,5 @@ test('Accounts nav link exists and role-gates the page content, not the navigati
   assert.match(shell, /\/accounts/);
   const page = readFileSync('app/accounts/page.tsx', 'utf8');
   assert.match(page, /canViewUsers/);
-  assert.match(page, /unavailable for this role/);
+  assert.match(page, /Your role cannot manage accounts/);
 });

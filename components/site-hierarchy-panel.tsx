@@ -132,8 +132,8 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
             <DialogTitle>{tier === 'supervisor' ? (staffing?.supervisor ? 'Change Supervisor' : 'Assign Supervisor') : 'Add Admin'}</DialogTitle>
             <DialogDescription>
               {tier === 'supervisor'
-                ? 'Create the authorized account and assign it to this Site. Any previous assignment is closed and retained in history.'
-                : 'Create the authorized account and add it as an Admin for this Site — existing Admins are unaffected.'}
+                ? 'Create a sign-in account for the Supervisor of this Site. The previous Supervisor, if any, is replaced but stays in the history.'
+                : 'Create an Admin sign-in account for this Site. Existing Admins keep their access.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={createAndAssign}>

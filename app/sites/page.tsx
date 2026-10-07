@@ -87,7 +87,7 @@ export default function SitesPage() {
       setError(
         reason instanceof ApiRequestError
           ? reason.message
-          : 'Site could not be created.',
+          : 'The Site could not be added. Please try again.',
       );
     } finally {
       setSaving(false);
@@ -101,12 +101,11 @@ export default function SitesPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-bold text-[#e86405]">
-                Authenticated management scope
+                Your Sites
               </p>
               <h1 className="mt-1 text-3xl font-black">Sites</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Only sites returned for your backend-authorized scope appear
-                here.
+                Pick a Site to manage its guards, phones, patrols and reports.
               </p>
             </div>
             {allowed && (
@@ -115,7 +114,7 @@ export default function SitesPage() {
                 onClick={() => setShowCreate(true)}
               >
                 <Plus />
-                Create site
+                Add Site
               </Button>
             )}
           </div>
@@ -148,10 +147,10 @@ export default function SitesPage() {
                   <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">
                     Site information
                   </p>
-                  <h2 className="mt-1 font-black">Create Site</h2>
+                  <h2 className="mt-1 font-black">Add a Site</h2>
                 </div>
                 <Button
-                  aria-label="Close create form"
+                  aria-label="Close"
                   onClick={() => setShowCreate(false)}
                   size="icon"
                   type="button"
@@ -161,8 +160,9 @@ export default function SitesPage() {
                 </Button>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
-                Start with the location basics. You will continue directly to
-                Supervisor and Site setup.
+                Start with the basics. Next you will choose a Supervisor and set
+                the Site up. The map location is optional - in Google Maps,
+                right-click the spot and tap the two numbers to copy them.
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <label className="text-sm font-bold">
@@ -227,23 +227,23 @@ export default function SitesPage() {
                 disabled={saving}
                 type="submit"
               >
-                {saving ? 'Creating…' : 'Create and continue setup'}
+                {saving ? 'Adding…' : 'Add Site and continue'}
               </Button>
             </form>
           )}
           <section className="mt-7 grid gap-4">
             {loading ? (
               <p className="rounded-2xl border p-8 text-center text-sm text-muted-foreground">
-                Loading authorized sites…
+                Loading your Sites…
               </p>
             ) : !error && sites.length === 0 ? (
               <div className="rounded-2xl border p-10 text-center">
                 <Building2 className="mx-auto size-9 text-muted-foreground" />
-                <p className="mt-4 font-bold">No authorized sites found</p>
+                <p className="mt-4 font-bold">No Sites yet</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {allowed
-                    ? 'Create the first site to begin setup.'
-                    : 'Ask the Owner or Engineer to assign your site access.'}
+                    ? 'Add the first Site to get started.'
+                    : 'You do not have access to any Site yet. Ask the Owner or Engineer to give you access.'}
                 </p>
               </div>
             ) : !error ? (
@@ -259,10 +259,10 @@ export default function SitesPage() {
                   <div className="min-w-0">
                     <h2 className="truncate font-black">{site.name}</h2>
                     <p className="mt-1 truncate text-sm text-muted-foreground">
-                      {site.address || 'No address configured'}
+                      {site.address || 'No address yet'}
                     </p>
                   </div>
-                  <span className="ml-auto hidden rounded-full border px-3 py-1 text-xs font-bold sm:block">
+                  <span className="ml-auto hidden rounded-full border px-3 py-1 text-xs font-bold capitalize sm:block">
                     {site.status}
                   </span>
                   <ArrowRight className="size-4" />

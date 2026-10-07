@@ -55,7 +55,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     if (!role || !canViewSitesOverview(role)) {
-      setSites({ kind: 'skipped', reason: 'Your role does not have a Site listing endpoint under the current production access model.' });
+      setSites({ kind: 'skipped', reason: 'Your role does not include the Sites overview.' });
       return;
     }
     setSites({ kind: 'loading' });

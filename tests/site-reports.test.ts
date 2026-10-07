@@ -58,7 +58,7 @@ test('Incidents acknowledge/resolve and SOS acknowledge/cancel actions are gated
 });
 
 test('checkpoint visits/scans has no listing endpoint and is explicitly reported as such, not silently omitted', () => {
-  assert.match(panel, /no listing endpoint on the current backend yet/);
+  assert.match(panel, /past checkpoint scans is not available yet/);
 });
 
 test('every report widget loads independently — one failing report does not block the others', () => {
@@ -78,7 +78,7 @@ test('Lone Worker Check-In widget shows only the latest check-in and says so pla
   assert.match(api, /^\s*getLastLoneWorkerCheckin:/m);
   assert.match(api, /\/lone-worker-checkins\/last\?siteId=\$\{siteId\}/);
   assert.match(panel, /managementApi\.getLastLoneWorkerCheckin\(session\.api, siteId\)/);
-  assert.match(panel, /the backend has no history-list endpoint yet/);
+  assert.match(panel, /Only the most recent Check-In is shown/);
 });
 
 // P5(a) (branch release/dry-run-ops) — read-only, existing endpoint only
