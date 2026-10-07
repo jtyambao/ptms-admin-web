@@ -201,7 +201,32 @@ function InCallPanel({
   iceConfiguration: RTCConfiguration;
   onEnded: () => void;
 }) {
-  const { state, toggleMute, toggleCamera, hangUp } = useCallSession(client, call, iceConfiguration);
+  const { state, toggleMute, toggleCamera, hangUp, getAudioStats } = useCallSession(client, call, iceConfiguration);
+  // Live audio check while connected: shows whether this browser's mic is
+  // picking up sound and whether audio is actually flowing each way, so a
+  // one-way-audio problem can be pinned to this side or the Guard phone.
+  const [audioStats, setAudioStats] = useState<Awaited<ReturnType<typeof getAudioStats>>>(null);
+  const isConnected = state?.phase === 'connected';
+  useEffect(() => {
+    if (!isConnected) {
+      setAudioStats(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = () => {
+      void getAudioStats().then((next) => {
+        if (!cancelled) setAudioStats(next);
+      }).catch(() => undefined);
+    };
+    poll();
+    const timer = window.setInterval(poll, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+    // getAudioStats reads the current session through a ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected]);
 
   useEffect(() => {
     if (state?.phase === 'ended') {
@@ -228,6 +253,23 @@ function InCallPanel({
           {state.phase === 'ended' && `Ended — ${describeEndReason(state.endReason)}`}
         </Badge>
         {state.error && <p className="text-sm text-red-700 dark:text-red-400">{state.error}</p>}
+        {audioStats && (
+          <div className="grid gap-1 rounded-lg border p-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span className="w-28 font-bold">Your microphone</span>
+              <div className="h-2 flex-1 overflow-hidden rounded bg-muted">
+                <div
+                  className="h-2 bg-green-600 transition-all"
+                  style={{ width: `${Math.min(100, Math.round((audioStats.micLevel ?? 0) * 300))}%` }}
+                />
+              </div>
+            </div>
+            <p>
+              Sending audio: {audioStats.sentKb.toFixed(0)} KB · Receiving audio: {audioStats.receivedKb.toFixed(0)} KB
+              {state.muted && ' · You are muted'}
+            </p>
+          </div>
+        )}
 
         {/* Voice calls had no media element at all, so the remote voice was
             never played. The video element below carries audio for video

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getIceConfiguration } from './ice-config';
-import { CallSession, type CallSessionState, type CallDirection, type PeerConnectionLike } from './call-session';
+import { CallSession, type CallAudioStats, type CallSessionState, type CallDirection, type PeerConnectionLike } from './call-session';
 import type { CallType, CallsSignalingClient } from './signaling-client';
 
 export interface UseCallSessionResult {
@@ -10,6 +10,7 @@ export interface UseCallSessionResult {
   toggleMute(): void;
   toggleCamera(): void;
   hangUp(): void;
+  getAudioStats(): Promise<CallAudioStats | null>;
 }
 
 // Thin React binding over CallSession — the state machine itself
@@ -66,5 +67,6 @@ export function useCallSession(
     toggleMute: () => sessionRef.current?.toggleMute(),
     toggleCamera: () => sessionRef.current?.toggleCamera(),
     hangUp: () => sessionRef.current?.hangUp(),
+    getAudioStats: async () => (sessionRef.current ? sessionRef.current.getAudioStats() : null),
   };
 }

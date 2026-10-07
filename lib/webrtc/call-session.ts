@@ -31,6 +31,14 @@ export interface PeerConnectionLike {
   onconnectionstatechange: (() => void) | null;
   onicecandidate: ((event: { candidate: RTCIceCandidateInit | null }) => void) | null;
   ontrack: ((event: { streams: readonly MediaStream[]; track?: MediaStreamTrack }) => void) | null;
+  getStats?(): Promise<RTCStatsReport>;
+}
+
+// Live audio numbers for the in-call diagnostics line.
+export interface CallAudioStats {
+  micLevel: number | null; // 0..1, from the local media source
+  sentKb: number;
+  receivedKb: number;
 }
 
 export type PeerConnectionFactory = () => PeerConnectionLike;
@@ -363,6 +371,20 @@ export class CallSession {
 
   hangUp(): void {
     this.endLocally('ended', true);
+  }
+
+  async getAudioStats(): Promise<CallAudioStats | null> {
+    if (!this.pc?.getStats) return null;
+    const report = await this.pc.getStats();
+    const stats: CallAudioStats = { micLevel: null, sentKb: 0, receivedKb: 0 };
+    report.forEach((entry: Record<string, unknown>) => {
+      const kind = entry.kind ?? entry.mediaType;
+      if (kind !== 'audio') return;
+      if (entry.type === 'media-source' && typeof entry.audioLevel === 'number') stats.micLevel = entry.audioLevel;
+      if (entry.type === 'outbound-rtp' && typeof entry.bytesSent === 'number') stats.sentKb += entry.bytesSent / 1024;
+      if (entry.type === 'inbound-rtp' && typeof entry.bytesReceived === 'number') stats.receivedKb += entry.bytesReceived / 1024;
+    });
+    return stats;
   }
 
   dispose(): void {
