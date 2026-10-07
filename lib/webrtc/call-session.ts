@@ -30,7 +30,7 @@ export interface PeerConnectionLike {
   connectionState: RTCPeerConnectionState;
   onconnectionstatechange: (() => void) | null;
   onicecandidate: ((event: { candidate: RTCIceCandidateInit | null }) => void) | null;
-  ontrack: ((event: { streams: readonly MediaStream[] }) => void) | null;
+  ontrack: ((event: { streams: readonly MediaStream[]; track?: MediaStreamTrack }) => void) | null;
 }
 
 export type PeerConnectionFactory = () => PeerConnectionLike;
@@ -181,8 +181,16 @@ export class CallSession {
       if (event.candidate) this.signaling.sendIceCandidate(this.state.callId, event.candidate);
     };
     pc.ontrack = (event) => {
+      // Some senders add a track without an associated stream; build one
+      // from the bare track so its audio still plays.
       const [stream] = event.streams;
-      if (stream) this.setState({ remoteStream: stream });
+      if (stream) {
+        this.setState({ remoteStream: stream });
+      } else if (event.track && typeof MediaStream !== 'undefined') {
+        const current = this.state.remoteStream ?? new MediaStream();
+        current.addTrack(event.track);
+        this.setState({ remoteStream: current });
+      }
     };
     pc.onconnectionstatechange = () => this.handleConnectionStateChange(pc.connectionState);
     this.pc = pc;

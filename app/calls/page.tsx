@@ -229,6 +229,20 @@ function InCallPanel({
         </Badge>
         {state.error && <p className="text-sm text-red-700 dark:text-red-400">{state.error}</p>}
 
+        {/* Voice calls had no media element at all, so the remote voice was
+            never played. The video element below carries audio for video
+            calls; this hidden audio element does it for voice calls. */}
+        {call.callType !== 'video' && (
+          <audio
+            autoPlay
+            ref={(el) => {
+              if (el && state.remoteStream && el.srcObject !== state.remoteStream) {
+                el.srcObject = state.remoteStream;
+                void el.play().catch(() => undefined);
+              }
+            }}
+          />
+        )}
         {call.callType === 'video' && (
           <div className="grid gap-3 sm:grid-cols-2">
             <video
