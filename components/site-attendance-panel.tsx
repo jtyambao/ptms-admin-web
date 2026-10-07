@@ -122,7 +122,7 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
           />
         </label>
         <label htmlFor="attendance-to" className="grid gap-2 text-sm font-bold">
-          Thru
+          To
           <input
             id="attendance-to"
             type="date"
@@ -142,9 +142,9 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
 
       <div className="rounded-2xl border bg-card">
         {loading ? (
-          <p className="p-8 text-center text-sm text-muted-foreground">Loading Attendance…</p>
+          <p className="p-8 text-center text-sm text-muted-foreground">Loading attendance…</p>
         ) : fromDate > toDate ? (
-          <p className="p-8 text-center text-sm text-muted-foreground">&quot;Thru&quot; must be on or after &quot;From&quot;.</p>
+          <p className="p-8 text-center text-sm text-muted-foreground">The end date must be on or after the start date.</p>
         ) : (
           <div className="divide-y">
             {days.map((day) => (
@@ -159,7 +159,7 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
                 ) : (
                   <div className="flex flex-1 flex-wrap gap-2">
                     {day.segments.map((segment, i) => (
-                      <Badge key={`${segment.personnelId}-${segment.startedAt}-${i}`} variant="secondary" className="gap-1.5">
+                      <div key={`${segment.personnelId}-${segment.startedAt}-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground">
                         <UserRound className="size-3" />
                         {segment.fullName}
                         <span className="font-normal text-muted-foreground">
@@ -175,7 +175,7 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
                             Missing time-out
                           </Badge>
                         )}
-                      </Badge>
+                      </div>
                     ))}
                   </div>
                 )}
