@@ -178,11 +178,17 @@ export function IncomingSosBanner() {
             )}
             <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase">{alert.status === 'active' ? 'New' : alert.status === 'acknowledged' ? 'Responding' : alert.status}</span>
             <div className="ml-auto flex flex-wrap gap-2">
-              {callsFeatureEnabled() && canCallSosSender(alert) && (
+              {callsFeatureEnabled() && canCallSosSender(alert) ? (
                 <Link href={callSenderUrl(alert)} className="inline-flex h-8 items-center gap-1 rounded-md bg-white px-3 text-sm font-bold text-red-700 hover:bg-red-50">
                   <PhoneCall className="size-4" />Call sender now
                 </Link>
-              )}
+              ) : callsFeatureEnabled() && alert.site_id !== null ? (
+                // The alert didn't record which phone sent it, so ring the
+                // whole Site; the SOS phone auto-answers while its SOS is on.
+                <Link href={`/calls?siteId=${alert.site_id}&autostart=1`} className="inline-flex h-8 items-center gap-1 rounded-md bg-white px-3 text-sm font-bold text-red-700 hover:bg-red-50">
+                  <PhoneCall className="size-4" />Call the Site
+                </Link>
+              ) : null}
               {alert.status === 'active' && (
                 <Button size="sm" variant="secondary" disabled={actingOn === alert.id} onClick={() => void respond(alert.id, 'acknowledge')}>
                   I&apos;m responding

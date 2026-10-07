@@ -482,6 +482,17 @@ function CallsShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sosCtx, status, client, sosAlert, activeCall, dialing, incomingInvite]);
 
+  // /calls?siteId=S&autostart=1 without an SOS alert (an SOS that didn't
+  // record its phone): ring the whole Site once, as soon as it's ready.
+  useEffect(() => {
+    if (!sosCtx?.autostart || sosCtx.sosAlertId || !sosCtx.siteId || sosAutostarted.current) return;
+    if (status !== 'registered' || !client || activeCall || dialing || incomingInvite) return;
+    if (dialSiteId !== sosCtx.siteId) return;
+    sosAutostarted.current = true;
+    void placeCall();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sosCtx, status, client, activeCall, dialing, incomingInvite, dialSiteId]);
+
   function enableSound() {
     void ringtone.enableSound().then(() => setSoundEnabled(true));
   }
