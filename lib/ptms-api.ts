@@ -642,6 +642,10 @@ export type SosAlertEntry = {
   acknowledged_by_name?: string | null;
   cancelled_by_name?: string | null;
   resolution_note?: string | null;
+  // The exact guard phone that pressed SOS (sos_alerts.triggering_site_device_id,
+  // already returned by GET /sos-alerts). null on older alerts - then there is
+  // no single phone to call and the Site is called instead.
+  triggering_site_device_id?: number | null;
 };
 
 // Special Check Requests create page (branch release/dry-run-ops) —

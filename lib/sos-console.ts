@@ -87,3 +87,21 @@ export function trackLocationChange(
   }
   return next;
 }
+
+// "Call the SOS sender" (2026-10-08) - call the exact phone that pressed SOS.
+export function canCallSosSender(alert: SosAlertEntry): boolean {
+  return isOpenSos(alert) && alert.site_id !== null && alert.triggering_site_device_id != null;
+}
+
+export function callSenderUrl(alert: SosAlertEntry): string {
+  return `/calls?sosAlertId=${alert.id}&siteId=${alert.site_id}&autostart=1`;
+}
+
+export function parseSosCallParams(search: string): { sosAlertId: number | null; siteId: number | null; autostart: boolean } {
+  const params = new URLSearchParams(search);
+  const num = (key: string) => {
+    const value = Number(params.get(key));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  };
+  return { sosAlertId: num('sosAlertId'), siteId: num('siteId'), autostart: params.get('autostart') === '1' };
+}

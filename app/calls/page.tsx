@@ -13,6 +13,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SosActionDialog, SosAlertCard, useSosActions } from '@/components/sos-alert-card';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
 import { SectionErrorBoundary } from '@/components/section-error-boundary';
@@ -21,6 +22,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { callsFeatureEnabled } from '@/lib/calls-feature';
+import { canRespondToSos } from '@/lib/dashboard';
+import { canCallSosSender, isOpenSos, parseSosCallParams } from '@/lib/sos-console';
+import type { SosAlertEntry } from '@/lib/ptms-api';
 import { useCallsSocket, type CallsSocketStatus } from '@/lib/calls-socket';
 import { loadCallableSites, type CallableSite } from '@/lib/calls-contacts';
 import { managementApi } from '@/lib/management-api';
@@ -356,6 +360,17 @@ function CallsShell() {
   const [dialing, setDialing] = useState(false);
   const [dialError, setDialError] = useState('');
 
+  // "Call the SOS sender" (2026-10-08): /calls?sosAlertId=N&siteId=S&autostart=1
+  // (from the SOS page or the global SOS banner). The alert stays on screen
+  // above the call (with its Acknowledge / Resolve / False alarm buttons) and
+  // the call goes straight to the phone that pressed SOS - no Site picking.
+  const [sosCtx] = useState(() => (typeof window === 'undefined' ? null : parseSosCallParams(window.location.search)));
+  const [sosAlert, setSosAlert] = useState<SosAlertEntry | null>(null);
+  const [sosLoaded, setSosLoaded] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const sosAutostarted = useRef(false);
+  const canRespond = canRespondToSos(session.user?.role ?? 'auditor');
+
   const [incomingInvite, setIncomingInvite] = useState<IncomingInvite | null>(null);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   // Session-only (in memory): the backend keeps no staff call log, so a
@@ -421,6 +436,28 @@ function CallsShell() {
     });
   }, [client, activeCall, incomingInvite, dialing, ringtone]);
 
+  const pollSos = useCallback(async () => {
+    if (!sosCtx?.sosAlertId || session.status !== 'authenticated') return;
+    try {
+      const all = await managementApi.listSosAlerts(session.api);
+      setSosAlert(all.find((a) => a.id === sosCtx.sosAlertId) ?? null);
+    } catch {
+      // keep showing the last known alert; the next poll tries again
+    } finally {
+      setSosLoaded(true);
+    }
+  }, [sosCtx, session.api, session.status]);
+
+  useEffect(() => {
+    if (!enabled || !sosCtx?.sosAlertId) return;
+    void pollSos();
+    const poll = window.setInterval(() => void pollSos(), 5000);
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => { window.clearInterval(poll); window.clearInterval(tick); };
+  }, [enabled, sosCtx, pollSos]);
+
+  const sosActions = useSosActions(session.api, pollSos);
+
   // /calls?siteId=N (the SOS console's "Call the Site" button) preselects
   // that Site once the list has loaded - once only, so it never fights the
   // dispatcher's own choice afterwards.
@@ -433,6 +470,17 @@ function CallsShell() {
   }, [sites]);
 
   useEffect(() => () => ringtone.dispose(), [ringtone]);
+
+  // autostart=1: dial the SOS sender once, as soon as the connection is ready
+  // and the alert is known and still open. Never repeats (redial is a button).
+  useEffect(() => {
+    if (!sosCtx?.autostart || sosAutostarted.current) return;
+    if (status !== 'registered' || !client || !sosAlert || activeCall || dialing || incomingInvite) return;
+    if (!canCallSosSender(sosAlert)) return;
+    sosAutostarted.current = true;
+    void placeSosCall(sosAlert);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sosCtx, status, client, sosAlert, activeCall, dialing, incomingInvite]);
 
   function enableSound() {
     void ringtone.enableSound().then(() => setSoundEnabled(true));
@@ -456,11 +504,26 @@ function CallsShell() {
   }
 
   async function placeCall() {
-    if (!client || dialSiteId === null) return;
+    if (dialSiteId === null) return;
+    await dial(dialSiteId, dialCallType);
+  }
+
+  // Calls the exact phone that pressed SOS (voice). The server resolves the
+  // device from the alert and rings only that phone.
+  async function placeSosCall(alert: SosAlertEntry) {
+    if (!canCallSosSender(alert) || alert.site_id === null) return;
+    await dial(alert.site_id, 'voice', {
+      sosAlertId: alert.id,
+      targetSiteDeviceId: alert.triggering_site_device_id ?? undefined,
+    });
+  }
+
+  async function dial(siteId: number, callType: CallType, target?: { sosAlertId?: number; targetSiteDeviceId?: number }) {
+    if (!client) return;
     setDialError('');
     setDialing(true);
     setIceConfiguration(await fetchIceConfiguration(session.api));
-    client.invite(dialSiteId, dialCallType);
+    client.invite(siteId, callType, target);
     // If the call service never answers the invite (no ringing, no error),
     // don't leave the button stuck on "Calling…" with nothing happening.
     window.setTimeout(() => {
@@ -496,6 +559,42 @@ function CallsShell() {
         Calls are still being tested with real phones. If a call does not connect, phone the guards the normal way.
       </p>
 
+      {sosCtx?.sosAlertId && (
+        <div className="space-y-3">
+          {sosAlert && isOpenSos(sosAlert) ? (
+            <SosAlertCard
+              alert={sosAlert}
+              now={now}
+              canRespond={canRespond}
+              actingOn={sosActions.actingOn}
+              onAcknowledge={(a) => void sosActions.acknowledge(a)}
+              onOpenAction={sosActions.openAction}
+              callSlot={canCallSosSender(sosAlert) ? (
+                <Button
+                  size="lg"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  disabled={dialing || !!activeCall || status !== 'registered'}
+                  onClick={() => void placeSosCall(sosAlert)}
+                >
+                  <PhoneCall />{dialing ? 'Calling the SOS phone…' : activeCall ? 'On a call' : 'Call sender now'}
+                </Button>
+              ) : (
+                <p className="self-center text-sm text-muted-foreground">This alert does not say which phone sent it. Use &quot;Call a Site&quot; below.</p>
+              )}
+            />
+          ) : sosLoaded ? (
+            <p className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+              {sosAlert ? 'This SOS alert is closed.' : 'This SOS alert could not be found.'} You can still call a Site below.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading the SOS alert…</p>
+          )}
+          {sosActions.success && <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{sosActions.success}</p>}
+          {sosActions.error && <p role="alert" className="text-sm font-bold text-red-700 dark:text-red-400">{sosActions.error}</p>}
+          <SosActionDialog actions={sosActions} />
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -521,7 +620,7 @@ function CallsShell() {
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">
               The call rings every Guard phone that is online at the chosen Site. You cannot pick
-              one phone from here (only a guard can call one specific phone).
+              one phone from here (only a guard can call one specific phone). The exception is an SOS: "Call sender now" rings only the phone that sent it.
             </p>
             {sitesError && <p className="text-sm text-red-700 dark:text-red-400">{sitesError}</p>}
             <div className="grid gap-3 sm:grid-cols-2">

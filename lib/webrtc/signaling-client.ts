@@ -147,11 +147,17 @@ export class CallsSignalingClient {
     this.socket.emit('register', { role: 'staff', accessToken });
   }
 
-  // Untargeted (site-wide fan-out to every connected guard device at the
-  // site) — targeting one exact device is guard-only per the backend's
-  // own InvitePayload (staff never supplies targetSiteDeviceId).
-  invite(siteId: number, callType: CallType): void {
-    this.socket.emit('call:invite', { callType, siteId });
+  // Untargeted by default (site-wide fan-out to every connected guard device
+  // at the site). "Call the SOS sender" (2026-10-08) may name the exact
+  // phone: `sosAlertId` and/or `targetSiteDeviceId` - the backend then rings
+  // ONLY that device (after the normal site authorization check).
+  invite(siteId: number, callType: CallType, target?: { sosAlertId?: number; targetSiteDeviceId?: number }): void {
+    this.socket.emit('call:invite', {
+      callType,
+      siteId,
+      ...(target?.sosAlertId != null ? { sosAlertId: target.sosAlertId } : {}),
+      ...(target?.targetSiteDeviceId != null ? { targetSiteDeviceId: target.targetSiteDeviceId } : {}),
+    });
   }
 
   accept(callId: string): void {

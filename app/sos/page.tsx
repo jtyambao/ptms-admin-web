@@ -1,19 +1,17 @@
 'use client';
 
-import { AlertTriangle, BadgeCheck, CheckCircle2, MapPin, Phone, PhoneCall, ShieldAlert, Siren } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, CheckCircle2, Phone, PhoneCall, ShieldAlert, Siren } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { ApiRequestError } from '@/lib/authenticated-api';
+import { SosActionDialog, SosAlertCard, useSosActions } from '@/components/sos-alert-card';
 import { callsFeatureEnabled } from '@/lib/calls-feature';
 import { canRespondToSos, canViewSos } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
-import { formatElapsed, mapsUrl, sosOutcome, splitSosAlerts, trackLocationChange } from '@/lib/sos-console';
+import { callSenderUrl, canCallSosSender, formatElapsed, sosOutcome, splitSosAlerts, trackLocationChange } from '@/lib/sos-console';
 import type { SosAlertEntry } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
@@ -34,12 +32,6 @@ import { useSession } from '@/lib/session-provider';
 const POLL_MS = 5000;
 const HISTORY_PAGE = 20;
 
-type Action = { kind: 'resolve' | 'cancel'; alert: SosAlertEntry };
-
-function errorMessage(reason: unknown): string {
-  return reason instanceof ApiRequestError ? reason.message : 'The action could not be completed.';
-}
-
 function SosConsole() {
   const session = useSession();
   const role = session.user?.role ?? null;
@@ -49,11 +41,7 @@ function SosConsole() {
 
   const [alerts, setAlerts] = useState<SosAlertEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [actingOn, setActingOn] = useState<number | null>(null);
-  const [action, setAction] = useState<Action | null>(null);
-  const [note, setNote] = useState('');
+  const [pollError, setPollError] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [historyShown, setHistoryShown] = useState(HISTORY_PAGE);
   const [locations, setLocations] = useState<Record<number, { key: string; changedAt: number }>>({});
@@ -66,9 +54,9 @@ function SosConsole() {
       const all = await managementApi.listSosAlerts(session.api);
       setAlerts(all);
       setLocations(trackLocationChange(locationsRef.current, all));
-      setError((prev) => (prev.startsWith('Could not refresh') ? '' : prev));
+      setPollError('');
     } catch {
-      setError((prev) => prev || 'Could not refresh SOS alerts - retrying.');
+      setPollError('Could not refresh SOS alerts - retrying.');
     } finally { setLoading(false); }
   }, [session.api, session.status, canView]);
 
@@ -84,33 +72,9 @@ function SosConsole() {
     return () => window.clearInterval(tick);
   }, []);
 
-  async function acknowledge(alert: SosAlertEntry) {
-    setActingOn(alert.id); setError(''); setSuccess('');
-    try {
-      await managementApi.acknowledgeSos(session.api, alert.id);
-      setSuccess('Acknowledged - the guards at that Site can see someone is responding.');
-      await poll();
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setActingOn(null); }
-  }
-
-  function openAction(kind: Action['kind'], alert: SosAlertEntry) {
-    setNote(''); setError(''); setAction({ kind, alert });
-  }
-
-  async function submitAction(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!action) return;
-    setActingOn(action.alert.id); setError(''); setSuccess('');
-    try {
-      if (action.kind === 'resolve') await managementApi.resolveSos(session.api, action.alert.id, note.trim() || undefined);
-      else await managementApi.cancelSos(session.api, action.alert.id, note.trim() || undefined);
-      setSuccess(action.kind === 'resolve' ? 'Marked resolved.' : 'Cancelled as a false alarm.');
-      setAction(null);
-      await poll();
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setActingOn(null); }
-  }
+  const actions = useSosActions(session.api, poll);
+  const { actingOn, success } = actions;
+  const error = actions.error || pollError;
 
   if (!canView) {
     return (
@@ -148,76 +112,37 @@ function SosConsole() {
         </div>
       ) : (
         <div className="space-y-4">
-          {open.map((alert) => {
-            const isNew = alert.status === 'active';
-            const loc = locations[alert.id];
-            const hasLocation = alert.latitude !== null && alert.longitude !== null;
-            return (
-              <div key={alert.id} className={`rounded-2xl border-2 p-5 ${isNew ? 'border-red-500 bg-red-50 dark:bg-red-950/30' : 'border-amber-400 bg-amber-50 dark:bg-amber-950/20'}`}>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Siren className={`size-6 ${isNew ? 'animate-pulse text-red-600' : 'text-amber-600'}`} />
-                  <p className="text-lg font-black">{alert.site_name ?? 'Unknown Site'}</p>
-                  <Badge variant={isNew ? 'destructive' : 'secondary'} className="uppercase">{isNew ? 'New - needs a response' : 'Responding'}</Badge>
-                  <p className="ml-auto text-2xl font-black tabular-nums">{formatElapsed(alert.triggered_at, now)}</p>
-                </div>
-                <dl className="mt-3 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
-                  <div><dt className="inline font-bold">Guard: </dt><dd className="inline">{alert.personnel_name ?? 'The Site’s guard device (no individual named)'}</dd></div>
-                  <div><dt className="inline font-bold">Triggered: </dt><dd className="inline">{new Date(alert.triggered_at).toLocaleString()}</dd></div>
-                  {alert.acknowledged_at && (
-                    <div><dt className="inline font-bold">Acknowledged: </dt><dd className="inline">{new Date(alert.acknowledged_at).toLocaleTimeString()}{alert.acknowledged_by_name ? ` by ${alert.acknowledged_by_name}` : ''}</dd></div>
-                  )}
-                  <div>
-                    <dt className="inline font-bold">Location: </dt>
-                    <dd className="inline">
-                      {hasLocation ? (
-                        <>
-                          <a className="inline-flex items-center gap-1 font-bold underline" href={mapsUrl(alert.latitude!, alert.longitude!)} target="_blank" rel="noreferrer">
-                            <MapPin className="size-3" />Open map
-                          </a>
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            {alert.latitude!.toFixed(5)}, {alert.longitude!.toFixed(5)}
-                            {loc && now - loc.changedAt > 2000 ? ` · last moved ${formatElapsed(new Date(loc.changedAt).toISOString(), now)} ago` : ' · just updated'}
-                          </span>
-                        </>
-                      ) : <span className="text-muted-foreground">Waiting for the guard&apos;s GPS…</span>}
-                    </dd>
-                  </div>
-                </dl>
-                {canRespond && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {isNew ? (
-                      <Button size="lg" className="bg-red-600 text-white hover:bg-red-700" disabled={actingOn === alert.id} onClick={() => void acknowledge(alert)}>
-                        <Siren />Acknowledge - I&apos;m responding
-                      </Button>
-                    ) : (
-                      <Button size="lg" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={actingOn === alert.id} onClick={() => openAction('resolve', alert)}>
-                        <CheckCircle2 />Resolve
-                      </Button>
-                    )}
-                    {callsOn && alert.site_id !== null && (
-                      <Link
-                        href={`/calls?siteId=${alert.site_id}`}
-                        className="inline-flex h-10 items-center gap-2 rounded-lg border bg-background px-5 text-sm font-medium hover:bg-muted"
-                      >
-                        <PhoneCall className="size-4" />Call the Site
-                      </Link>
-                    )}
-                    {isNew && (
-                      <Button size="lg" variant="outline" disabled={actingOn === alert.id} onClick={() => openAction('resolve', alert)}>
-                        Resolve (already handled)
-                      </Button>
-                    )}
-                    <Button size="lg" variant="outline" disabled={actingOn === alert.id} onClick={() => openAction('cancel', alert)}>
-                      False alarm - cancel
-                    </Button>
-                  </div>
-                )}
-                {!callsOn && (
-                  <p className="mt-3 flex items-center gap-1 text-xs text-muted-foreground"><Phone className="size-3" />Phone the Site directly - in-app calls are not enabled yet.</p>
-                )}
-              </div>
-            );
-          })}
+          {open.map((alert) => (
+            <SosAlertCard
+              key={alert.id}
+              alert={alert}
+              now={now}
+              location={locations[alert.id]}
+              canRespond={canRespond}
+              actingOn={actingOn}
+              onAcknowledge={(a) => void actions.acknowledge(a)}
+              onOpenAction={actions.openAction}
+              callSlot={callsOn && canCallSosSender(alert) ? (
+                <Link
+                  href={callSenderUrl(alert)}
+                  className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-6 text-base font-bold text-white hover:bg-blue-700"
+                >
+                  <PhoneCall className="size-5" />Call sender now
+                </Link>
+              ) : callsOn && alert.site_id !== null ? (
+                <Link
+                  href={`/calls?siteId=${alert.site_id}`}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border bg-background px-5 text-sm font-medium hover:bg-muted"
+                  title="This alert does not say which phone sent it, so the whole Site is called."
+                >
+                  <PhoneCall className="size-4" />Call the Site
+                </Link>
+              ) : null}
+            />
+          ))}
+          {!callsOn && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="size-3" />Phone the Site directly - in-app calls are not enabled yet.</p>
+          )}
         </div>
       )}
 
@@ -248,31 +173,7 @@ function SosConsole() {
         )}
       </div>
 
-      <Dialog open={!!action} onOpenChange={(openState) => { if (!openState) setAction(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{action?.kind === 'resolve' ? 'Resolve this SOS' : 'Cancel as a false alarm'}</DialogTitle>
-            <DialogDescription>
-              {action?.kind === 'resolve'
-                ? 'Close it out as a real emergency that has been handled. Say what happened.'
-                : 'Use this when there was no emergency. It is kept in the history as cancelled.'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={submitAction}>
-            <label htmlFor="sos-note" className="grid gap-2 font-bold">
-              {action?.kind === 'resolve' ? 'What happened / what was done' : 'Reason'} <span className="font-normal text-muted-foreground">(optional)</span>
-              <Textarea id="sos-note" rows={4} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
-            </label>
-            {error && <p role="alert" className="mt-3 text-sm font-bold text-red-700 dark:text-red-400">{error}</p>}
-            <DialogFooter className="mt-5">
-              <Button type="button" variant="outline" onClick={() => setAction(null)}>Back</Button>
-              <Button type="submit" disabled={actingOn !== null} className={action?.kind === 'resolve' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : ''}>
-                {action?.kind === 'resolve' ? 'Mark resolved' : 'Cancel the alert'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <SosActionDialog actions={actions} />
     </section>
   );
 }

@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ApiRequestError } from '@/lib/authenticated-api';
+import { callsFeatureEnabled } from '@/lib/calls-feature';
 import { canRespondToSos } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
+import { callSenderUrl, canCallSosSender } from '@/lib/sos-console';
 import type { SosAlertEntry } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
@@ -175,7 +177,12 @@ export function IncomingSosBanner() {
               </a>
             )}
             <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase">{alert.status === 'active' ? 'New' : alert.status === 'acknowledged' ? 'Responding' : alert.status}</span>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex flex-wrap gap-2">
+              {callsFeatureEnabled() && canCallSosSender(alert) && (
+                <Link href={callSenderUrl(alert)} className="inline-flex h-8 items-center gap-1 rounded-md bg-white px-3 text-sm font-bold text-red-700 hover:bg-red-50">
+                  <PhoneCall className="size-4" />Call sender now
+                </Link>
+              )}
               {alert.status === 'active' && (
                 <Button size="sm" variant="secondary" disabled={actingOn === alert.id} onClick={() => void respond(alert.id, 'acknowledge')}>
                   I&apos;m responding

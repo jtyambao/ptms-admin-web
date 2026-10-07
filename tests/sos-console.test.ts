@@ -8,6 +8,7 @@ import type { SosAlertEntry } from '../lib/ptms-api.ts';
 // SOS receiver console (user-authorized 2026-10-07).
 const page = readFileSync('app/sos/page.tsx', 'utf8');
 const banner = readFileSync('components/incoming-sos-banner.tsx', 'utf8');
+const card = readFileSync('components/sos-alert-card.tsx', 'utf8');
 
 function alert(over: Partial<SosAlertEntry>): SosAlertEntry {
   return {
@@ -76,17 +77,17 @@ test('resolve wrapper posts the optional note to the staff resolve endpoint', as
 });
 
 test('the console: acknowledge -> Responding -> Resolve (with a note) or False alarm, Call the Site, and a History with outcomes', () => {
-  assert.match(page, /Acknowledge - I&apos;m responding/);
-  assert.match(page, /'Responding'/);
-  assert.match(page, /managementApi\.resolveSos\(session\.api, action\.alert\.id,/);
-  assert.match(page, /False alarm - cancel/);
+  assert.match(card, /Acknowledge - I&apos;m responding/);
+  assert.match(card, /'Responding'|Responding</);
+  assert.match(card, /managementApi\.resolveSos\(api, action\.alert\.id,/);
+  assert.match(card, /False alarm - cancel/);
   assert.match(page, /Call the Site/);
   assert.match(page, /sosOutcome\(alert\)/);
-  assert.match(page, /Open map/);
+  assert.match(card, /Open map/);
 });
 
 test('the console only offers response actions to canRespondToSos roles, polls every 5s, and says plainly what the backend does not provide', () => {
-  assert.match(page, /canRespond && \(/);
+  assert.match(card, /canRespond && \(/);
   assert.match(page, /POLL_MS = 5000/);
   assert.match(page, /guard selfie/);
 });
@@ -104,4 +105,42 @@ test('the global alarm banner links to the console and flashes the tab title whi
 
 test('SOS is in the portal navigation', () => {
   assert.match(readFileSync('components/portal-shell.tsx', 'utf8'), /href: '\/sos', label: 'SOS'/);
+});
+
+// "Call the SOS sender" (2026-10-08).
+import { callSenderUrl, canCallSosSender, parseSosCallParams } from '../lib/sos-console.ts';
+
+test('Call sender now is offered only for an OPEN alert that names its phone', () => {
+  assert.equal(canCallSosSender(alert({ id: 9, status: 'active', triggering_site_device_id: 4 })), true);
+  assert.equal(canCallSosSender(alert({ id: 9, status: 'acknowledged', triggering_site_device_id: 4 })), true);
+  assert.equal(canCallSosSender(alert({ id: 9, status: 'active', triggering_site_device_id: null })), false);
+  assert.equal(canCallSosSender(alert({ id: 9, status: 'resolved', triggering_site_device_id: 4 })), false);
+  assert.equal(canCallSosSender(alert({ id: 9, status: 'active', site_id: null, triggering_site_device_id: 4 })), false);
+});
+
+test('the call link and its parameters round-trip, and bad values are ignored', () => {
+  const url = callSenderUrl(alert({ id: 9, site_id: 4, triggering_site_device_id: 7 }));
+  assert.equal(url, '/calls?sosAlertId=9&siteId=4&autostart=1');
+  assert.deepEqual(parseSosCallParams(url.split('?')[1]), { sosAlertId: 9, siteId: 4, autostart: true });
+  assert.deepEqual(parseSosCallParams('?sosAlertId=abc&siteId=-2'), { sosAlertId: null, siteId: null, autostart: false });
+});
+
+test('the SOS page, the banner and the Calls page all wire the sender call; staff invites carry the target', async () => {
+  assert.match(page, /Call sender now/);
+  assert.match(page, /callSenderUrl\(alert\)/);
+  assert.match(banner, /Call sender now/);
+  assert.match(banner, /canCallSosSender\(alert\)/);
+  const calls = readFileSync('app/calls/page.tsx', 'utf8');
+  assert.match(calls, /sosAutostarted/);
+  assert.match(calls, /sosAlertId: alert\.id/);
+  assert.match(calls, /<SosAlertCard/);
+  const emitted: unknown[] = [];
+  const { CallsSignalingClient } = await import('../lib/webrtc/signaling-client.ts');
+  const client = new CallsSignalingClient({ connected: true, on() {}, off() {}, emit: (_e: string, p?: unknown) => emitted.push(p), disconnect() {} }, () => 't');
+  client.invite(4, 'voice', { sosAlertId: 9, targetSiteDeviceId: 7 });
+  client.invite(4, 'video');
+  assert.deepEqual(emitted.slice(-2), [
+    { callType: 'voice', siteId: 4, sosAlertId: 9, targetSiteDeviceId: 7 },
+    { callType: 'video', siteId: 4 },
+  ]);
 });
