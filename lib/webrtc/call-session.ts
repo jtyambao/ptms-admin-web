@@ -97,8 +97,11 @@ export class CallSession {
     this.signaling = deps.signaling;
     this.createPeerConnection = deps.createPeerConnection;
     this.getUserMedia = deps.getUserMedia;
-    this.setTimeoutFn = deps.setTimeoutFn ?? setTimeout;
-    this.clearTimeoutFn = deps.clearTimeoutFn ?? clearTimeout;
+    // Wrapped, not stored bare: calling the browser's setTimeout as
+    // this.setTimeoutFn(...) binds `this` to the CallSession and Chrome
+    // throws "Illegal invocation" (it crashed /calls in production).
+    this.setTimeoutFn = deps.setTimeoutFn ?? (((fn: () => void, ms?: number) => setTimeout(fn, ms)) as typeof setTimeout);
+    this.clearTimeoutFn = deps.clearTimeoutFn ?? (((id?: ReturnType<typeof setTimeout>) => clearTimeout(id)) as typeof clearTimeout);
 
     this.state = {
       phase: params.direction === 'outgoing' ? 'ringing' : 'connecting',
