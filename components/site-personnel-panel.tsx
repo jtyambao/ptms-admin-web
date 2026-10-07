@@ -41,7 +41,6 @@ import {
   canManagePersonnel,
   canViewPersonnel,
   generatePersonnelMpin,
-  isValidMpin,
 } from '@/lib/personnel-management';
 import type { Personnel, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
@@ -63,7 +62,6 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
   const [createOpen, setCreateOpen] = useState(false);
   const [oicOpen, setOicOpen] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [mpin, setMpin] = useState('');
   const [selectedOic, setSelectedOic] = useState('');
   // Fewer clicks (UI pass 2026-10-07): add a guard and make them Officer in Charge in one go.
   const [makeOicNow, setMakeOicNow] = useState(false);
@@ -82,6 +80,10 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
   // which is a Personnel's own login MPIN, a different credential
   // entirely) so the dialog can label which credential just changed.
   const [newSiteMpin, setNewSiteMpin] = useState<string | null>(null);
+  // Who the one-time OIC PIN is for, so the dialog can say "give this to <name>".
+  const [newSiteMpinFor, setNewSiteMpinFor] = useState('');
+  // "Generate new PIN" for the current OIC (user-requested 2026-10-07), in addition to the PIN made when the OIC changes.
+  const [pinConfirmOpen, setPinConfirmOpen] = useState(false);
   const [siteMpinCopyConfirmed, setSiteMpinCopyConfirmed] = useState(false);
 
   const allowed = !!session.user && canManagePersonnel(session.user.role);
@@ -145,29 +147,37 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
       setError('Type the guard\'s name.');
       return;
     }
-    if (!isValidMpin(mpin)) {
-      setError('The PIN must be 4 to 8 digits.');
-      return;
-    }
     setSaving(true);
     try {
-      const created = await managementApi.createPersonnel(session.api, {
-        siteId,
-        fullName: fullName.trim(),
-        mpin,
-      });
+      // PINs are only for the Guard app. The personnel record still needs one,
+      // so it is generated here (crypto-random, 6 digits), sent once and never
+      // shown, stored or kept in state. A PIN already used at this Site is a
+      // 409 - retry with a fresh value, up to 3 more times.
+      let created: Personnel | null = null;
+      for (let attempt = 0; attempt < 4 && !created; attempt += 1) {
+        try {
+          created = await managementApi.createPersonnel(session.api, {
+            siteId,
+            fullName: fullName.trim(),
+            mpin: generatePersonnelMpin(),
+          });
+        } catch (reason) {
+          if (!(reason instanceof ApiRequestError && reason.status === 409) || attempt === 3) throw reason;
+        }
+      }
       const wantsOic = makeOicNow && canChangeOic && !!created?.id;
-      setMpin('');
+      const createdName = fullName.trim();
       setFullName('');
       setMakeOicNow(false);
       setCreateOpen(false);
       await refreshPersonnel();
-      setSuccess('Guard added. Tell them their PIN now - it cannot be shown again.');
-      if (wantsOic) {
+      setSuccess('Guard added.');
+      if (wantsOic && created) {
         try {
           const result = await managementApi.handoverOic(session.api, siteId, { personnelId: created.id });
           onStaffingChange(await managementApi.getStaffing(session.api, siteId));
-          setSuccess('Guard added and made Officer in Charge. Tell them their PIN now - it cannot be shown again.');
+          setSuccess('Guard added and made Officer in Charge.');
+          setNewSiteMpinFor(createdName);
           setNewSiteMpin(result.newSiteMpin);
         } catch (reason) {
           setError(
@@ -177,10 +187,9 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
         }
       }
     } catch (reason) {
-      setMpin('');
       setError(
         reason instanceof ApiRequestError && reason.status === 409
-          ? 'Another guard at this Site already uses this PIN. Type a different PIN or tap Generate.'
+          ? 'The guard could not be added right now. Please try again.'
           : reason instanceof ApiRequestError
             ? reason.message
             : genericError,
@@ -260,6 +269,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
 
   function closeSiteMpinDisplay() {
     setNewSiteMpin(null);
+    setNewSiteMpinFor('');
     setSiteMpinCopyConfirmed(false);
   }
 
@@ -270,6 +280,24 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
       setSiteMpinCopyConfirmed(true);
     } catch {
       setSiteMpinCopyConfirmed(false);
+    }
+  }
+
+  async function generateOicPin() {
+    const oicName = staffing?.oic?.full_name ?? 'the OIC';
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      const result = await managementApi.regenerateSiteCredential(session.api, siteId);
+      setPinConfirmOpen(false);
+      setNewSiteMpinFor(oicName);
+      setNewSiteMpin(result.newSiteMpin);
+    } catch (reason) {
+      setPinConfirmOpen(false);
+      setError(reason instanceof ApiRequestError ? reason.message : genericError);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -290,6 +318,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
       setOicOpen(false);
       setSelectedOic('');
       setSuccess('Officer in Charge changed.');
+      setNewSiteMpinFor(activePersonnel.find((person) => person.id === personnelId)?.full_name ?? 'the new OIC');
       setNewSiteMpin(result.newSiteMpin);
     } catch (reason) {
       setError(reason instanceof ApiRequestError ? reason.message : genericError);
@@ -331,6 +360,23 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="size-5 shrink-0 text-[#e86405]" />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Officer in Charge (OIC)</p>
+            <p className="font-black">{staffing?.oic?.full_name ?? 'Not chosen yet'}</p>
+          </div>
+        </div>
+        {canChangeOic && (staffing?.oic ? (
+          <Button variant="outline" onClick={() => setPinConfirmOpen(true)} disabled={saving}>
+            <KeyRound /> Generate new PIN
+          </Button>
+        ) : (
+          <p className="text-sm text-muted-foreground">Choose an OIC first</p>
+        ))}
       </div>
 
       {error && (
@@ -398,38 +444,17 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
         )}
       </div>
 
-      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setMpin(''); setMakeOicNow(false); } }}>
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setMakeOicNow(false); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add a guard</DialogTitle>
-            <DialogDescription>The guard is added to this Site. Choose a PIN and tell the guard - it cannot be shown again later.</DialogDescription>
+            <DialogDescription>The guard is added to this Site. Only the name is needed.</DialogDescription>
           </DialogHeader>
           <form onSubmit={createPersonnel}>
             <div className="grid gap-4">
               <label htmlFor="personnel-name" className="grid gap-2 text-sm font-bold">
                 Guard name
                 <Input id="personnel-name" value={fullName} onChange={(event) => setFullName(event.target.value)} maxLength={150} autoComplete="off" required />
-              </label>
-              <label htmlFor="personnel-mpin" className="grid gap-2 text-sm font-bold">
-                PIN
-                <div className="flex gap-2">
-                  <Input
-                    id="personnel-mpin"
-                    aria-describedby="mpin-help"
-                    aria-invalid={mpin.length > 0 && !isValidMpin(mpin)}
-                    autoComplete="new-password"
-                    inputMode="numeric"
-                    maxLength={8}
-                    pattern="[0-9]{4,8}"
-                    value={mpin}
-                    onChange={(event) => setMpin(event.target.value)}
-                    required
-                  />
-                  <Button type="button" variant="outline" onClick={() => setMpin(generatePersonnelMpin())}>
-                    <KeyRound /> Generate
-                  </Button>
-                </div>
-                <span id="mpin-help" className="font-normal text-muted-foreground">4 to 8 digits. Tap Generate if you want one made for you.</span>
               </label>
               {canChangeOic && (
                 <label htmlFor="personnel-make-oic" className="flex items-start gap-3 rounded-xl border p-3 text-sm">
@@ -442,15 +467,15 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
                   <span>
                     <span className="font-bold">Make this guard the Officer in Charge (OIC) now</span>
                     <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                      This also gives the Site a new PIN. You will see it next, and the Guard phone must use it.
+                      This also makes a new PIN for the OIC. You will see it next - give it to this guard.
                     </span>
                   </span>
                 </label>
               )}
             </div>
             <DialogFooter className="mt-5">
-              <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); setMpin(''); setMakeOicNow(false); }}>Cancel</Button>
-              <Button type="submit" disabled={saving || !fullName.trim() || !isValidMpin(mpin)}>{saving ? 'Adding…' : 'Add guard'}</Button>
+              <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); setMakeOicNow(false); }}>Cancel</Button>
+              <Button type="submit" disabled={saving || !fullName.trim()}>{saving ? 'Adding…' : 'Add guard'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -460,7 +485,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{staffing?.oic ? 'Change Officer in Charge' : 'Choose Officer in Charge'}</DialogTitle>
-            <DialogDescription>Pick the guard in charge of this Site. The change is saved in the handover history. The Site also gets a new PIN, which you will see next - the Guard phone must use it to sign in.</DialogDescription>
+            <DialogDescription>Pick the guard in charge of this Site. The change is saved in the handover history. The new Officer in Charge also gets a PIN for the Guard app, which you will see next.</DialogDescription>
           </DialogHeader>
           <form onSubmit={changeOic}>
             <label className="grid gap-2 text-sm font-bold">
@@ -477,6 +502,23 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={pinConfirmOpen} onOpenChange={(open) => { if (!open) setPinConfirmOpen(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate a new PIN for {staffing?.oic?.full_name ?? 'the OIC'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This replaces the OIC&apos;s current PIN. The Guard phone will need the new PIN to sign in.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={saving} onClick={() => void generateOicPin()}>
+              {saving ? 'Please wait…' : 'Generate new PIN'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deactivateTarget} onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}>
         <AlertDialogContent>
@@ -536,15 +578,14 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
       <Dialog open={!!newSiteMpin} onOpenChange={(open) => { if (!open) closeSiteMpinDisplay(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Site PIN - write it down now</DialogTitle>
+            <DialogTitle>New PIN for the OIC</DialogTitle>
             <DialogDescription>
-              Changing the Officer in Charge gave this Site a new PIN. The Guard phone must sign in
-              with this new PIN - the old PIN no longer works. It cannot be shown again after you
-              close this window, so give it to the guards at this Site now.
+              Give this to {newSiteMpinFor || 'the new OIC'}. They use it to sign in to the Guard app.
+              It won&apos;t be shown again.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2">
-            <Input readOnly value={newSiteMpin ?? ''} className="font-mono text-lg tracking-widest" aria-label="New Site PIN" />
+            <Input readOnly value={newSiteMpin ?? ''} className="font-mono text-lg tracking-widest" aria-label="New PIN for the OIC" />
             <Button type="button" variant="outline" onClick={() => void copySiteMpin()}>
               <Copy /> {siteMpinCopyConfirmed ? 'Copied' : 'Copy'}
             </Button>

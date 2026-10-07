@@ -83,12 +83,11 @@ test('Site Personnel UI includes safe list, create, duplicate, delete, and OIC f
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
   assert.match(source, /Guards and Officer in Charge \(OIC\)/);
   assert.match(source, /Add guard/);
-  assert.match(source, /Another guard at this Site already uses this PIN/);
+  assert.match(source, /The guard could not be added right now/);
   assert.match(source, /Delete this guard\?/);
   assert.match(source, /Change the Officer in Charge first, then delete this guard/);
   assert.match(source, /Change OIC|Choose OIC/);
   assert.match(source, /person\.status === 'active'/);
-  assert.match(source, /setMpin\(''\)/);
   assert.doesNotMatch(source, /localStorage|sessionStorage/);
   assert.doesNotMatch(source, /mpin_hash/);
   assert.doesNotMatch(source, /Math\.random/);
@@ -203,9 +202,11 @@ test('handoverOic is typed for and surfaces the rotated Site MPIN it has always 
 
   const panel = readFileSync('components/site-personnel-panel.tsx', 'utf8');
   assert.match(panel, /result\.newSiteMpin/);
-  assert.match(panel, /New Site PIN - write it down now/);
+  assert.match(panel, /New PIN for the OIC/);
   // The new Site PIN must say the Guard phone has to use it (peer requirement 2026-10-07).
-  assert.match(panel, /Guard phone must sign in\s+with this new PIN/);
+  assert.match(panel, /Give this to \{newSiteMpinFor/);
+  assert.match(panel, /They use it to sign in to the Guard app/);
+  assert.match(panel, /It won&apos;t be shown again/);
 });
 
 test('Add guard can make them Officer in Charge in the same step, and still shows the new Site PIN dialog', () => {
@@ -214,5 +215,35 @@ test('Add guard can make them Officer in Charge in the same step, and still show
   assert.match(source, /\{canChangeOic && \(\s*<label htmlFor="personnel-make-oic"/);
   assert.match(source, /managementApi\.handoverOic\(session\.api, siteId, \{ personnelId: created\.id \}\)/);
   assert.match(source, /setNewSiteMpin\(result\.newSiteMpin\)/);
-  assert.match(source, /Guard phone must use it/);
+  assert.match(source, /give it to this guard/);
+});
+
+// PINs are only for the Guard app (user-requested 2026-10-07): admins use email + password.
+test('Add guard has no PIN field; the required personnel MPIN is generated silently, retried on 409, never stored in state', () => {
+  const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
+  assert.doesNotMatch(source, /id="personnel-mpin"|setMpin|useState\(''\);\s*\n\s*const \[mpin/);
+  assert.doesNotMatch(source, /const \[mpin,/);
+  assert.match(source, /mpin: generatePersonnelMpin\(\)/);
+  assert.match(source, /attempt < 4/);
+  assert.match(source, /reason\.status === 409\) \|\| attempt === 3/);
+  assert.doesNotMatch(source, /localStorage|sessionStorage/);
+});
+
+test('generatePersonnelMpin is crypto-random and always a valid 4-8 digit MPIN', () => {
+  const lib = readFileSync('lib/personnel-management.ts', 'utf8');
+  assert.match(lib, /getRandomValues/);
+  assert.doesNotMatch(lib, /Math\.random/);
+  for (let i = 0; i < 200; i += 1) assert.ok(isValidMpin(generatePersonnelMpin()));
+});
+
+test('Generate new PIN for the current OIC: gated by canManageOic, hidden with a hint when there is no OIC, confirm text, one-time dialog', () => {
+  const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
+  assert.match(source, /\{canChangeOic && \(staffing\?\.oic \? \(/);
+  assert.match(source, /Generate new PIN/);
+  assert.match(source, /Choose an OIC first/);
+  assert.match(source, /This replaces the OIC&apos;s current PIN\. The Guard phone will need the new PIN to sign in\./);
+  assert.match(source, /managementApi\.regenerateSiteCredential\(session\.api, siteId\)/);
+  assert.match(source, /setNewSiteMpinFor\(oicName\);\s*setNewSiteMpin\(result\.newSiteMpin\)/);
+  assert.ok(canManageOic('admin') && canManageOic('site_admin') && canManageOic('super_admin'));
+  assert.equal(canManageOic('supervisor'), false);
 });
