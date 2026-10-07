@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer, PageHeader } from '@/components/page-layout';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { managementApi } from '@/lib/management-api';
 import { canCreateSite } from '@/lib/portal-access';
@@ -97,18 +98,12 @@ export default function SitesPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="sites">
-        <div className="mx-auto max-w-6xl p-5 sm:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-bold text-[#e86405]">
-                Your Sites
-              </p>
-              <h1 className="mt-1 text-3xl font-black">Sites</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Pick a Site to manage its guards, phones, patrols and reports.
-              </p>
-            </div>
-            {allowed && (
+        <PageContainer>
+          <PageHeader
+            eyebrow="Your Sites"
+            title="Sites"
+            subtitle="Pick a Site to manage its guards, phones, patrols and reports."
+            actions={allowed ? (
               <Button
                 className="bg-[#f36f0a] text-white hover:bg-[#d95e00]"
                 onClick={() => setShowCreate(true)}
@@ -116,12 +111,12 @@ export default function SitesPage() {
                 <Plus />
                 Add Site
               </Button>
-            )}
-          </div>
+            ) : undefined}
+          />
           {error && (
             <div
               role="alert"
-              className="mt-6 flex flex-col gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100 sm:flex-row sm:items-center"
+              className="flex flex-col gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100 sm:flex-row sm:items-center"
             >
               <p className="flex flex-1 gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
@@ -139,7 +134,7 @@ export default function SitesPage() {
           )}
           {showCreate && (
             <form
-              className="mt-6 rounded-2xl border bg-card p-5"
+              className="rounded-2xl border bg-card p-5"
               onSubmit={create}
             >
               <div className="flex items-center justify-between">
@@ -231,7 +226,7 @@ export default function SitesPage() {
               </Button>
             </form>
           )}
-          <section className="mt-7 grid gap-4">
+          <section className="grid gap-4">
             {loading ? (
               <p className="rounded-2xl border p-8 text-center text-sm text-muted-foreground">
                 Loading your Sites…
@@ -270,7 +265,7 @@ export default function SitesPage() {
               ))
             ) : null}
           </section>
-        </div>
+        </PageContainer>
       </PortalShell>
     </ProtectedPortal>
   );

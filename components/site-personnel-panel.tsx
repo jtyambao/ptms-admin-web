@@ -336,7 +336,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
   );
 
   return (
-    <section className="mt-8" aria-labelledby="personnel-heading">
+    <section aria-labelledby="personnel-heading">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Guards</p>

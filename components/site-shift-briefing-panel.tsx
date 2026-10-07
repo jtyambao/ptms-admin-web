@@ -106,7 +106,7 @@ export function SiteShiftBriefingPanel({ siteId }: { siteId: number }) {
   }
 
   return (
-    <section className="mt-8 space-y-5">
+    <section className="space-y-6">
       <div>
         <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Guard Home screen</p>
         <h2 className="mt-1 flex items-center gap-2 text-xl font-black"><NotebookPen className="size-5 text-[#f36f0a]" />Pre-Shift Briefing</h2>

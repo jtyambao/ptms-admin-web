@@ -105,7 +105,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   }
 
   return (
-    <section className="mt-8 space-y-5" aria-labelledby="requests-heading">
+    <section className="space-y-6" aria-labelledby="requests-heading">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Tasks for the guards</p>

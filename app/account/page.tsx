@@ -3,6 +3,7 @@ import { AlertTriangle, BadgeCheck, KeyRound, Save, UserCircle } from 'lucide-re
 import { useState, type SyntheticEvent } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer, PageHeader } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -68,14 +69,12 @@ export default function MyAccountPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="account">
-        <div className="mx-auto max-w-2xl space-y-6 p-5 sm:p-8">
-          <div>
-            <p className="text-sm font-bold text-[#e86405]">Your account</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight">My Account</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Update your own name and password. This never affects your role, organization, email, or account status.
-            </p>
-          </div>
+        <PageContainer narrow>
+          <PageHeader
+            eyebrow="Your account"
+            title="My Account"
+            subtitle="Update your own name and password. This never changes your role, email or account status."
+          />
 
           <Card>
             <CardHeader>
@@ -182,7 +181,7 @@ export default function MyAccountPage() {
               </form>
             </CardContent>
           </Card>
-        </div>
+        </PageContainer>
       </PortalShell>
     </ProtectedPortal>
   );

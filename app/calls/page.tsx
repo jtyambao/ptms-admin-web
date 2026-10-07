@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SosActionDialog, SosAlertCard, useSosActions } from '@/components/sos-alert-card';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer, PageHeader } from '@/components/page-layout';
 import { SectionErrorBoundary } from '@/components/section-error-boundary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -563,7 +564,7 @@ function CallsShell() {
 
   if (!enabled) {
     return (
-      <section className="mt-8 rounded-2xl border bg-muted/20 p-5">
+      <section className="rounded-2xl border bg-muted/20 p-5">
         <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Voice and video</p>
         <h2 className="mt-1 text-xl font-black">Calls</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
@@ -575,11 +576,8 @@ function CallsShell() {
   }
 
   return (
-    <section className="mt-8 space-y-4">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Voice and video</p>
-        <h2 className="mt-1 text-xl font-black">Calls</h2>
-      </div>
+    <section className="space-y-6">
+      <PageHeader eyebrow="Voice and video" title="Calls" subtitle="Call the guards at a Site, or answer when they call you." />
 
       <p className="flex gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
         <AlertTriangle className="size-4 shrink-0" />
@@ -729,9 +727,11 @@ export default function CallsPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="calls">
-        <SectionErrorBoundary title="Calls">
-          <CallsShell />
-        </SectionErrorBoundary>
+        <PageContainer>
+          <SectionErrorBoundary title="Calls">
+            <CallsShell />
+          </SectionErrorBoundary>
+        </PageContainer>
       </PortalShell>
     </ProtectedPortal>
   );

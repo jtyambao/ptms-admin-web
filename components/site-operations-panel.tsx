@@ -172,7 +172,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
   }
 
   if (!allowed) return (
-    <section className="mt-8 rounded-2xl border bg-muted/20 p-5" aria-labelledby="operations-heading">
+    <section className="rounded-2xl border bg-muted/20 p-5" aria-labelledby="operations-heading">
       <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Site setup</p>
       <h2 id="operations-heading" className="mt-1 text-xl font-black">{section === 'devices' ? 'Guard phones' : section === 'checkpoints' ? 'Checkpoints and NFC tags' : 'Phones, Checkpoints and NFC tags'}</h2>
       <p className="mt-3 flex gap-2 text-sm text-muted-foreground"><ShieldAlert className="size-4 shrink-0" />Your role cannot manage this part of the Site. Ask a Supervisor or Admin if something needs to change.</p>
@@ -180,7 +180,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
   );
 
   return (
-    <section className="mt-8 space-y-8" aria-labelledby="operations-heading">
+    <section className="space-y-6" aria-labelledby="operations-heading">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Site setup</p><h2 id="operations-heading" className="mt-1 text-xl font-black">{section === 'devices' ? 'Guard phones' : section === 'checkpoints' ? 'Checkpoints and NFC tags' : 'Phones, Checkpoints and NFC tags'}</h2><p className="mt-2 text-sm text-muted-foreground">{section === 'devices' ? 'Only the phones listed here can sign in to this Site.' : 'Add each patrol spot, then put an NFC tag on it so guards can scan it.'}</p></div>
         <Button variant="outline" onClick={() => void refresh()} disabled={loading}><RefreshCw className={loading ? 'animate-spin' : ''} />Refresh</Button>

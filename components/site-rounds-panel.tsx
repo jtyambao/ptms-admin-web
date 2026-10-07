@@ -414,7 +414,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
 
   if (!canView) {
     return (
-      <section className="mt-8 rounded-2xl border bg-muted/20 p-5">
+      <section className="rounded-2xl border bg-muted/20 p-5">
         <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Patrols</p>
         <h2 className="mt-1 text-xl font-black">Rounds</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
@@ -428,7 +428,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   const activeCheckpoints = checkpoints.filter((c) => c.status === 'active');
 
   return (
-    <section className="mt-8 space-y-5">
+    <section className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Patrols</p>

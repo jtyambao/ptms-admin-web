@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer, PageHeader } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SosActionDialog, SosAlertCard, useSosActions } from '@/components/sos-alert-card';
@@ -78,7 +79,7 @@ function SosConsole() {
 
   if (!canView) {
     return (
-      <section className="mt-8 rounded-2xl border bg-muted/20 p-5">
+      <section className="rounded-2xl border bg-muted/20 p-5">
         <h2 className="text-xl font-black">SOS</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
           <ShieldAlert className="size-4 shrink-0" />SOS alerts are not available for this role.
@@ -90,14 +91,13 @@ function SosConsole() {
   const { open, history } = splitSosAlerts(alerts);
 
   return (
-    <section className="mt-8 space-y-6">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Emergency response</p>
-        <h2 className="mt-1 flex items-center gap-2 text-xl font-black"><Siren className="size-5 text-red-600" />SOS</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          An alarm sounds on every page until each new SOS is acknowledged. Handle it here.
-        </p>
-      </div>
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow="Emergency response"
+        title="SOS"
+        icon={<Siren className="size-6 text-red-600" />}
+        subtitle="An alarm sounds on every page until each new SOS is acknowledged. Handle it here."
+      />
 
       {error && <p role="alert" className="flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100"><AlertTriangle className="size-4 shrink-0" />{error}</p>}
       {success && <p className="flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"><BadgeCheck className="size-4 shrink-0" />{success}</p>}
@@ -182,7 +182,9 @@ export default function SosPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="sos">
-        <SosConsole />
+        <PageContainer>
+          <SosConsole />
+        </PageContainer>
       </PortalShell>
     </ProtectedPortal>
   );

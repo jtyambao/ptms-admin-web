@@ -158,7 +158,7 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
 
   if (!canView) {
     return (
-      <section className="mt-8 rounded-2xl border bg-muted/20 p-5" aria-labelledby="emergency-contacts-heading">
+      <section className="rounded-2xl border bg-muted/20 p-5" aria-labelledby="emergency-contacts-heading">
         <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Site safety</p>
         <h2 id="emergency-contacts-heading" className="mt-1 text-xl font-black">Emergency Contacts</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
@@ -170,7 +170,7 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
   }
 
   return (
-    <section className="mt-8" aria-labelledby="emergency-contacts-heading">
+    <section aria-labelledby="emergency-contacts-heading">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Site safety</p>

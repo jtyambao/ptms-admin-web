@@ -4,6 +4,7 @@ import { AlertTriangle, BadgeCheck, Plus, RefreshCw, ShieldAlert, UserRound, X }
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer, PageHeader } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,7 +127,7 @@ export default function AccountsPage() {
     return (
       <ProtectedPortal>
         <PortalShell active="accounts">
-          <div className="mx-auto max-w-6xl p-5 sm:p-8">
+          <PageContainer>
             <section className="rounded-2xl border bg-muted/20 p-5">
               <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Platform accounts</p>
               <h1 className="mt-1 text-xl font-black">Accounts</h1>
@@ -135,7 +136,7 @@ export default function AccountsPage() {
                 Your role cannot manage accounts. Ask the Owner or Engineer.
               </p>
             </section>
-          </div>
+          </PageContainer>
         </PortalShell>
       </ProtectedPortal>
     );
@@ -144,42 +145,38 @@ export default function AccountsPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="accounts">
-        <div className="mx-auto max-w-6xl p-5 sm:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-bold text-[#e86405]">Who can sign in</p>
-              <h1 className="mt-1 text-3xl font-black">Accounts</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Everyone who can sign in to this portal. A Site&apos;s Supervisor and Admins are
-                added from that Site&apos;s People tab instead. To change or turn off an account,
-                ask the platform team.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void refresh()} disabled={loading}>
-                <RefreshCw className={loading ? 'animate-spin' : ''} /> Refresh
-              </Button>
-              {canCreate && (
-                <Button className="bg-[#f36f0a] text-white hover:bg-[#d95e00]" onClick={() => setShowCreate(true)}>
-                  <Plus /> Add account
+        <PageContainer>
+          <PageHeader
+            eyebrow="Who can sign in"
+            title="Accounts"
+            subtitle="Everyone who can sign in to this portal. A Site's Supervisor and Admins are added from that Site's People tab. To change or turn off an account, ask the platform team."
+            actions={(
+              <>
+                <Button variant="outline" onClick={() => void refresh()} disabled={loading}>
+                  <RefreshCw className={loading ? 'animate-spin' : ''} /> Refresh
                 </Button>
-              )}
-            </div>
-          </div>
+                {canCreate && (
+                  <Button className="bg-[#f36f0a] text-white hover:bg-[#d95e00]" onClick={() => setShowCreate(true)}>
+                    <Plus /> Add account
+                  </Button>
+                )}
+              </>
+            )}
+          />
 
           {error && (
-            <p role="alert" className="mt-6 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+            <p role="alert" className="flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
               <AlertTriangle className="size-4 shrink-0" /> {error}
             </p>
           )}
           {success && (
-            <p className="mt-6 flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+            <p className="flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
               <BadgeCheck className="size-4 shrink-0" /> {success}
             </p>
           )}
 
           {showCreate && (
-            <form className="mt-6 rounded-2xl border bg-card p-5" onSubmit={create}>
+            <form className="rounded-2xl border bg-card p-5" onSubmit={create}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">New account</p>
@@ -241,7 +238,7 @@ export default function AccountsPage() {
             </form>
           )}
 
-          <section className="mt-7 overflow-hidden rounded-2xl border bg-card">
+          <section className="overflow-hidden rounded-2xl border bg-card">
             {loading ? (
               <p className="p-8 text-center text-sm text-muted-foreground">Loading accounts…</p>
             ) : !error && users.length === 0 ? (
@@ -266,7 +263,7 @@ export default function AccountsPage() {
               </div>
             ) : null}
           </section>
-        </div>
+        </PageContainer>
       </PortalShell>
     </ProtectedPortal>
   );

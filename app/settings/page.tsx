@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Clock, RefreshCw, Save } from 'lucide-reac
 import { useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer, PageHeader } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -209,7 +210,7 @@ export default function OperationalSettingsPage() {
     return (
       <ProtectedPortal>
         <PortalShell active="settings">
-          <div className="mx-auto max-w-2xl p-5 sm:p-8">
+          <PageContainer narrow>
             <section className="rounded-2xl border bg-muted/20 p-5">
               <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Settings</p>
               <h1 className="mt-1 text-xl font-black">Guard app settings</h1>
@@ -218,7 +219,7 @@ export default function OperationalSettingsPage() {
                 Operational Settings are unavailable for this role.
               </p>
             </section>
-          </div>
+          </PageContainer>
         </PortalShell>
       </ProtectedPortal>
     );
@@ -227,20 +228,17 @@ export default function OperationalSettingsPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="settings">
-        <div className="mx-auto max-w-2xl space-y-8 p-5 sm:p-8">
-          <div>
-            <p className="text-sm font-bold text-[#e86405]">Settings</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight">Guard app settings</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              How the Guard app behaves - for one Site, or for your whole organization. Safety
-              timers inside the app cannot be changed here.
-            </p>
-          </div>
+        <PageContainer narrow>
+          <PageHeader
+            eyebrow="Settings"
+            title="Guard app settings"
+            subtitle="How the Guard app behaves - for one Site, or for your whole organization. Safety timers inside the app cannot be changed here."
+          />
 
           {canViewSite && <SiteOperationalSettingsPanel />}
 
           {canView && needsOrganizationId && (
-            <label htmlFor="settings-organization-id" className="mt-6 grid gap-2 text-sm font-bold">
+            <label htmlFor="settings-organization-id" className="grid gap-2 text-sm font-bold">
               Organization ID
               <div className="flex gap-2">
                 <Input
@@ -284,7 +282,7 @@ export default function OperationalSettingsPage() {
               )}
 
               {settings && (
-                <Card className="mt-6">
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Clock className="size-4 text-[#f36f0a]" />
@@ -330,7 +328,7 @@ export default function OperationalSettingsPage() {
               )}
             </div>
           )}
-        </div>
+        </PageContainer>
       </PortalShell>
     </ProtectedPortal>
   );

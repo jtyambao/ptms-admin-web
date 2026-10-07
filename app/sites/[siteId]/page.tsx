@@ -20,6 +20,7 @@ import {
 } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer } from '@/components/page-layout';
 import { SiteHierarchyPanel } from '@/components/site-hierarchy-panel';
 import { SitePersonnelPanel } from '@/components/site-personnel-panel';
 import { SiteOperationsPanel } from '@/components/site-operations-panel';
@@ -246,14 +247,14 @@ export default function SiteDetailPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="sites" siteName={site?.name}>
-        <div className="mx-auto max-w-6xl p-5 sm:p-8">
+        <PageContainer>
           <Link className="text-sm font-bold text-[#e86405]" href="/sites">
             ← All Sites
           </Link>
           {error && (
             <div
               role="alert"
-              className="mt-5 flex flex-col gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100 sm:flex-row sm:items-center"
+              className="flex flex-col gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100 sm:flex-row sm:items-center"
             >
               <p className="flex flex-1 gap-2">
                 <AlertTriangle className="size-4 shrink-0" />
@@ -275,12 +276,12 @@ export default function SiteDetailPage() {
           {!site && loading ? (
             <p
               aria-live="polite"
-              className="mt-8 text-sm text-muted-foreground"
+              className="text-sm text-muted-foreground"
             >
               Loading this Site…
             </p>
           ) : !site ? (
-            <div className="mt-8 rounded-2xl border p-8 text-center">
+            <div className="rounded-2xl border p-8 text-center">
               <p className="font-bold">Site unavailable</p>
               <p className="mt-2 text-sm text-muted-foreground">
                 Go back to the Sites list and pick a Site you have access to.
@@ -288,7 +289,7 @@ export default function SiteDetailPage() {
             </div>
           ) : (
             <>
-              <div className="mt-5 flex flex-col gap-4 rounded-2xl border bg-card p-5 sm:flex-row sm:items-start">
+              <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5 sm:flex-row sm:items-start">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-3">
                     <h1 className="text-3xl font-black">{site.name}</h1>
@@ -318,7 +319,6 @@ export default function SiteDetailPage() {
                   const group = SITE_GROUPS.find((candidate) => candidate.id === value);
                   if (group) goTo(group.items[0].section);
                 }}
-                className="mt-6"
               >
                 <TabsList className="h-auto w-full flex-wrap justify-start rounded-xl p-1">
                   {SITE_GROUPS.map((group) => (
@@ -538,7 +538,7 @@ export default function SiteDetailPage() {
               </Tabs>
             </>
           )}
-        </div>
+        </PageContainer>
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent>
             <DialogHeader>

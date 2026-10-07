@@ -140,7 +140,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
   }
 
   return (
-    <section className="mt-8 space-y-6" aria-labelledby="reports-heading">
+    <section className="space-y-6" aria-labelledby="reports-heading">
       <div>
         <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">View only</p>
         <h2 id="reports-heading" className="mt-1 text-xl font-black">Reports</h2>

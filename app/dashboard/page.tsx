@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { PageContainer, PageHeader } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,19 +84,20 @@ export default function DashboardPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="dashboard">
-        <div className="mx-auto max-w-6xl p-5 sm:p-8">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-[#e86405]">Right now</p>
-              <h1 className="mt-1 text-3xl font-black tracking-tight">Operations</h1>
-            </div>
-            <Button variant="outline" onClick={() => void refresh()} disabled={refreshing}>
-              <RefreshCw className={refreshing ? 'animate-spin' : ''} />
-              {refreshing ? 'Refreshing…' : 'Refresh'}
-            </Button>
-          </div>
+        <PageContainer>
+          <PageHeader
+            eyebrow="Right now"
+            title="Operations"
+            subtitle="How each of your Sites is doing at the moment."
+            actions={(
+              <Button variant="outline" onClick={() => void refresh()} disabled={refreshing}>
+                <RefreshCw className={refreshing ? 'animate-spin' : ''} />
+                {refreshing ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            )}
+          />
 
-          <div className="mt-6 space-y-5">
+          <div className="space-y-6">
             {sites.kind === 'skipped' && <SkippedCard reason={sites.reason} />}
             {sites.kind === 'loading' && <p className="text-sm text-muted-foreground">Loading…</p>}
             {sites.kind === 'error' && <Failed message={sites.message} />}
@@ -106,7 +108,7 @@ export default function DashboardPage() {
               <SiteStatusCard key={`${site.id}-${refreshKey}`} site={site} role={role} />
             ))}
           </div>
-        </div>
+        </PageContainer>
       </PortalShell>
     </ProtectedPortal>
   );
