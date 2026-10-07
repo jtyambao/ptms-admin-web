@@ -41,6 +41,9 @@ export function IncomingSosBanner() {
 
   const [alerts, setAlerts] = useState<SosAlertEntry[]>([]);
   const [actingOn, setActingOn] = useState<number | null>(null);
+  // Inline "Resolve" for an SOS someone is already responding to.
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [resolveNote, setResolveNote] = useState('');
   const [error, setError] = useState('');
   const [soundBlocked, setSoundBlocked] = useState(false);
 
@@ -140,12 +143,25 @@ export function IncomingSosBanner() {
     } finally { setActingOn(null); }
   }
 
+  async function resolve(id: number) {
+    setActingOn(id); setError('');
+    try {
+      await managementApi.resolveSos(session.api, id, resolveNote.trim() || undefined);
+      setResolvingId(null); setResolveNote('');
+      await poll();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally { setActingOn(null); }
+  }
+
   if (!enabled || alerts.length === 0) return null;
 
+  // Red while any SOS still needs a response; calmer orange once every open
+  // SOS has someone responding (it stays until Resolved or False alarm).
   return (
-    <div className="max-h-[45vh] space-y-2 overflow-y-auto bg-red-600 px-4 py-2 text-white shadow-lg sm:px-8 sm:py-3" role="alert">
+    <div className={`max-h-[45vh] space-y-2 overflow-y-auto px-4 py-2 text-white shadow-lg sm:px-8 sm:py-3 ${hasActive ? 'bg-red-600' : 'bg-orange-600'}`} role="alert">
       <div className="flex flex-wrap items-center gap-2">
-        <PhoneCall className="size-5 shrink-0 animate-pulse" />
+        <PhoneCall className={`size-5 shrink-0 ${hasActive ? 'animate-pulse' : ''}`} />
         <p className="font-black uppercase tracking-wide">
           {alerts.length === 1 ? 'SOS alert' : `${alerts.length} SOS alerts`}
         </p>
@@ -194,10 +210,31 @@ export function IncomingSosBanner() {
                   I&apos;m responding
                 </Button>
               )}
+              {alert.status === 'acknowledged' && resolvingId !== alert.id && (
+                <Button size="sm" className="bg-green-700 text-white hover:bg-green-800" disabled={actingOn === alert.id} onClick={() => { setResolvingId(alert.id); setResolveNote(''); }}>
+                  Resolve
+                </Button>
+              )}
               <Button size="sm" variant="secondary" disabled={actingOn === alert.id} onClick={() => void respond(alert.id, 'cancel')}>
                 False alarm
               </Button>
             </div>
+            {resolvingId === alert.id && (
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <input
+                  className="h-9 min-w-0 flex-1 rounded-md border-0 px-3 text-sm text-foreground"
+                  placeholder="What happened / what was done (optional)"
+                  maxLength={500}
+                  value={resolveNote}
+                  onChange={(e) => setResolveNote(e.target.value)}
+                  autoFocus
+                />
+                <Button size="sm" className="bg-green-700 text-white hover:bg-green-800" disabled={actingOn === alert.id} onClick={() => void resolve(alert.id)}>
+                  Mark resolved
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setResolvingId(null)}>Back</Button>
+              </div>
+            )}
           </div>
         ))}
       </div>
