@@ -1,7 +1,8 @@
 'use client';
 
 import { AlertTriangle, BookText, ClipboardList, Eye, ImageOff, Lock, PhoneCall, ShieldAlert, UserCheck, Users } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
+import { ExpandableText, ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Empty, EmptyContent, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
@@ -152,98 +153,86 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
       {actionError && <p role="alert" className="flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100"><AlertTriangle className="size-4 shrink-0" />{actionError}</p>}
 
       <ReportSection title="Incidents" icon={ClipboardList} widget={incidents}>
-        {(data) => data.length === 0 ? <EmptyRow text="No Incidents reported at this Site." /> : (
-          <div className="divide-y">
-            {data.map((incident) => (
-              <div key={incident.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <p className="min-w-0 flex-1 truncate font-bold">{incident.title}</p>
-                <Badge variant="outline" className="uppercase">{incident.severity}</Badge>
-                <Badge variant={incident.status === 'resolved' ? 'outline' : 'secondary'} className="uppercase">{incident.status}</Badge>
-                <span className="text-xs text-muted-foreground">{new Date(incident.occurred_at).toLocaleString()}</span>
-                {role && canViewIncidents(role) && incident.status === 'open' && (
-                  <Button size="sm" variant="outline" disabled={actingOn === `incident-${incident.id}`} onClick={() => void runIncidentAction(incident.id, 'acknowledge')}>
-                    I&apos;m responding
-                  </Button>
-                )}
-                {role && canViewIncidents(role) && incident.status === 'acknowledged' && (
-                  <Button size="sm" variant="outline" disabled={actingOn === `incident-${incident.id}`} onClick={() => void runIncidentAction(incident.id, 'resolve')}>
-                    Resolve
-                  </Button>
-                )}
-              </div>
-            ))}
+        {(data) => (
+          <ReportList items={data} empty="No Incidents reported at this Site." render={(incident) => (
+          <div key={incident.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <p className="min-w-0 flex-1 truncate font-bold">{incident.title}</p>
+            <Badge variant="outline" className="uppercase">{incident.severity}</Badge>
+            <Badge variant={incident.status === 'resolved' ? 'outline' : 'secondary'} className="uppercase">{incident.status}</Badge>
+            <span className="text-xs text-muted-foreground">{new Date(incident.occurred_at).toLocaleString()}</span>
+            {role && canViewIncidents(role) && incident.status === 'open' && (
+              <Button size="sm" variant="outline" disabled={actingOn === `incident-${incident.id}`} onClick={() => void runIncidentAction(incident.id, 'acknowledge')}>
+                I&apos;m responding
+              </Button>
+            )}
+            {role && canViewIncidents(role) && incident.status === 'acknowledged' && (
+              <Button size="sm" variant="outline" disabled={actingOn === `incident-${incident.id}`} onClick={() => void runIncidentAction(incident.id, 'resolve')}>
+                Resolve
+              </Button>
+            )}
           </div>
+          )} />
         )}
       </ReportSection>
 
       <ReportSection title="Missed Checkpoints" icon={ShieldAlert} widget={missed}>
-        {(data) => data.length === 0 ? <EmptyRow text="No missed checkpoints at this Site." /> : (
-          <div className="divide-y">
-            {data.map((tap) => (
-              <div key={tap.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <p className="min-w-0 flex-1 font-bold">{tap.checkpoint_name}</p>
-                <Badge variant="outline">{tap.round_name}</Badge>
-                <span className="text-xs text-muted-foreground">{new Date(tap.missed_at).toLocaleString()}</span>
-              </div>
-            ))}
+        {(data) => (
+          <ReportList items={data} empty="No missed checkpoints at this Site." render={(tap) => (
+          <div key={tap.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <p className="min-w-0 flex-1 font-bold">{tap.checkpoint_name}</p>
+            <Badge variant="outline">{tap.round_name}</Badge>
+            <span className="text-xs text-muted-foreground">{new Date(tap.missed_at).toLocaleString()}</span>
           </div>
+          )} />
         )}
       </ReportSection>
 
       <ReportSection title="Missed checkpoints (after the make-up period)" icon={ShieldAlert} widget={governedMissed}>
-        {(data) => data.length === 0 ? <EmptyRow text="No missed checkpoints after the make-up period." /> : (
-          <div className="divide-y">
-            {data.map((tap) => (
-              <div key={tap.missedTapId} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <p className="min-w-0 flex-1 font-bold">{tap.checkpointName}</p>
-                <Badge variant="outline" className="uppercase">{tap.catchUpStatus.replace('_', ' ')}</Badge>
-                <span className="text-xs text-muted-foreground">{new Date(tap.missedAt).toLocaleString()}</span>
-              </div>
-            ))}
+        {(data) => (
+          <ReportList items={data} empty="No missed checkpoints after the make-up period." render={(tap) => (
+          <div key={tap.missedTapId} className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <p className="min-w-0 flex-1 font-bold">{tap.checkpointName}</p>
+            <Badge variant="outline" className="uppercase">{tap.catchUpStatus.replace('_', ' ')}</Badge>
+            <span className="text-xs text-muted-foreground">{new Date(tap.missedAt).toLocaleString()}</span>
           </div>
+          )} />
         )}
       </ReportSection>
 
       <ReportSection title="Visitor Logs" icon={Users} widget={visitorLogs}>
-        {(data) => data.length === 0 ? <EmptyRow text="No visitors logged at this Site." /> : (
-          <div className="divide-y">
-            {data.map((log) => (
-              <div key={log.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <p className="min-w-0 flex-1 font-bold">{log.visitor_name}</p>
-                <Badge variant="outline">{log.purpose}</Badge>
-                <span className="text-xs text-muted-foreground">Host: {log.host_name}</span>
-                <span className="text-xs text-muted-foreground">{new Date(log.occurred_at).toLocaleString()}</span>
-                <PhotoLink url={log.photo_view_url} />
-              </div>
-            ))}
+        {(data) => (
+          <ReportList items={data} empty="No visitors logged at this Site." render={(log) => (
+          <div key={log.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <p className="min-w-0 flex-1 font-bold">{log.visitor_name}</p>
+            <Badge variant="outline">{log.purpose}</Badge>
+            <span className="text-xs text-muted-foreground">Host: {log.host_name}</span>
+            <span className="text-xs text-muted-foreground">{new Date(log.occurred_at).toLocaleString()}</span>
+            <PhotoLink url={log.photo_view_url} />
           </div>
+          )} />
         )}
       </ReportSection>
 
       <ReportSection title="Voluntary Observation Reports" icon={Eye} widget={vorReports}>
-        {(data) => data.length === 0 ? <EmptyRow text="No voluntary observation reports at this Site." /> : (
-          <div className="divide-y">
-            {data.map((report) => (
-              <div key={report.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <p className="min-w-0 flex-1 truncate">{report.remarks ?? <span className="italic text-muted-foreground">No remarks</span>}</p>
-                <span className="text-xs text-muted-foreground">{new Date(report.occurred_at).toLocaleString()}</span>
-                <PhotoLink url={report.photo_view_url} />
-              </div>
-            ))}
+        {(data) => (
+          <ReportList items={data} empty="No voluntary observation reports at this Site." render={(report) => (
+          <div key={report.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <div className="min-w-0 flex-1">{report.remarks ? <ExpandableText text={report.remarks} /> : <span className="italic text-muted-foreground">No remarks</span>}</div>
+            <span className="text-xs text-muted-foreground">{new Date(report.occurred_at).toLocaleString()}</span>
+            <PhotoLink url={report.photo_view_url} />
           </div>
+          )} />
         )}
       </ReportSection>
 
       <ReportSection title="Daily Occurrence Book" icon={BookText} widget={dob}>
-        {(data) => data.length === 0 ? <EmptyRow text="No Daily Occurrence Book entries at this Site." /> : (
-          <div className="divide-y">
-            {data.map((entry) => (
-              <div key={entry.id} className="py-3 text-sm">
-                <p>{entry.entry_text}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{new Date(entry.occurred_at).toLocaleString()}</p>
-              </div>
-            ))}
+        {(data) => (
+          <ReportList items={data} empty="No Daily Occurrence Book entries at this Site." render={(entry) => (
+          <div key={entry.id} className="py-3 text-sm">
+            <ExpandableText text={entry.entry_text} />
+            <p className="mt-1 text-xs text-muted-foreground">{new Date(entry.occurred_at).toLocaleString()}</p>
           </div>
+          )} />
         )}
       </ReportSection>
 
@@ -260,26 +249,24 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
       </ReportSection>
 
       <ReportSection title="SOS alerts" icon={PhoneCall} widget={sos}>
-        {(data) => data.length === 0 ? <EmptyRow text="No SOS alerts at this Site." /> : (
-          <div className="divide-y">
-            {data.map((alert) => (
-              <div key={alert.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <p className="min-w-0 flex-1 font-bold">{alert.personnel_name ?? 'Guard not identified'}</p>
-                <Badge variant={alert.status === 'resolved' || alert.status === 'cancelled' ? 'outline' : 'secondary'} className="uppercase">{alert.status === 'active' ? 'New' : alert.status === 'acknowledged' ? 'Responding' : alert.status === 'cancelled' ? 'False alarm' : alert.status}</Badge>
-                <span className="text-xs text-muted-foreground">{new Date(alert.triggered_at).toLocaleString()}</span>
-                {role && canRespondToSos(role) && alert.status === 'active' && (
-                  <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'acknowledge')}>
-                    Acknowledge
-                  </Button>
-                )}
-                {role && canRespondToSos(role) && (alert.status === 'active' || alert.status === 'acknowledged') && (
-                  <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'cancel')}>
-                    False alarm
-                  </Button>
-                )}
-              </div>
-            ))}
+        {(data) => (
+          <ReportList items={data} empty="No SOS alerts at this Site." render={(alert) => (
+          <div key={alert.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            <p className="min-w-0 flex-1 font-bold">{alert.personnel_name ?? 'Guard not identified'}</p>
+            <Badge variant={alert.status === 'resolved' || alert.status === 'cancelled' ? 'outline' : 'secondary'} className="uppercase">{alert.status === 'active' ? 'New' : alert.status === 'acknowledged' ? 'Responding' : alert.status === 'cancelled' ? 'False alarm' : alert.status}</Badge>
+            <span className="text-xs text-muted-foreground">{new Date(alert.triggered_at).toLocaleString()}</span>
+            {role && canRespondToSos(role) && alert.status === 'active' && (
+              <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'acknowledge')}>
+                Acknowledge
+              </Button>
+            )}
+            {role && canRespondToSos(role) && (alert.status === 'active' || alert.status === 'acknowledged') && (
+              <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'cancel')}>
+                False alarm
+              </Button>
+            )}
           </div>
+          )} />
         )}
       </ReportSection>
 
@@ -302,7 +289,7 @@ function ReportSection<T>({
     <div className="rounded-2xl border bg-card">
       <div className="flex items-center gap-2 border-b p-4">
         <Icon className="size-4 text-[#f36f0a]" />
-        <h3 className="font-black">{title}</h3>
+        <h3 className="font-black">{title}{widget.kind === 'loaded' && Array.isArray(widget.data) && <span className="ml-2 text-sm font-normal text-muted-foreground">({widget.data.length})</span>}</h3>
       </div>
       <div className="p-4">
         {widget.kind === 'skipped' && (
@@ -322,6 +309,19 @@ function ReportSection<T>({
         )}
         {widget.kind === 'loaded' && children(widget.data)}
       </div>
+    </div>
+  );
+}
+
+function ReportList<T>({ items, empty, render }: { items: T[]; empty: string; render: (item: T) => React.ReactNode }) {
+  const { visible, remaining, showMore, step } = useShowMore(items, 5, 10);
+  if (items.length === 0) return <EmptyRow text={empty} />;
+  return (
+    <div>
+      <div className="divide-y">
+        {visible.map((item, index) => <Fragment key={index}>{render(item)}</Fragment>)}
+      </div>
+      <ShowMore remaining={remaining} onClick={showMore} step={step} />
     </div>
   );
 }

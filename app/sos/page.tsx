@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
-import { PageContainer, PageHeader } from '@/components/page-layout';
+import { Disclosure, PageContainer, PageHeader, ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SosActionDialog, SosAlertCard, useSosActions } from '@/components/sos-alert-card';
@@ -31,7 +31,34 @@ import { useSession } from '@/lib/session-provider';
 // "Missed SOS" and resolve-callback are the Guard device's own log
 // (Guard Site Session), not something a staff console can see.
 const POLL_MS = 5000;
-const HISTORY_PAGE = 20;
+
+// Closed alerts: collapsed by default, newest 5 first, "Show more" for the rest.
+function SosHistory({ history }: { history: SosAlertEntry[] }) {
+  const { visible, remaining, showMore, step } = useShowMore(history, 5, 10);
+  return (
+    <Disclosure title="History" count={history.length}>
+      {history.length === 0 ? (
+        <p className="p-6 text-center text-sm text-muted-foreground">No closed SOS alerts yet.</p>
+      ) : (
+        <div className="divide-y">
+          {visible.map((alert) => {
+            const outcome = sosOutcome(alert);
+            return (
+              <div key={alert.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 p-4 text-sm">
+                <Badge variant={outcome.tone === 'good' ? 'secondary' : 'outline'}>{outcome.label}</Badge>
+                <span className="font-bold">{alert.site_name ?? 'Unknown Site'}</span>
+                <span className="text-muted-foreground">{new Date(alert.triggered_at).toLocaleString()}</span>
+                {outcome.responseTime && <span className="text-xs text-muted-foreground">responded in {outcome.responseTime}</span>}
+                {outcome.detail && <span className="w-full text-xs text-muted-foreground">{outcome.detail}</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <ShowMore remaining={remaining} onClick={showMore} step={step} />
+    </Disclosure>
+  );
+}
 
 function SosConsole() {
   const session = useSession();
@@ -44,7 +71,6 @@ function SosConsole() {
   const [loading, setLoading] = useState(true);
   const [pollError, setPollError] = useState('');
   const [now, setNow] = useState(() => Date.now());
-  const [historyShown, setHistoryShown] = useState(HISTORY_PAGE);
   const [locations, setLocations] = useState<Record<number, { key: string; changedAt: number }>>({});
   const locationsRef = useRef(locations);
   locationsRef.current = locations;
@@ -146,32 +172,7 @@ function SosConsole() {
         </div>
       )}
 
-      <div className="rounded-2xl border bg-card">
-        <p className="border-b p-4 font-black">History</p>
-        {history.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">No closed SOS alerts yet.</p>
-        ) : (
-          <div className="divide-y">
-            {history.slice(0, historyShown).map((alert) => {
-              const outcome = sosOutcome(alert);
-              return (
-                <div key={alert.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 p-4 text-sm">
-                  <Badge variant={outcome.tone === 'good' ? 'secondary' : 'outline'}>{outcome.label}</Badge>
-                  <span className="font-bold">{alert.site_name ?? 'Unknown Site'}</span>
-                  <span className="text-muted-foreground">{new Date(alert.triggered_at).toLocaleString()}</span>
-                  {outcome.responseTime && <span className="text-xs text-muted-foreground">responded in {outcome.responseTime}</span>}
-                  {outcome.detail && <span className="w-full text-xs text-muted-foreground">{outcome.detail}</span>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {history.length > historyShown && (
-          <div className="border-t p-3 text-center">
-            <Button variant="ghost" size="sm" onClick={() => setHistoryShown((n) => n + HISTORY_PAGE)}>Show more</Button>
-          </div>
-        )}
-      </div>
+      <SosHistory history={history} />
 
       <SosActionDialog actions={actions} />
     </section>

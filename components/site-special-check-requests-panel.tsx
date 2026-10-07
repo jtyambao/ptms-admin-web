@@ -2,6 +2,7 @@
 
 import { AlertTriangle, BadgeCheck, ClipboardCheck, MapPin, Plus, RefreshCw, Siren } from 'lucide-react';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
+import { ExpandableText, ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -104,6 +105,8 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
     } finally { setSaving(false); }
   }
 
+  const more = useShowMore(requests, 5, 10);
+
   return (
     <section className="space-y-6" aria-labelledby="requests-heading">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -149,7 +152,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
           </div>
         ) : (
           <div className="divide-y">
-            {requests.map((request) => {
+            {more.visible.map((request) => {
               const steps = requestStatusSteps(request);
               return (
                 <div key={request.id} className="p-5">
@@ -159,7 +162,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                     <Badge variant="outline">{request.type === 'spot_visit' ? 'Spot request' : 'Request'}</Badge>
                     <Badge variant={request.status === 'completed' ? 'secondary' : 'outline'}>{requestStatusLabel(request.status)}</Badge>
                   </div>
-                  {request.instructions && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{request.instructions}</p>}
+                  {request.instructions && <div className="mt-2 text-sm text-muted-foreground"><ExpandableText text={request.instructions} /></div>}
                   {request.type === 'spot_visit' && (
                     <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
                       <MapPin className="size-3 text-[#e86405]" />
@@ -186,6 +189,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
             })}
           </div>
         )}
+        <ShowMore remaining={more.remaining} onClick={more.showMore} step={more.step} />
       </div>
 
       <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) setMode(null); }}>
