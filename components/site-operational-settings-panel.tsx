@@ -37,31 +37,31 @@ type PresetFieldKey = 'guardIdleTimeoutSeconds' | 'guardIdleWarningSeconds' | 'n
 const PRESET_FIELDS: { key: PresetFieldKey; label: string; helper: string; min: number; max: number }[] = [
   {
     key: 'guardIdleTimeoutSeconds',
-    label: 'Guard inactivity timeout',
-    helper: 'How long a guard screen may sit idle before automatically returning to Home.',
+    label: 'Return to the Home screen after the guard is idle for',
+    helper: 'If nobody touches the Guard phone for this long, it goes back to the Home screen.',
     min: 5,
     max: 120,
   },
   {
     key: 'guardIdleWarningSeconds',
-    label: 'Warning before auto-close',
-    helper: 'How long the warning shows before auto-close. Must be less than the timeout above.',
+    label: 'Show a warning during the last',
+    helper: 'The warning the guard sees before the screen closes by itself. Must be shorter than the idle time above.',
     min: 1,
     max: 60,
   },
   {
     key: 'nfcScanTimeoutSeconds',
-    label: 'NFC reading timeout',
-    helper: 'How long the app waits for an NFC tag read attempt before giving up.',
+    label: 'Wait for an NFC tag scan for up to',
+    helper: 'How long the app waits for the guard to hold the phone on a tag before giving up.',
     min: 5,
     max: 60,
   },
 ];
 
 const OTHER_FIELDS: { key: 'weatherCacheFreshnessSeconds' | 'orphanPhotoCleanupIntervalSeconds' | 'catchupWindowSeconds'; label: string; unit: string; divisor: number; min: number; max: number }[] = [
-  { key: 'weatherCacheFreshnessSeconds', label: 'Weather refresh / cache freshness', unit: 'minutes', divisor: 60, min: 1, max: 1440 },
-  { key: 'orphanPhotoCleanupIntervalSeconds', label: 'Orphan evidence/photo cleanup check interval', unit: 'hours', divisor: 3600, min: 1, max: 168 },
-  { key: 'catchupWindowSeconds', label: 'Catch-Up Window', unit: 'minutes', divisor: 60, min: 5, max: 240 },
+  { key: 'weatherCacheFreshnessSeconds', label: 'Refresh the weather every', unit: 'minutes', divisor: 60, min: 1, max: 1440 },
+  { key: 'orphanPhotoCleanupIntervalSeconds', label: 'Clean up unused photos every', unit: 'hours', divisor: 3600, min: 1, max: 168 },
+  { key: 'catchupWindowSeconds', label: 'Time allowed to make up a missed checkpoint', unit: 'minutes', divisor: 60, min: 5, max: 240 },
 ];
 
 function PresetField({ id, label, helper, min, max, value, onChange }: {
@@ -166,17 +166,17 @@ export function SiteOperationalSettingsPanel() {
   function validate(): string {
     for (const f of PRESET_FIELDS) {
       const n = Number(formValues[f.key]);
-      if (formValues[f.key]?.trim() === '' || Number.isNaN(n)) return `${f.label} must be a number.`;
-      if (n < f.min || n > f.max) return `${f.label} must be between ${f.min} and ${f.max} seconds.`;
+      if (formValues[f.key]?.trim() === '' || Number.isNaN(n)) return `Check "${f.label}": it must be a number.`;
+      if (n < f.min || n > f.max) return `Check "${f.label}": it must be between ${f.min} and ${f.max} seconds.`;
     }
     for (const f of OTHER_FIELDS) {
       const n = Number(formValues[f.key]);
-      if (formValues[f.key]?.trim() === '' || Number.isNaN(n)) return `${f.label} must be a number.`;
-      if (n < f.min || n > f.max) return `${f.label} must be between ${f.min} and ${f.max} ${f.unit}.`;
+      if (formValues[f.key]?.trim() === '' || Number.isNaN(n)) return `Check "${f.label}": it must be a number.`;
+      if (n < f.min || n > f.max) return `Check "${f.label}": it must be between ${f.min} and ${f.max} ${f.unit}.`;
     }
     const timeout = Number(formValues.guardIdleTimeoutSeconds);
     const warning = Number(formValues.guardIdleWarningSeconds);
-    if (warning >= timeout) return 'Warning before auto-close must be less than the Guard inactivity timeout.';
+    if (warning >= timeout) return 'The warning time must be shorter than the idle time.';
     return '';
   }
 
@@ -213,9 +213,9 @@ export function SiteOperationalSettingsPanel() {
       const updated = await managementApi.resetSiteOperationalSettings(session.api, siteId);
       setSettings(updated);
       populateForm(updated);
-      setSuccess('This Site now follows the organization default again.');
+      setSuccess('This Site follows the organization settings again.');
     } catch (reason) {
-      setError(reason instanceof ApiRequestError ? reason.message : 'Operational settings could not be reset.');
+      setError(reason instanceof ApiRequestError ? reason.message : 'The settings could not be reset. Please try again.');
     } finally {
       setResetting(false);
     }
@@ -227,19 +227,19 @@ export function SiteOperationalSettingsPanel() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Clock className="size-4 text-[#f36f0a]" />
-            Per-Site Guard App Timing
+            Guard app timing for one Site
           </CardTitle>
           {settings && (
             <Badge variant={settings.hasOverride ? 'secondary' : 'outline'}>
-              {settings.hasOverride ? 'Custom for this Site' : 'Organization default'}
+              {settings.hasOverride ? 'Custom for this Site' : 'Same as the organization'}
             </Badge>
           )}
         </div>
       </CardHeader>
       <CardContent className="grid gap-5">
         <p className="text-sm text-muted-foreground">
-          These values apply only to the Site selected below. A Site with no customization of its
-          own follows the organization-wide settings automatically.
+          These settings apply only to the Site chosen below. If you do not change them, the Site
+          follows your organization&apos;s settings.
         </p>
 
         {sites.length > 1 && (
@@ -259,7 +259,7 @@ export function SiteOperationalSettingsPanel() {
           <p className="text-sm font-bold">{sites[0].name}</p>
         )}
         {sites.length === 0 && !loading && (
-          <p className="text-sm text-muted-foreground">No Sites are assigned to your account yet.</p>
+          <p className="text-sm text-muted-foreground">You have no Sites yet.</p>
         )}
 
         {error && (
@@ -310,16 +310,16 @@ export function SiteOperationalSettingsPanel() {
             {canEdit ? (
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => void handleSave()} disabled={saving} className="w-fit gap-2">
-                  <Save className="size-4" />{saving ? 'Saving…' : 'Save changes for this Site'}
+                  <Save className="size-4" />{saving ? 'Saving…' : 'Save for this Site'}
                 </Button>
                 {settings.hasOverride && (
                   <Button variant="outline" onClick={() => void handleReset()} disabled={resetting} className="w-fit gap-2">
-                    <RotateCcw className="size-4" />{resetting ? 'Resetting…' : 'Reset to organization default'}
+                    <RotateCcw className="size-4" />{resetting ? 'Resetting…' : 'Go back to the organization settings'}
                   </Button>
                 )}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Your role can view this Site's settings but cannot change them.</p>
+              <p className="text-xs text-muted-foreground">You can see this Site&apos;s settings but cannot change them.</p>
             )}
           </>
         )}

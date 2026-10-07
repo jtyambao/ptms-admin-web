@@ -43,49 +43,49 @@ const FIELDS: {
 }[] = [
   {
     key: 'guardIdleTimeoutSeconds',
-    label: 'Guard inactivity timeout',
+    label: 'Return to the Home screen after the guard is idle for',
     unit: 'seconds',
-    helper: 'How long a guard screen may sit idle before automatically returning to Home.',
+    helper: 'If nobody touches the Guard phone for this long, it goes back to the Home screen.',
     min: 5,
     max: 120,
   },
   {
     key: 'guardIdleWarningSeconds',
-    label: 'Warning before auto-close',
+    label: 'Show a warning during the last',
     unit: 'seconds',
-    helper: 'How many seconds of the countdown show a visible warning. Must be less than the timeout above.',
+    helper: 'The warning the guard sees before the screen closes by itself. Must be shorter than the idle time above.',
     min: 1,
     max: 60,
   },
   {
     key: 'nfcScanTimeoutSeconds',
-    label: 'NFC reading timeout',
+    label: 'Wait for an NFC tag scan for up to',
     unit: 'seconds',
-    helper: 'How long the app waits for an NFC tag read attempt before giving up (never longer than the real checkpoint deadline).',
+    helper: 'How long the app waits for the guard to hold the phone on a tag before giving up.',
     min: 5,
     max: 60,
   },
   {
     key: 'weatherCacheFreshnessSeconds',
-    label: 'Weather refresh / cache freshness',
+    label: 'Refresh the weather every',
     unit: 'minutes',
-    helper: 'How old cached weather may get before the app fetches a fresh reading.',
+    helper: 'How old the weather shown on the Guard phone can get before it is updated.',
     min: 1,
     max: 1440,
   },
   {
     key: 'orphanPhotoCleanupIntervalSeconds',
-    label: 'Orphan evidence/photo cleanup check interval',
+    label: 'Clean up unused photos every',
     unit: 'hours',
-    helper: 'How often the app checks for and removes locally-stored photos no longer referenced by any queued submission.',
+    helper: 'How often the Guard phone deletes photos that were never sent with a report.',
     min: 1,
     max: 168,
   },
   {
     key: 'catchupWindowSeconds',
-    label: 'Catch-Up Window',
+    label: 'Time allowed to make up a missed checkpoint',
     unit: 'minutes',
-    helper: 'How long a missed checkpoint remains available for authorized Catch-Up. Applies to newly scheduled opportunities only — a window already scheduled or active keeps its original deadline.',
+    helper: 'How long a guard can still make up a missed checkpoint. A change only affects make-up chances that have not started yet.',
     min: 5,
     max: 240,
   },
@@ -129,7 +129,7 @@ export default function OperationalSettingsPage() {
   async function load() {
     const parsedOrganizationId = needsOrganizationId ? Number(organizationId) : undefined;
     if (needsOrganizationId && (!organizationId.trim() || !Number.isInteger(parsedOrganizationId) || parsedOrganizationId! < 1)) {
-      setError('Enter a valid Organization ID. There is no Organization directory yet — this must be a known numeric id.');
+      setError('Enter the Organization ID (a number). Ask the platform team if you do not have it.');
       return;
     }
     setLoading(true);
@@ -144,7 +144,7 @@ export default function OperationalSettingsPage() {
       );
     } catch (reason) {
       setSettings(null);
-      setError(reason instanceof ApiRequestError ? reason.message : 'Operational settings could not be loaded.');
+      setError(reason instanceof ApiRequestError ? reason.message : 'The settings could not be loaded. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -164,15 +164,15 @@ export default function OperationalSettingsPage() {
     for (const f of FIELDS) {
       const raw = formValues[f.key];
       const n = Number(raw);
-      if (raw.trim() === '' || Number.isNaN(n)) return `${f.label} must be a number.`;
+      if (raw.trim() === '' || Number.isNaN(n)) return `Check "${f.label}": it must be a number.`;
       if (n < f.min || n > f.max) {
-        return `${f.label} must be between ${f.min} and ${f.max} ${f.unit}.`;
+        return `Check "${f.label}": it must be between ${f.min} and ${f.max} ${f.unit}.`;
       }
     }
     const timeout = Number(formValues.guardIdleTimeoutSeconds);
     const warning = Number(formValues.guardIdleWarningSeconds);
     if (warning >= timeout) {
-      return 'Warning before auto-close must be less than the Guard inactivity timeout.';
+      return 'The warning time must be shorter than the idle time.';
     }
     return '';
   }
@@ -199,7 +199,7 @@ export default function OperationalSettingsPage() {
       );
       setSuccess(true);
     } catch (reason) {
-      setError(reason instanceof ApiRequestError ? reason.message : 'Operational settings could not be saved.');
+      setError(reason instanceof ApiRequestError ? reason.message : 'The settings could not be saved. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -211,8 +211,8 @@ export default function OperationalSettingsPage() {
         <PortalShell active="settings">
           <div className="mx-auto max-w-2xl p-5 sm:p-8">
             <section className="rounded-2xl border bg-muted/20 p-5">
-              <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Configuration</p>
-              <h1 className="mt-1 text-xl font-black">Operational Settings</h1>
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Settings</p>
+              <h1 className="mt-1 text-xl font-black">Guard app settings</h1>
               <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
                 <AlertTriangle className="size-4 shrink-0" />
                 Operational Settings are unavailable for this role.
@@ -229,12 +229,11 @@ export default function OperationalSettingsPage() {
       <PortalShell active="settings">
         <div className="mx-auto max-w-2xl space-y-8 p-5 sm:p-8">
           <div>
-            <p className="text-sm font-bold text-[#e86405]">Configuration</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight">Operational Settings</h1>
+            <p className="text-sm font-bold text-[#e86405]">Settings</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight">Guard app settings</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Guard App timing behavior, either for one Site or for your whole organization.
-              Technical/safety timers (network timeouts, animations, hardware safety limits) are
-              not shown here — they remain code-controlled.
+              How the Guard app behaves - for one Site, or for your whole organization. Safety
+              timers inside the app cannot be changed here.
             </p>
           </div>
 
@@ -256,7 +255,7 @@ export default function OperationalSettingsPage() {
                 </Button>
               </div>
               <span className="font-normal text-muted-foreground">
-                No Organization directory exists yet — enter a known numeric id.
+                A number that identifies the company. Ask the platform team if you do not know it.
               </span>
             </label>
           )}
@@ -264,12 +263,12 @@ export default function OperationalSettingsPage() {
           {canView && (
             <div>
               {canViewSite && (
-                <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Organization-wide</p>
+                <p className="mb-3 text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Whole organization</p>
               )}
 
               {!needsOrganizationId && !settings && !loading && !error && (
                 <Button type="button" variant="outline" onClick={() => void load()}>
-                  <RefreshCw /> Load Operational Settings
+                  <RefreshCw /> Show the settings
                 </Button>
               )}
 
@@ -281,7 +280,7 @@ export default function OperationalSettingsPage() {
               )}
 
               {loading && !settings && (
-                <p className="mt-8 text-sm text-muted-foreground">Loading Operational Settings…</p>
+                <p className="mt-8 text-sm text-muted-foreground">Loading the settings…</p>
               )}
 
               {settings && (
@@ -289,7 +288,7 @@ export default function OperationalSettingsPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Clock className="size-4 text-[#f36f0a]" />
-                      Guard App Timing
+                      Guard app timing for the whole organization
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="grid gap-5">
@@ -318,13 +317,13 @@ export default function OperationalSettingsPage() {
                     {success && !fieldError && (
                       <p className="flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
                         <CheckCircle2 className="size-4 shrink-0" />
-                        Operational settings saved.
+                        Settings saved.
                       </p>
                     )}
 
                     <Button onClick={() => void handleSave()} disabled={saving} className="w-fit gap-2">
                       <Save className="size-4" />
-                      {saving ? 'Saving…' : 'Save changes'}
+                      {saving ? 'Saving…' : 'Save'}
                     </Button>
                   </CardContent>
                 </Card>

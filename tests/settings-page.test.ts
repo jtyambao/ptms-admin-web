@@ -56,7 +56,7 @@ test('canViewSiteOperationalSettings is broader than canEditSiteOperationalSetti
 test('super_admin gets an Organization ID field with an explicit Load action; org_admin auto-loads without one', () => {
   assert.match(source, /needsOrganizationId/);
   assert.match(source, /settings-organization-id/);
-  assert.match(source, /No Organization directory exists yet/);
+  assert.match(source, /A number that identifies the company/);
   assert.match(source, /!needsOrganizationId && !settings && !loading && !error/);
 });
 
@@ -71,7 +71,7 @@ test('a missing/invalid Organization ID is rejected client-side before any reque
   const fnEnd = source.indexOf('\n  }', fnStart);
   const body = source.slice(fnStart, fnEnd);
   assert.match(body, /Number\.isInteger\(parsedOrganizationId\)/);
-  assert.match(body, /Enter a valid Organization ID/);
+  assert.match(body, /Enter the Organization ID \(a number\)/);
 });
 
 test('org-wide load/save still pass the parsed/needed organizationId', () => {
@@ -97,7 +97,7 @@ test('the per-Site panel is a real site selector with friendly presets, not a ra
 });
 
 test('"Default" is a whole-row Reset action (shown only when a Site override exists), not a per-field null', () => {
-  assert.match(panel, /Reset to organization default/);
+  assert.match(panel, /Go back to the organization settings/);
   assert.match(panel, /settings\.hasOverride && \(/);
 });
 
