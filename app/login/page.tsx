@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { AlertTriangle, LockKeyhole } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, LockKeyhole } from 'lucide-react';
 import { useEffect, useState, type SyntheticEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/lib/session-provider';
@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
   useEffect(() => {
     if (session.status === 'authenticated')
@@ -40,7 +41,7 @@ export default function LoginPage() {
           <div>
             <h1 className="text-2xl font-black">PTMS Admin</h1>
             <p className="text-sm text-muted-foreground">
-              Ground-test setup console
+              Sign in to manage your Sites
             </p>
           </div>
         </div>
@@ -58,14 +59,24 @@ export default function LoginPage() {
           </label>
           <label className="block text-sm font-bold">
             Password
-            <input
-              autoComplete="current-password"
-              className="mt-2 h-12 w-full rounded-xl border bg-card px-4 font-normal outline-none focus:border-[#f36f0a]"
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              type="password"
-              value={password}
-            />
+            <span className="relative mt-2 block">
+              <input
+                autoComplete="current-password"
+                className="h-12 w-full rounded-xl border bg-card px-4 pr-12 font-normal outline-none focus:border-[#f36f0a]"
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+              />
+              <button
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-0 grid w-12 place-items-center text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPassword((value) => !value)}
+                type="button"
+              >
+                {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+              </button>
+            </span>
           </label>
           <Button
             className="h-12 w-full bg-[#f36f0a] font-bold text-white hover:bg-[#d95e00]"
@@ -73,7 +84,7 @@ export default function LoginPage() {
             type="submit"
           >
             <LockKeyhole />
-            {busy ? 'Signing in…' : 'Sign in securely'}
+            {busy ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
         {error && (
@@ -83,11 +94,11 @@ export default function LoginPage() {
             className="mt-4 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100"
           >
             <AlertTriangle className="size-4 shrink-0" />
-            Unable to sign in. Check your credentials and try again.
+            We could not sign you in. Check your email and password, then try again.
           </p>
         )}
         <p className="mt-5 text-center text-xs text-muted-foreground">
-          Protected session. Access tokens are never stored in browser storage.
+          Forgot your password? Ask your administrator to reset it for you.
         </p>
       </section>
     </main>
