@@ -185,7 +185,7 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
           </Button>
           {canManage && (
             <Button className="bg-[#f36f0a] text-white hover:bg-[#d95e00]" onClick={() => setCreateOpen(true)}>
-              <Plus /> Add Contact
+              <Plus /> Add contact
             </Button>
           )}
         </div>
@@ -223,7 +223,7 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate font-bold">{contact.name}</p>
-                    <Badge variant={contact.category === 'internal' ? 'secondary' : 'outline'}>{contact.category}</Badge>
+                    <Badge variant={contact.category === 'internal' ? 'secondary' : 'outline'}>{contact.category === 'internal' ? 'Our company' : 'Outside help'}</Badge>
                   </div>
                   {contact.notes && <p className="mt-1 text-xs text-muted-foreground">{contact.notes}</p>}
                 </div>
@@ -267,8 +267,8 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
                   required
                 >
                   <option value="">Select category</option>
-                  <option value="internal">Internal</option>
-                  <option value="external">External</option>
+                  <option value="internal">Our company (e.g. head office)</option>
+                  <option value="external">Outside help (e.g. fire station, police)</option>
                 </select>
               </label>
               <label htmlFor="contact-name" className="grid gap-2 text-sm font-bold">
@@ -286,7 +286,7 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
             </div>
             <DialogFooter className="mt-5">
               <Button type="button" variant="outline" onClick={closeCreate}>Cancel</Button>
-              <Button type="submit" disabled={saving || !name.trim() || !category}>{saving ? 'Saving…' : editTarget ? 'Save changes' : 'Add Contact'}</Button>
+              <Button type="submit" disabled={saving || !name.trim() || !category}>{saving ? 'Saving…' : editTarget ? 'Save' : 'Add contact'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

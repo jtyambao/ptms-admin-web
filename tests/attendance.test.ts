@@ -160,8 +160,8 @@ test('the panel offers a CSV export', () => {
 
 test('the panel is honest that this is an OIC-only ledger, not full multi-guard attendance', () => {
   const source = readFileSync('components/site-attendance-panel.tsx', 'utf8');
-  assert.match(source, /not a full[\s\S]{0,15}multi-guard roster/i);
-  assert.match(source, /identified by a photo at each[\s\S]{0,15}checkpoint tap/i);
+  assert.match(source, /Officer in Charge \(OIC\) started and ended their duty/i);
+  assert.match(source, /Other guards[\s\S]{0,20}do not clock in one by one/i);
 });
 
 test('the panel view-gates the same as OIC\\/Personnel visibility (canViewPersonnel)', () => {

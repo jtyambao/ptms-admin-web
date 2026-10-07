@@ -65,7 +65,7 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
     return (
       <section className="mt-8 rounded-2xl border bg-muted/20 p-5">
         <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Attendance</p>
-        <h2 className="mt-1 text-xl font-black">OIC Time In / Time Out</h2>
+        <h2 className="mt-1 text-xl font-black">Officer in Charge: time in and out</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
           <ShieldAlert className="size-4 shrink-0" />
           Your role cannot see Attendance for this Site.
@@ -91,7 +91,7 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Attendance</p>
-          <h2 className="mt-1 text-xl font-black">OIC Time In / Time Out</h2>
+          <h2 className="mt-1 text-xl font-black">Officer in Charge: time in and out</h2>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCsv} disabled={loading || days.length === 0}>
@@ -105,10 +105,8 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
 
       <p className="flex gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
         <AlertTriangle className="size-4 shrink-0" />
-        This is a real time-in/time-out record for whoever is OIC at this Site, not a full
-        multi-guard roster — individual guards under the OIC are identified by a photo at each
-        checkpoint tap, not by their own login, so no other per-guard clock-in data exists today.
-        Dates are shown in your own browser&apos;s local time.
+        When the Officer in Charge (OIC) started and ended their duty at this Site. Other guards
+        do not clock in one by one. Times are shown in your own local time.
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -156,7 +154,7 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
                 </p>
                 {day.segments.length === 0 ? (
                   <Badge variant="outline" className="border-red-400 text-red-700 dark:text-red-400">
-                    No OIC coverage
+                    No Officer in Charge
                   </Badge>
                 ) : (
                   <div className="flex flex-1 flex-wrap gap-2">

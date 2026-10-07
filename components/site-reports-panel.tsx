@@ -162,7 +162,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
                 <span className="text-xs text-muted-foreground">{new Date(incident.occurred_at).toLocaleString()}</span>
                 {role && canViewIncidents(role) && incident.status === 'open' && (
                   <Button size="sm" variant="outline" disabled={actingOn === `incident-${incident.id}`} onClick={() => void runIncidentAction(incident.id, 'acknowledge')}>
-                    Acknowledge
+                    I&apos;m responding
                   </Button>
                 )}
                 {role && canViewIncidents(role) && incident.status === 'acknowledged' && (
@@ -190,8 +190,8 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
         )}
       </ReportSection>
 
-      <ReportSection title="Missed Checkpoints (governed / catch-up)" icon={ShieldAlert} widget={governedMissed}>
-        {(data) => data.length === 0 ? <EmptyRow text="No governed missed checkpoints outside the active catch-up window." /> : (
+      <ReportSection title="Missed checkpoints (after the make-up period)" icon={ShieldAlert} widget={governedMissed}>
+        {(data) => data.length === 0 ? <EmptyRow text="No missed checkpoints after the make-up period." /> : (
           <div className="divide-y">
             {data.map((tap) => (
               <div key={tap.missedTapId} className="flex flex-wrap items-center gap-2 py-3 text-sm">
@@ -259,13 +259,13 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
         )}
       </ReportSection>
 
-      <ReportSection title="SOS Alerts" icon={PhoneCall} widget={sos}>
+      <ReportSection title="SOS alerts" icon={PhoneCall} widget={sos}>
         {(data) => data.length === 0 ? <EmptyRow text="No SOS alerts at this Site." /> : (
           <div className="divide-y">
             {data.map((alert) => (
               <div key={alert.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                <p className="min-w-0 flex-1 font-bold">{alert.personnel_name ?? 'Unknown Personnel'}</p>
-                <Badge variant={alert.status === 'resolved' || alert.status === 'cancelled' ? 'outline' : 'secondary'} className="uppercase">{alert.status}</Badge>
+                <p className="min-w-0 flex-1 font-bold">{alert.personnel_name ?? 'Guard not identified'}</p>
+                <Badge variant={alert.status === 'resolved' || alert.status === 'cancelled' ? 'outline' : 'secondary'} className="uppercase">{alert.status === 'active' ? 'New' : alert.status === 'acknowledged' ? 'Responding' : alert.status === 'cancelled' ? 'False alarm' : alert.status}</Badge>
                 <span className="text-xs text-muted-foreground">{new Date(alert.triggered_at).toLocaleString()}</span>
                 {role && canRespondToSos(role) && alert.status === 'active' && (
                   <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'acknowledge')}>
@@ -274,7 +274,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
                 )}
                 {role && canRespondToSos(role) && (alert.status === 'active' || alert.status === 'acknowledged') && (
                   <Button size="sm" variant="outline" disabled={actingOn === `sos-${alert.id}`} onClick={() => void runSosAction(alert.id, 'cancel')}>
-                    Cancel
+                    False alarm
                   </Button>
                 )}
               </div>
