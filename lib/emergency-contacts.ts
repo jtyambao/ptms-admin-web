@@ -36,16 +36,16 @@ export function validateEmergencyContact(input: {
 export const canViewEmergencyContacts = (role: UserRole) =>
   role === 'supervisor' || role === 'site_admin' || role === 'admin' || role === 'super_admin';
 
-// Batch 3 correction (2026-09-26): reverted a 2026-09-24 edit that migrated
-// this to Supervisor/Admin on the mistaken premise that the future
-// five-role design was already CURRENT PRODUCTION TECHNICAL RBAC. Verified
-// against a fresh origin/main read (emergency-contacts.controller.ts):
-// still exactly
-// `@Roles('org_admin', 'site_manager')`, unchanged since Batch 2. Note:
-// as of Batch 1's role reconciliation, neither role is in PORTAL_ROLES, so
-// this control remains currently unreachable by any role that can sign
-// into Admin Web — a real, current limitation, not a bug to silently paper
-// over by adding those roles to portal access, which would be an
-// unauthorized permission expansion.
-export const canCreateEmergencyContact = (role: UserRole) =>
-  role === 'org_admin' || role === 'site_manager';
+// Write authority (user-authorized 2026-10-07, per
+// PTMS_FINAL_ROLE_PERMISSION_POLICY.md section 11): Supervisor/Admin
+// add/edit/remove for their own Site. Mirrors the backend's
+// requireManageAccess exactly (supervisor/site_admin/admin own assigned
+// Site, org_admin org-wide, super_admin cross-tenant); Manager/Engineer
+// are view-only. Before this, create was org_admin/site_manager only -
+// legacy roles that cannot sign into Admin Web, so nobody could add one.
+export const canManageEmergencyContacts = (role: UserRole) =>
+  role === 'supervisor' ||
+  role === 'site_admin' ||
+  role === 'admin' ||
+  role === 'org_admin' ||
+  role === 'super_admin';

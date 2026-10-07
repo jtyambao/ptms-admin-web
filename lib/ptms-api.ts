@@ -316,6 +316,14 @@ export type CreateEmergencyContactRequest = {
   sortOrder?: number;
 };
 
+export type UpdateEmergencyContactRequest = {
+  category?: 'internal' | 'external';
+  name?: string;
+  phoneNumber?: string | null;
+  notes?: string | null;
+  sortOrder?: number;
+};
+
 // Batch 2, corrected Batch 3 (2026-09-26) — generic platform/organization
 // accounts (src/users). Distinct from the Supervisor/Admin hierarchy
 // accounts managed via site-hierarchy-panel.tsx — `POST /users` on

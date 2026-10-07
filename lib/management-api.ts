@@ -36,6 +36,7 @@ import type {
   PersonnelMpinRegenerated,
   EmergencyContact,
   CreateEmergencyContactRequest,
+  UpdateEmergencyContactRequest,
   CreateUserRequest,
   OperationalSettings,
   UpdateOperationalSettingsRequest,
@@ -320,13 +321,20 @@ export const managementApi = {
     api.request<RoundStatus>(`/checkpoint-rounds/site/${siteId}/status`),
 
   // Batch 2 — Emergency Contacts. GET is genuinely unauthenticated at the
-  // backend (guard-facing); no update/deactivate/delete endpoint exists.
+  // backend (guard-facing). Edit/delete added 2026-10-07 (soft delete).
   listEmergencyContacts: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<EmergencyContact[]>(`/emergency-contacts?siteId=${siteId}`),
   createEmergencyContact: (api: AuthenticatedApiClient, body: CreateEmergencyContactRequest) =>
     api.request<EmergencyContact>('/emergency-contacts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
+  // null clears phoneNumber/notes; omitted leaves them unchanged.
+  updateEmergencyContact: (api: AuthenticatedApiClient, id: number, body: UpdateEmergencyContactRequest) =>
+    api.request<EmergencyContact>(`/emergency-contacts/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }),
+  deleteEmergencyContact: (api: AuthenticatedApiClient, id: number) =>
+    api.request<EmergencyContact>(`/emergency-contacts/${id}`, { method: 'DELETE' }),
 
   // Batch 3 correction (2026-09-26): reverted a 2026-09-24 edit that
   // assumed `POST/GET /users` had already moved to the future five-role

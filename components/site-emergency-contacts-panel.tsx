@@ -1,7 +1,17 @@
 'use client';
 
-import { AlertTriangle, BadgeCheck, Phone, Plus, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Pencil, Phone, Plus, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +27,7 @@ import {
   CONTACT_NAME_MAX,
   CONTACT_NOTES_MAX,
   CONTACT_PHONE_MAX,
-  canCreateEmergencyContact,
+  canManageEmergencyContacts,
   canViewEmergencyContacts,
   validateEmergencyContact,
 } from '@/lib/emergency-contacts';
@@ -32,16 +42,19 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
   const session = useSession();
   const role = session.user?.role;
   const canView = !!role && canViewEmergencyContacts(role);
-  // Matches EmergencyContactsController's real, current
-  // @Roles('org_admin', 'site_manager') exactly (verified against
-  // origin/main, 2026-09-26) — see lib/emergency-contacts.ts.
-  const canCreate = !!role && canCreateEmergencyContact(role);
+  // Add / edit / delete - Supervisor/Admin of this Site (policy section
+  // 11), matching the backend's requireManageAccess - see
+  // lib/emergency-contacts.ts.
+  const canManage = !!role && canManageEmergencyContacts(role);
 
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  // null = adding a new contact; a contact = editing that one (same dialog).
+  const [editTarget, setEditTarget] = useState<EmergencyContact | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EmergencyContact | null>(null);
   const [category, setCategory] = useState<'internal' | 'external' | ''>('');
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -66,7 +79,37 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
     return () => window.clearTimeout(timer);
   }, [refresh]);
 
+  function openEdit(contact: EmergencyContact) {
+    setError('');
+    setSuccess('');
+    setEditTarget(contact);
+    setCategory(contact.category);
+    setName(contact.name);
+    setPhoneNumber(contact.phone_number ?? '');
+    setNotes(contact.notes ?? '');
+    setCreateOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await managementApi.deleteEmergencyContact(session.api, deleteTarget.id);
+      setDeleteTarget(null);
+      await refresh();
+      setSuccess('Emergency contact deleted. Guards no longer see it.');
+    } catch (reason) {
+      setDeleteTarget(null);
+      setError(reason instanceof ApiRequestError ? reason.message : genericError);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function closeCreate() {
+    setEditTarget(null);
     setCreateOpen(false);
     setCategory('');
     setName('');
@@ -85,16 +128,27 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
     }
     setSaving(true);
     try {
-      await managementApi.createEmergencyContact(session.api, {
-        siteId,
-        category: category as 'internal' | 'external',
-        name: name.trim(),
-        ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-      });
+      if (editTarget) {
+        // Blank phone/notes are sent as null so clearing a field really clears it.
+        await managementApi.updateEmergencyContact(session.api, editTarget.id, {
+          category: category as 'internal' | 'external',
+          name: name.trim(),
+          phoneNumber: phoneNumber.trim() ? phoneNumber.trim() : null,
+          notes: notes.trim() ? notes.trim() : null,
+        });
+      } else {
+        await managementApi.createEmergencyContact(session.api, {
+          siteId,
+          category: category as 'internal' | 'external',
+          name: name.trim(),
+          ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
+          ...(notes.trim() ? { notes: notes.trim() } : {}),
+        });
+      }
+      const wasEdit = !!editTarget;
       closeCreate();
       await refresh();
-      setSuccess('Emergency contact added.');
+      setSuccess(wasEdit ? 'Emergency contact updated.' : 'Emergency contact added.');
     } catch (reason) {
       setError(reason instanceof ApiRequestError ? reason.message : genericError);
     } finally {
@@ -122,15 +176,14 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
           <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Site safety</p>
           <h2 id="emergency-contacts-heading" className="mt-1 text-xl font-black">Emergency Contacts</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Active contacts visible to guards at this Site. There is no edit or deactivate action yet —
-            the backend does not expose one.
+            These are the contacts guards at this Site see in the Guard app. Changes show up for them right away.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw className={loading ? 'animate-spin' : ''} /> Refresh
           </Button>
-          {canCreate && (
+          {canManage && (
             <Button className="bg-[#f36f0a] text-white hover:bg-[#d95e00]" onClick={() => setCreateOpen(true)}>
               <Plus /> Add Contact
             </Button>
@@ -138,9 +191,9 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
         </div>
       </div>
 
-      {!canCreate && (
+      {!canManage && (
         <p className="mt-4 text-xs text-muted-foreground">
-          Adding a contact requires an Organization Admin or Site Manager account.
+          Only a Supervisor or Admin of this Site can add, edit or delete contacts.
         </p>
       )}
 
@@ -174,11 +227,23 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
                   </div>
                   {contact.notes && <p className="mt-1 text-xs text-muted-foreground">{contact.notes}</p>}
                 </div>
-                {contact.phone_number && (
-                  <p className="flex items-center gap-2 text-sm font-bold">
-                    <Phone className="size-4 text-[#e86405]" /> {contact.phone_number}
-                  </p>
-                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  {contact.phone_number && (
+                    <p className="flex items-center gap-2 text-sm font-bold">
+                      <Phone className="size-4 text-[#e86405]" /> {contact.phone_number}
+                    </p>
+                  )}
+                  {canManage && (
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openEdit(contact)}>
+                        <Pencil /> Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => setDeleteTarget(contact)}>
+                        <Trash2 /> Delete
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -188,7 +253,7 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
       <Dialog open={createOpen} onOpenChange={(open) => { if (!open) closeCreate(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Emergency Contact</DialogTitle>
+            <DialogTitle>{editTarget ? 'Edit Emergency Contact' : 'Add Emergency Contact'}</DialogTitle>
             <DialogDescription>Visible to guards at this Site immediately.</DialogDescription>
           </DialogHeader>
           <form onSubmit={create}>
@@ -221,11 +286,28 @@ export function SiteEmergencyContactsPanel({ siteId }: { siteId: number }) {
             </div>
             <DialogFooter className="mt-5">
               <Button type="button" variant="outline" onClick={closeCreate}>Cancel</Button>
-              <Button type="submit" disabled={saving || !name.trim() || !category}>{saving ? 'Adding…' : 'Add Contact'}</Button>
+              <Button type="submit" disabled={saving || !name.trim() || !category}>{saving ? 'Saving…' : editTarget ? 'Save changes' : 'Add Contact'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Guards at this Site will no longer see this contact. You can add it again later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>
+              {saving ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
