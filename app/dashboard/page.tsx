@@ -86,8 +86,8 @@ export default function DashboardPage() {
         <div className="mx-auto max-w-6xl p-5 sm:p-8">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-bold text-[#e86405]">Live operations</p>
-              <h1 className="mt-1 text-3xl font-black tracking-tight">Dashboard</h1>
+              <p className="text-sm font-bold text-[#e86405]">Right now</p>
+              <h1 className="mt-1 text-3xl font-black tracking-tight">Operations</h1>
             </div>
             <Button variant="outline" onClick={() => void refresh()} disabled={refreshing}>
               <RefreshCw className={refreshing ? 'animate-spin' : ''} />
@@ -100,7 +100,7 @@ export default function DashboardPage() {
             {sites.kind === 'loading' && <p className="text-sm text-muted-foreground">Loading…</p>}
             {sites.kind === 'error' && <Failed message={sites.message} />}
             {sites.kind === 'loaded' && sites.data.length === 0 && (
-              <p className="text-sm text-muted-foreground">No Sites are assigned to your account yet.</p>
+              <p className="text-sm text-muted-foreground">You have no Sites yet. Ask the Owner or Engineer to give you access.</p>
             )}
             {sites.kind === 'loaded' && sites.data.map((site) => (
               <SiteStatusCard key={`${site.id}-${refreshKey}`} site={site} role={role} />
@@ -198,34 +198,34 @@ function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
             <Building2 className="size-4 text-[#f36f0a]" />
             <Link href={`/sites/${site.id}`} className="hover:underline">{site.name}</Link>
           </CardTitle>
-          <Badge variant={site.status === 'active' ? 'secondary' : 'outline'}>{site.status}</Badge>
+          <Badge variant={site.status === 'active' ? 'secondary' : 'outline'}>{site.status === 'active' ? 'Active' : 'Inactive'}</Badge>
         </div>
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <Tile
             icon={ShieldCheck}
-            label="Patrol"
-            value={site.patrol_operations_active ? 'Active' : 'Inactive'}
+            label="Patrols"
+            value={site.patrol_operations_active ? 'On' : 'Off'}
             valueClassName={site.patrol_operations_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}
             detail={
               roundStatus.kind === 'loaded'
                 ? roundStatus.data.nextDueAt
                   ? `Next due ${new Date(roundStatus.data.nextDueAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
-                  : 'No round scheduled'
+                  : 'No patrol scheduled'
                 : roundStatus.kind === 'loading' ? 'Loading…' : null
             }
           />
           <Tile
             icon={ShieldAlert}
-            label="Missed today"
+            label="Missed checkpoints today"
             value={missed.kind === 'loaded' ? String(missed.data.filter((m) => isToday(m.missed_at)).length) : missed.kind === 'loading' ? '…' : '—'}
             valueClassName={missed.kind === 'loaded' && missed.data.some((m) => isToday(m.missed_at)) ? 'text-amber-700 dark:text-amber-400' : undefined}
             error={missed.kind === 'error' ? missed.message : undefined}
           />
           <Tile
             icon={PhoneCall}
-            label="Active SOS"
+            label="SOS alerts now"
             value={activeSos.kind === 'loaded' ? String(activeSos.data) : activeSos.kind === 'skipped' ? '—' : activeSos.kind === 'loading' ? '…' : '—'}
             valueClassName={activeSos.kind === 'loaded' && activeSos.data > 0 ? 'text-red-700 dark:text-red-400' : undefined}
             skipped={activeSos.kind === 'skipped' ? activeSos.reason : undefined}
@@ -241,14 +241,14 @@ function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
           />
           <Tile
             icon={UserRound}
-            label="On duty (OIC)"
-            value={staffing.kind === 'loaded' ? (staffing.data.oic?.full_name ?? 'None assigned') : staffing.kind === 'loading' ? '…' : '—'}
+            label="Officer in Charge"
+            value={staffing.kind === 'loaded' ? (staffing.data.oic?.full_name ?? 'Not chosen yet') : staffing.kind === 'loading' ? '…' : '—'}
             error={staffing.kind === 'error' ? staffing.message : undefined}
           />
           <Tile
             icon={Smartphone}
-            label="Devices"
-            value={devices.kind === 'loaded' ? `${onlineDeviceCount}/${activeDevices.length} online` : devices.kind === 'loading' ? '…' : '—'}
+            label="Guard phones"
+            value={devices.kind === 'loaded' ? `${onlineDeviceCount} of ${activeDevices.length} online` : devices.kind === 'loading' ? '…' : '—'}
             valueClassName={devices.kind === 'loaded' && onlineDeviceCount > 0 ? 'text-emerald-700 dark:text-emerald-400' : undefined}
             detail={devices.kind === 'loaded' ? deviceOnlineStatus(mostRecentDeviceActivity).label : undefined}
             error={devices.kind === 'error' ? devices.message : undefined}

@@ -64,6 +64,15 @@ const links = [
   // page convention; the page says "not available for this role" itself.
   { href: '/sos', label: 'SOS', icon: Siren, active: 'sos' as const },
 ];
+const PAGE_TITLES = {
+  dashboard: 'Operations',
+  sites: 'Sites',
+  accounts: 'Accounts',
+  settings: 'Settings',
+  account: 'My Account',
+  calls: 'Calls',
+  sos: 'SOS alerts',
+} as const;
 export function PortalShell({
   active,
   children,
@@ -165,10 +174,10 @@ export function PortalShell({
             </Button>
             <div className="ml-3 lg:ml-0">
               <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">
-                PTMS operations
+                {siteName ? 'Site' : 'PTMS Admin'}
               </p>
               <p className="text-sm font-black">
-                {siteName ?? 'Operational console'}
+                {siteName ?? PAGE_TITLES[active]}
               </p>
             </div>
             <Button

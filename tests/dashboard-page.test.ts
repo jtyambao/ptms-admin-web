@@ -46,7 +46,7 @@ test('4/5. Errors render the real ApiRequestError message, distinct from skipped
 });
 
 test('6. A Site with no Sites assigned renders an explicit empty message, not an error', () => {
-  assert.match(source, /No Sites are assigned to your account yet\./);
+  assert.match(source, /You have no Sites yet\./);
 });
 
 test('7. Site scope comes only from what the backend actually returns — no client-side organizationId or siteId override', () => {
@@ -64,7 +64,7 @@ test('9. Missed-today count is computed client-side from missed_at, same "today 
 });
 
 test('10. Patrol status reads patrol_operations_active straight off the already-fetched Site row, not a second redundant call', () => {
-  assert.match(source, /site\.patrol_operations_active \? 'Active' : 'Inactive'/);
+  assert.match(source, /site\.patrol_operations_active \? 'On' : 'Off'/);
 });
 
 test('11. Device tile shows a real Online/Offline claim (deviceOnlineStatus), counting devices proven online in the last 60s', () => {
