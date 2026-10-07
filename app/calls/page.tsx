@@ -461,6 +461,14 @@ function CallsShell() {
     setDialing(true);
     setIceConfiguration(await fetchIceConfiguration(session.api));
     client.invite(dialSiteId, dialCallType);
+    // If the call service never answers the invite (no ringing, no error),
+    // don't leave the button stuck on "Calling…" with nothing happening.
+    window.setTimeout(() => {
+      setDialing((still) => {
+        if (still) setDialError('The call did not go through. Reload the page and try again. If it keeps happening, the Guard phone may still be busy with an SOS or a previous call.');
+        return false;
+      });
+    }, 12000);
   }
 
   if (!enabled) {
@@ -542,6 +550,12 @@ function CallsShell() {
               </select>
             </div>
             {dialError && <p className="text-sm text-red-700 dark:text-red-400">{dialError}</p>}
+            {status !== 'registered' && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Not connected to the call service right now ({STATUS_LABEL[status]}
+                {error ? `: ${error}` : ''}). The Call button turns on when it reconnects — reload the page if it doesn't.
+              </p>
+            )}
             <Button
               type="button"
               onClick={() => void placeCall()}
