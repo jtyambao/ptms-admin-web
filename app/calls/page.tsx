@@ -651,7 +651,7 @@ function CallsShell() {
             {sitesError && <p className="text-sm text-red-700 dark:text-red-400">{sitesError}</p>}
             <div className="grid gap-3 sm:grid-cols-2">
               <select
-                className="h-10 rounded-lg border bg-background px-3"
+                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3"
                 value={dialSiteId ?? ''}
                 onChange={(e) => setDialSiteId(e.target.value ? Number(e.target.value) : null)}
                 disabled={sitesLoading || dialing}
@@ -665,7 +665,7 @@ function CallsShell() {
                 ))}
               </select>
               <select
-                className="h-10 rounded-lg border bg-background px-3"
+                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3"
                 value={dialCallType}
                 onChange={(e) => setDialCallType(e.target.value as CallType)}
                 disabled={dialing}
