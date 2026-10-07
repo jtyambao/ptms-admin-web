@@ -692,6 +692,14 @@ export type SpecialCheckRequest = {
   selfie_url: string | null;
 };
 
+// Staff list row (GET /special-check-requests/site/:siteId, 2026-10-07):
+// the Guard-facing row plus the sender's name and the targeted
+// checkpoints of a spot request ([] = any checkpoint at the Site).
+export type SpecialCheckRequestDetailed = SpecialCheckRequest & {
+  sender_name: string | null;
+  target_checkpoints: { id: number; name: string }[];
+};
+
 export type CreateSpecialCheckRequest = {
   siteId: number;
   title: string;
@@ -699,6 +707,8 @@ export type CreateSpecialCheckRequest = {
   priority?: 'normal' | 'urgent';
   neededBy?: string;
   type?: 'standard' | 'spot_visit';
+  // Spot Site Visit only; the guard may scan any ONE of these (sql/054).
+  checkpointIds?: number[];
 };
 
 export type ApiEnvelope<T> = {

@@ -32,6 +32,7 @@ import type {
   LoneWorkerCheckin,
   SosAlertEntry,
   SpecialCheckRequest,
+  SpecialCheckRequestDetailed,
   CreateSpecialCheckRequest,
   PersonnelMpinRegenerated,
   EmergencyContact,
@@ -115,6 +116,10 @@ export const managementApi = {
   // param); POST is JWT + SENDER_ROLES.
   listSpecialCheckRequests: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<SpecialCheckRequest[]>(`/special-check-requests?siteId=${siteId}`),
+  // Staff sent-requests list with sender name/targets (2026-10-07) - JWT,
+  // unlike the Guard-facing list above.
+  listSpecialCheckRequestsStaff: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<SpecialCheckRequestDetailed[]>(`/special-check-requests/site/${siteId}`),
   createSpecialCheckRequest: (api: AuthenticatedApiClient, body: CreateSpecialCheckRequest) =>
     api.request<SpecialCheckRequest>('/special-check-requests', {
       method: 'POST',
