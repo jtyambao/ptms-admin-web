@@ -320,7 +320,7 @@ export default function SiteDetailPage() {
                 }}
                 className="mt-6"
               >
-                <TabsList className="h-auto w-full justify-start overflow-x-auto overflow-y-hidden rounded-xl p-1">
+                <TabsList className="h-auto w-full flex-wrap justify-start rounded-xl p-1">
                   {SITE_GROUPS.map((group) => (
                     <TabsTrigger className="min-h-10 shrink-0 px-4" key={group.id} value={group.id}>
                       {group.label}

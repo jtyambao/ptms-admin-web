@@ -27,7 +27,7 @@ export function ProtectedPortal({ children }: { children: ReactNode }) {
         <output className="block text-center">
           <OfficialBrand />
           <p className="mt-5 text-sm text-muted-foreground">
-            Restoring protected workspace…
+            Loading, one moment…
           </p>
         </output>
       </main>

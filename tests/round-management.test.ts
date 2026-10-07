@@ -26,9 +26,9 @@ test('Rounds calls the real, authenticated sites/:siteId/rounds contract', () =>
 
 test('Rounds panel has a working create/edit/deactivate form, not a placeholder', () => {
   assert.doesNotMatch(panel, /not available yet/i);
-  assert.match(panel, /New Round/);
+  assert.match(panel, /Add a round/);
   assert.match(panel, /Edit \$\{editTarget/);
-  assert.match(panel, /Deactivate/);
+  assert.match(panel, /Delete \{deactivateTarget\?\.name\}\?/);
   // The Rounds tab itself is preserved.
   assert.match(page, /section === 'rounds'/);
 });

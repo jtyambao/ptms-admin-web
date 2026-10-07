@@ -153,7 +153,7 @@ export function PortalShell({
       <section className="min-h-screen lg:pl-64">
         <div className="sticky top-0 z-20">
           <IncomingSosBanner />
-          <header className="flex h-20 items-center border-b bg-background/90 px-4 backdrop-blur sm:px-8">
+          <header className="flex h-16 items-center border-b bg-background/90 px-4 backdrop-blur sm:h-20 sm:px-8">
             <Button
               aria-label="Open navigation"
               className="lg:hidden"

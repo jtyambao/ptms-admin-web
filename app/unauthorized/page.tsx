@@ -12,10 +12,9 @@ export default function UnauthorizedPage() {
           <OfficialBrand />
         </div>
         <ShieldX className="mx-auto size-12 text-[#f36f0a]" />
-        <h1 className="mt-5 text-3xl font-black">Access not authorized</h1>
+        <h1 className="mt-5 text-3xl font-black">You do not have access here</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Your authenticated role does not have an approved operational portal
-          contract.
+          Your account is not set up to use the admin portal. Ask your administrator to check your role, then sign in again.
         </p>
         <Button
           className="mt-7"

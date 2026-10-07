@@ -21,7 +21,7 @@ import { useSession } from '@/lib/session-provider';
 // not edit), so this panel has its own read gate separate from
 // canManageSiteOperations for the list/status view, and only shows
 // create/edit/deactivate controls when canManageSiteOperations is true.
-const operationError = 'The Round could not be saved. Please try again.';
+const operationError = 'The round could not be saved. Please try again.';
 
 // P1 friendly scheduling (branch feat/admin-oic-management) — the user's
 // own explicit rule: never make a non-technical admin compute seconds or
@@ -356,6 +356,14 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
     setSelectedCheckpointIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  // One click for the most common round: every active checkpoint, in list order.
+  function selectAll() {
+    setSelectedCheckpointIds(checkpoints.filter((c) => c.status === 'active').map((c) => c.id));
+  }
+  function clearAll() {
+    setSelectedCheckpointIds([]);
+  }
+
   async function submitCreate(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim() || selectedCheckpointIds.length === 0) return;
@@ -369,7 +377,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
       });
       setCreateOpen(false);
       await refresh();
-      setSuccess('Round created.');
+      setSuccess('Round added.');
     } catch (reason) { showError(reason); }
     finally { setSaving(false); }
   }
@@ -387,7 +395,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
       });
       setEditTarget(null);
       await refresh();
-      setSuccess('Round updated.');
+      setSuccess('Round saved.');
     } catch (reason) { showError(reason); }
     finally { setSaving(false); }
   }
@@ -399,7 +407,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
       await managementApi.deactivateRound(session.api, siteId, deactivateTarget.id);
       setDeactivateTarget(null);
       await refresh();
-      setSuccess('Round deactivated.');
+      setSuccess('Round deleted. Past patrols are kept.');
     } catch (reason) { setDeactivateTarget(null); showError(reason); }
     finally { setSaving(false); }
   }
@@ -407,7 +415,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   if (!canView) {
     return (
       <section className="mt-8 rounded-2xl border bg-muted/20 p-5">
-        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Patrol configuration</p>
+        <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Patrols</p>
         <h2 className="mt-1 text-xl font-black">Rounds</h2>
         <p className="mt-3 flex gap-2 text-sm text-muted-foreground">
           <ShieldAlert className="size-4 shrink-0" />
@@ -423,8 +431,9 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
     <section className="mt-8 space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Patrol configuration</p>
+          <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Patrols</p>
           <h2 className="mt-1 text-xl font-black">Rounds</h2>
+          <p className="mt-2 text-sm text-muted-foreground">A round is a patrol route: which checkpoints the guard visits, how often, and when.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => void refresh()} disabled={loading}>
@@ -432,7 +441,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
           </Button>
           {canManage && (
             <Button onClick={openCreate} className="bg-[#f36f0a] text-white hover:bg-[#d95e00]">
-              <Plus />New Round
+              <Plus />Add round
             </Button>
           )}
         </div>
@@ -447,32 +456,32 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
           <h3 className="flex items-center gap-2 font-black"><Clock className="size-4 text-[#e86405]" />Schedule status</h3>
           <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div>
-              <p className="text-xs text-muted-foreground">Next due</p>
+              <p className="text-xs text-muted-foreground">Next patrol due</p>
               <p className="font-bold">{status.nextDueAt ? new Date(status.nextDueAt).toLocaleString() : '—'}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Interval</p>
+              <p className="text-xs text-muted-foreground">Repeats every</p>
               <p className="font-bold">{status.nextDueIntervalMinutes ? `${status.nextDueIntervalMinutes} min` : '—'}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Missed (unresolved)</p>
+              <p className="text-xs text-muted-foreground">Missed checkpoints</p>
               <p className={`font-bold ${status.missedCount > 0 ? 'text-red-700 dark:text-red-400' : ''}`}>{status.missedCount}</p>
             </div>
           </div>
           {status.currentAlert !== null && (
-            <p className="mt-3 flex gap-2 text-sm text-amber-800 dark:text-amber-300"><AlertTriangle className="size-4 shrink-0" />An acknowledgement is currently pending for this Site.</p>
+            <p className="mt-3 flex gap-2 text-sm text-amber-800 dark:text-amber-300"><AlertTriangle className="size-4 shrink-0" />A patrol reminder is waiting for the guard to respond.</p>
           )}
         </div>
       )}
 
       <div className="rounded-2xl border bg-card">
         {loading ? (
-          <p className="p-8 text-center text-sm text-muted-foreground">Loading Rounds…</p>
+          <p className="p-8 text-center text-sm text-muted-foreground">Loading rounds…</p>
         ) : rounds.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">
             <Route className="mx-auto" />
-            <p className="mt-3 font-bold text-foreground">No Rounds configured</p>
-            <p className="mt-1 text-sm">Create a Round to schedule patrol checkpoints.</p>
+            <p className="mt-3 font-bold text-foreground">No rounds yet</p>
+            <p className="mt-1 text-sm">Add a round to set which checkpoints guards visit and how often. Add the checkpoints first if you have not yet.</p>
           </div>
         ) : (
           <div className="divide-y">
@@ -489,7 +498,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                         {formatTiming(round).map((part) => <Badge key={part} variant="outline">{part}</Badge>)}
                         {hasInactiveStop && (
                           <Badge variant="outline" className="border-red-400 text-red-700 dark:text-red-400">
-                            Points at a deactivated checkpoint
+                            Includes a deleted checkpoint
                           </Badge>
                         )}
                       </div>
@@ -504,7 +513,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                     {canManage && round.is_active && (
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={() => openEdit(round)}>Edit</Button>
-                        <Button variant="destructive" onClick={() => setDeactivateTarget(round)}>Deactivate</Button>
+                        <Button variant="destructive" onClick={() => setDeactivateTarget(round)}>Delete</Button>
                       </div>
                     )}
                   </div>
@@ -517,45 +526,49 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
 
       <RoundFormDialog
         open={createOpen}
-        title="New Round"
-        description="Ordered checkpoints define the patrol sequence. Only active checkpoints at this Site can be selected."
+        title="Add a round"
+        description="Pick the checkpoints the guard must visit, and when the patrol repeats."
         name={name} setName={setName}
         interval={interval} setInterval={setInterval_} timing={timing} setTiming={setTiming}
         activeCheckpoints={activeCheckpoints}
         selectedCheckpointIds={selectedCheckpointIds}
         toggleCheckpoint={toggleCheckpoint}
+        selectAll={selectAll}
+        clearAll={clearAll}
         saving={saving}
         onCancel={() => setCreateOpen(false)}
         onSubmit={submitCreate}
-        submitLabel={saving ? 'Creating…' : 'Create Round'}
+        submitLabel={saving ? 'Adding…' : 'Add round'}
       />
 
       <RoundFormDialog
         open={!!editTarget}
         title={`Edit ${editTarget?.name ?? ''}`}
-        description="Saving replaces the entire checkpoint sequence for this Round."
+        description="Change the checkpoints or timing. The checkpoint list you see here replaces the old one."
         name={name} setName={setName}
         interval={interval} setInterval={setInterval_} timing={timing} setTiming={setTiming}
         activeCheckpoints={activeCheckpoints}
         selectedCheckpointIds={selectedCheckpointIds}
         toggleCheckpoint={toggleCheckpoint}
+        selectAll={selectAll}
+        clearAll={clearAll}
         saving={saving}
         onCancel={() => setEditTarget(null)}
         onSubmit={submitEdit}
-        submitLabel={saving ? 'Saving…' : 'Save changes'}
+        submitLabel={saving ? 'Saving…' : 'Save'}
       />
 
       <AlertDialog open={!!deactivateTarget} onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate {deactivateTarget?.name}?</AlertDialogTitle>
+            <AlertDialogTitle>Delete {deactivateTarget?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This Round will stop generating due events. Historical due events and visits remain.
+              Guards will stop getting this round. Past patrols and visits are kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={saving} onClick={() => void confirmDeactivate()}>Deactivate</AlertDialogAction>
+            <AlertDialogAction variant="destructive" disabled={saving} onClick={() => void confirmDeactivate()}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -583,13 +596,18 @@ function timingRequest(timing: RoundTiming) {
   };
 }
 
+function friendlySeconds(seconds: number): string {
+  if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60} min`;
+  return `${seconds} sec`;
+}
+
 function formatTiming(round: ManagedRound): string[] {
   const parts: string[] = [];
   parts.push(round.window_start_time && round.window_end_time
     ? `${round.window_start_time.slice(0, 5)}–${round.window_end_time.slice(0, 5)}`
     : 'All day');
-  if (round.ack_window_seconds) parts.push(`Due Soon ${round.ack_window_seconds}s`);
-  if (round.tap_window_seconds) parts.push(`Tap all ${round.tap_window_seconds}s`);
+  if (round.ack_window_seconds) parts.push(`Reminder shows ${friendlySeconds(round.ack_window_seconds)}`);
+  if (round.tap_window_seconds) parts.push(`${friendlySeconds(round.tap_window_seconds)} to tap all`);
   const days = daysBadgeLabel(round);
   if (days) parts.push(days);
   const dateRange = dateRangeBadgeLabel(round);
@@ -599,7 +617,7 @@ function formatTiming(round: ManagedRound): string[] {
 
 function RoundFormDialog({
   open, title, description, name, setName, interval, setInterval, timing, setTiming, activeCheckpoints,
-  selectedCheckpointIds, toggleCheckpoint, saving, onCancel, onSubmit, submitLabel,
+  selectedCheckpointIds, toggleCheckpoint, selectAll, clearAll, saving, onCancel, onSubmit, submitLabel,
 }: {
   open: boolean; title: string; description: string;
   name: string; setName: (v: string) => void;
@@ -607,6 +625,7 @@ function RoundFormDialog({
   timing: RoundTiming; setTiming: (v: RoundTiming) => void;
   activeCheckpoints: ManagedCheckpoint[];
   selectedCheckpointIds: number[]; toggleCheckpoint: (id: number) => void;
+  selectAll: () => void; clearAll: () => void;
   saving: boolean; onCancel: () => void;
   onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
   submitLabel: string;
@@ -648,7 +667,7 @@ function RoundFormDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <SecondsPresetField
                 id="round-ack"
-                label="Check Due Soon shows for"
+                label="How long the “Check Due Soon” reminder shows"
                 value={timing.ack}
                 onChange={(v) => setTiming({ ...timing, ack: v })}
               />
@@ -660,9 +679,9 @@ function RoundFormDialog({
               />
             </div>
             <div className="lg:col-span-2">
-              <p className="font-bold">Checkpoints (in patrol order)</p>
+              <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-bold">Checkpoints (in patrol order)</p>{activeCheckpoints.length > 0 && <div className="flex gap-2"><Button type="button" size="sm" variant="outline" onClick={selectAll}>Select all</Button><Button type="button" size="sm" variant="ghost" onClick={clearAll} disabled={selectedCheckpointIds.length === 0}>Clear</Button></div>}</div>
               {activeCheckpoints.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">No active checkpoints at this Site yet.</p>
+                <p className="mt-2 text-sm text-muted-foreground">This Site has no checkpoints yet. Add them first under Patrols &gt; Checkpoints.</p>
               ) : (
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   {activeCheckpoints.map((cp) => (
@@ -681,7 +700,7 @@ function RoundFormDialog({
                 </div>
               )}
               <p className="mt-2 text-xs text-muted-foreground">
-                Order follows selection order. Deselect and reselect a checkpoint to move it to the end.
+                Guards visit them in the order you tick them (see the numbers). Untick and tick again to move one to the end.
               </p>
             </div>
           </div>
