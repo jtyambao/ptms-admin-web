@@ -39,6 +39,21 @@ npm run deploy  # vinext build && wrangler deploy --config dist/server/wrangler.
 Deploys to Cloudflare Workers (`wrangler` must already be logged in). The
 deployed instance runs at https://ptms-admin.jtyambao.workers.dev.
 
+## Calls (voice/video) feature flag
+
+Calls ship OFF. `NEXT_PUBLIC_CALLS_ENABLED=true` is read at **build** time, so
+it is chosen per deploy:
+
+```powershell
+$env:NEXT_PUBLIC_CALLS_ENABLED='true'; npm run deploy   # Calls ON
+npm run deploy                                          # Calls OFF
+```
+
+Real-device checklist: [`CALLS_TEST_SCRIPT.md`](CALLS_TEST_SCRIPT.md). TURN
+(calls across mobile networks) is configured on the **backend** only
+(`CLOUDFLARE_TURN_KEY_ID` / `CLOUDFLARE_TURN_API_TOKEN`); the app fetches
+`GET /calls/ice-servers` before each call and falls back to STUN.
+
 ## Known framework quirk: vinext client-side routing
 
 vinext 1.0.0-beta.5's production client router throws on `<Link>` clicks

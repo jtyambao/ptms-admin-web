@@ -12,7 +12,7 @@ import {
   VideoOff,
   Volume2,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ import { managementApi } from '@/lib/management-api';
 import { describeEndReason } from '@/lib/webrtc/call-session';
 import { useCallSession } from '@/lib/webrtc/use-call-session';
 import { Ringtone } from '@/lib/webrtc/ringtone';
+import { fetchIceConfiguration, getIceConfiguration } from '@/lib/webrtc/ice-config';
 import type { CallerContext, CallsSignalingClient, CallType, SignalingEvent } from '@/lib/webrtc/signaling-client';
 import { useSession } from '@/lib/session-provider';
 
@@ -115,6 +116,7 @@ const STATUS_VARIANT: Record<CallsSocketStatus, 'secondary' | 'outline' | 'destr
 
 type ActiveCall = { callId: string; callType: CallType; direction: 'outgoing' | 'incoming' };
 type IncomingInvite = { callId: string; callType: CallType; callerContext: CallerContext | null };
+type MissedCall = IncomingInvite & { at: number };
 
 // Caller identity (owner-authorized 2026-09-30, follow-up to items A/B —
 // closes gap 1) — e.g. "Guanzon Corporate Center · Galaxy A72" for a
@@ -190,13 +192,15 @@ function IncomingCallOverlay({
 function InCallPanel({
   call,
   client,
+  iceConfiguration,
   onEnded,
 }: {
   call: ActiveCall;
   client: CallsSignalingClient | null;
+  iceConfiguration: RTCConfiguration;
   onEnded: () => void;
 }) {
-  const { state, toggleMute, toggleCamera, hangUp } = useCallSession(client, call);
+  const { state, toggleMute, toggleCamera, hangUp } = useCallSession(client, call, iceConfiguration);
 
   useEffect(() => {
     if (state?.phase === 'ended') {
@@ -283,8 +287,19 @@ function CallsShell() {
 
   const [incomingInvite, setIncomingInvite] = useState<IncomingInvite | null>(null);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  // Session-only (in memory): the backend keeps no staff call log, so a
+  // call that stopped ringing before it was answered is remembered here
+  // until the page is closed.
+  const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
   const [ringtone] = useState(() => new Ringtone());
   const [soundEnabled, setSoundEnabled] = useState(false);
+  // ICE servers (STUN + short-lived TURN when the backend has it) are
+  // fetched BEFORE each call and always resolve (falls back to STUN) —
+  // for an incoming call the fetch starts the moment it rings, so it is
+  // ready by the time the dispatcher accepts and no early SDP offer is
+  // missed waiting on it.
+  const [iceConfiguration, setIceConfiguration] = useState<RTCConfiguration>(getIceConfiguration());
+  const icePrefetch = useRef<Promise<RTCConfiguration> | null>(null);
 
   const refreshSites = useCallback(async () => {
     if (session.status !== 'authenticated') return;
@@ -317,7 +332,14 @@ function CallsShell() {
     return client.on((event: SignalingEvent) => {
       if (event.type === 'invite' && !activeCall && !incomingInvite) {
         setIncomingInvite({ callId: event.callId, callType: event.callType, callerContext: event.callerContext });
+        icePrefetch.current = fetchIceConfiguration(session.api);
         ringtone.start();
+      } else if (event.type === 'end' && incomingInvite && event.callId === incomingInvite.callId) {
+        // The caller hung up (or another dispatcher answered) while this
+        // was still ringing — stop the ringtone and keep a Missed entry.
+        ringtone.stop();
+        setMissedCalls((prev) => [{ ...incomingInvite, at: Date.now() }, ...prev].slice(0, 20));
+        setIncomingInvite(null);
       } else if (event.type === 'ringing' && dialing && !activeCall) {
         setActiveCall({ callId: event.callId, callType: event.callType, direction: 'outgoing' });
         setDialing(false);
@@ -334,9 +356,11 @@ function CallsShell() {
     void ringtone.enableSound().then(() => setSoundEnabled(true));
   }
 
-  function acceptIncoming() {
+  async function acceptIncoming() {
     if (!incomingInvite || !client) return;
     ringtone.stop();
+    const configuration = await (icePrefetch.current ?? fetchIceConfiguration(session.api));
+    setIceConfiguration(configuration);
     client.accept(incomingInvite.callId);
     setActiveCall({ callId: incomingInvite.callId, callType: incomingInvite.callType, direction: 'incoming' });
     setIncomingInvite(null);
@@ -349,10 +373,11 @@ function CallsShell() {
     setIncomingInvite(null);
   }
 
-  function placeCall() {
+  async function placeCall() {
     if (!client || dialSiteId === null) return;
     setDialError('');
     setDialing(true);
+    setIceConfiguration(await fetchIceConfiguration(session.api));
     client.invite(dialSiteId, dialCallType);
   }
 
@@ -399,7 +424,7 @@ function CallsShell() {
       </Card>
 
       {activeCall ? (
-        <InCallPanel call={activeCall} client={client} onEnded={() => setActiveCall(null)} />
+        <InCallPanel call={activeCall} client={client} iceConfiguration={iceConfiguration} onEnded={() => setActiveCall(null)} />
       ) : (
         <Card>
           <CardHeader>
@@ -439,7 +464,7 @@ function CallsShell() {
             {dialError && <p className="text-sm text-red-700 dark:text-red-400">{dialError}</p>}
             <Button
               type="button"
-              onClick={placeCall}
+              onClick={() => void placeCall()}
               disabled={dialSiteId === null || dialing || status !== 'registered'}
               className="bg-[#f36f0a] text-white hover:bg-[#d95e00]"
             >
@@ -449,12 +474,30 @@ function CallsShell() {
         </Card>
       )}
 
+      {missedCalls.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Missed calls (this session)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {missedCalls.map((missed) => (
+              <div key={`${missed.callId}-${missed.at}`} className="flex flex-wrap items-center justify-between gap-2">
+                <span><CallerIdentityLine callerContext={missed.callerContext} /></span>
+                <span className="text-xs text-muted-foreground">
+                  {missed.callType} · {new Date(missed.at).toLocaleTimeString()}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {incomingInvite && (
         <IncomingCallOverlay
           invite={incomingInvite}
           soundEnabled={soundEnabled}
           onEnableSound={enableSound}
-          onAccept={acceptIncoming}
+          onAccept={() => void acceptIncoming()}
           onDecline={declineIncoming}
         />
       )}

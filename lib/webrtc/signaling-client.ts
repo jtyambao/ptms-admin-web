@@ -54,6 +54,11 @@ export class CallsSignalingClient {
   private readonly socket: SocketLike;
   private readonly getAccessToken: () => string | null;
   private readonly listeners = new Set<Listener>();
+  // SDP/ICE events are also kept briefly so a CallSession created a beat
+  // AFTER they arrive (e.g. the caller's offer landing between our
+  // call:accept and the React effect that builds the session) can replay
+  // them — the gateway relays them exactly once and does not retry.
+  private recentSignals: SignalingEvent[] = [];
   // Bound once so `off()` in dispose() removes the exact same reference
   // `on()` registered — an inline arrow per call would never be removable.
   private readonly boundHandlers: Record<string, (...args: unknown[]) => void>;
@@ -123,6 +128,12 @@ export class CallsSignalingClient {
   }
 
   private dispatch(event: SignalingEvent): void {
+    if (event.type === 'sdp-offer' || event.type === 'sdp-answer' || event.type === 'ice-candidate') {
+      this.recentSignals.push(event);
+      if (this.recentSignals.length > 64) this.recentSignals.shift();
+    } else if (event.type === 'end') {
+      this.recentSignals = this.recentSignals.filter((e) => !('callId' in e) || e.callId !== event.callId);
+    }
     for (const listener of this.listeners) listener(event);
   }
 
@@ -169,6 +180,13 @@ export class CallsSignalingClient {
 
   end(callId: string): void {
     this.socket.emit('call:end', { callId });
+  }
+
+  // Removes and returns buffered SDP/ICE events for one call, oldest first.
+  takeBufferedSignals(callId: string): SignalingEvent[] {
+    const mine = this.recentSignals.filter((e) => 'callId' in e && e.callId === callId);
+    this.recentSignals = this.recentSignals.filter((e) => !('callId' in e) || e.callId !== callId);
+    return mine;
   }
 
   dispose(): void {

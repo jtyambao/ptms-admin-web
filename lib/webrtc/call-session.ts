@@ -43,6 +43,11 @@ export type MediaFactory = (constraints: MediaStreamConstraints) => Promise<Medi
 // idea of "the call really ended" in agreement.
 const DISCONNECT_GRACE_MS = 8000;
 
+// The gateway has NO ringing timeout (verified): an unanswered outgoing
+// call would ring until someone gives up. After this long without an
+// accept, cancel it ourselves (call:end -> candidates get 'cancelled').
+const NO_ANSWER_MS = 45000;
+
 export interface CallSessionState {
   phase: CallPhase;
   callId: string;
@@ -80,6 +85,7 @@ export class CallSession {
   private hasSentConnected = false;
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private unsubscribeSignaling: (() => void) | null = null;
+  private ringTimer: ReturnType<typeof setTimeout> | null = null;
 
   private state: CallSessionState;
   private readonly listeners = new Set<CallSessionListener>();
@@ -108,6 +114,17 @@ export class CallSession {
     };
 
     this.unsubscribeSignaling = this.signaling.on((event) => this.handleSignalingEvent(event));
+
+    // Replay any SDP/ICE that arrived before this session existed.
+    for (const early of this.signaling.takeBufferedSignals(params.callId)) {
+      void this.handleSignalingEvent(early);
+    }
+
+    if (params.direction === 'outgoing') {
+      this.ringTimer = this.setTimeoutFn(() => {
+        if (this.state.phase === 'ringing') this.endLocally('no_answer', true);
+      }, NO_ANSWER_MS);
+    }
 
     // An incoming call has already been accepted (via the ringing overlay)
     // before this session is constructed — see app/calls/page.tsx — so it
@@ -190,6 +207,13 @@ export class CallSession {
     }
   }
 
+  private clearRingTimer(): void {
+    if (this.ringTimer) {
+      this.clearTimeoutFn(this.ringTimer);
+      this.ringTimer = null;
+    }
+  }
+
   private clearDisconnectTimer(): void {
     if (this.disconnectTimer) {
       this.clearTimeoutFn(this.disconnectTimer);
@@ -217,6 +241,7 @@ export class CallSession {
 
     switch (event.type) {
       case 'accept': {
+        this.clearRingTimer();
         this.acceptObserved = true;
         this.setState({ phase: 'connecting' });
         // The other half of the race guard in setupLocalMedia — if media
@@ -290,6 +315,7 @@ export class CallSession {
   private endLocally(reason: string, notifyPeer: boolean): void {
     if (this.state.phase === 'ended') return;
     this.clearDisconnectTimer();
+    this.clearRingTimer();
     if (notifyPeer) this.signaling.end(this.state.callId);
     this.teardownMedia();
     this.setState({ phase: 'ended', endReason: reason });
@@ -325,6 +351,7 @@ export class CallSession {
 
   dispose(): void {
     this.clearDisconnectTimer();
+    this.clearRingTimer();
     this.teardownMedia();
     this.unsubscribeSignaling?.();
     this.unsubscribeSignaling = null;
@@ -340,6 +367,8 @@ export function describeEndReason(reason: string | null): string {
       return 'Declined';
     case 'cancelled':
       return 'Cancelled';
+    case 'no_answer':
+      return 'No answer';
     case 'caller_disconnected':
     case 'peer_disconnected':
     case 'disconnected':

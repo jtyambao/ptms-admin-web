@@ -22,6 +22,9 @@ export interface UseCallSessionResult {
 export function useCallSession(
   signaling: CallsSignalingClient | null,
   call: { callId: string; callType: CallType; direction: CallDirection } | null,
+  // Resolved BEFORE the session is created (the page prefetches it while
+  // ringing/dialing) - creating the session late would miss an early SDP offer.
+  iceConfiguration: RTCConfiguration = getIceConfiguration(),
 ): UseCallSessionResult {
   const sessionRef = useRef<CallSession | null>(null);
   const [state, setState] = useState<CallSessionState | null>(null);
@@ -40,7 +43,7 @@ export function useCallSession(
         // its native event-handler property TYPES are more permissive
         // (accept a DOM Event argument) than this file's simplified,
         // browser-independent interface — never a runtime mismatch.
-        createPeerConnection: () => new RTCPeerConnection(getIceConfiguration()) as unknown as PeerConnectionLike,
+        createPeerConnection: () => new RTCPeerConnection(iceConfiguration) as unknown as PeerConnectionLike,
         getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
       },
       call,

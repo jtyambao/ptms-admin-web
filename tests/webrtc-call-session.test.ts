@@ -297,3 +297,76 @@ test('dispose() unsubscribes from the signaling client and closes the peer conne
   session.dispose();
   assert.equal(pcs[0].closed, true);
 });
+
+test('SDP/ICE that arrived BEFORE the session existed is replayed on construction (the gateway relays once, no retry)', async () => {
+  const socket = makeFakeSocket();
+  const signaling = new CallsSignalingClient(socket, () => 'token');
+  // The caller's offer lands between our call:accept and session creation.
+  socket.fire('sdp:offer', { callId: 'call-1', sdp: { type: 'offer', sdp: 'early-offer' } });
+  const pcs: ReturnType<typeof makeFakePeerConnection>[] = [];
+  new CallSession(
+    {
+      signaling,
+      createPeerConnection: () => { const pc = makeFakePeerConnection(); pcs.push(pc); return pc; },
+      getUserMedia: async () => makeFakeStream([makeFakeTrack('audio')]),
+    },
+    { callId: 'call-1', callType: 'voice', direction: 'incoming' },
+  );
+  await flush();
+  assert.ok(socket.emitted.find((e) => e.event === 'sdp:answer'), 'early offer should have been answered');
+});
+
+test('buffered signals for another call are not replayed into this session', async () => {
+  const socket = makeFakeSocket();
+  const signaling = new CallsSignalingClient(socket, () => 'token');
+  socket.fire('sdp:offer', { callId: 'other-call', sdp: { type: 'offer', sdp: 'x' } });
+  new CallSession(
+    { signaling, createPeerConnection: () => makeFakePeerConnection(), getUserMedia: async () => makeFakeStream([makeFakeTrack('audio')]) },
+    { callId: 'call-1', callType: 'voice', direction: 'incoming' },
+  );
+  await flush();
+  assert.equal(socket.emitted.some((e) => e.event === 'sdp:answer'), false);
+});
+
+test('an outgoing call nobody answers within 45s is cancelled by us (the gateway has no ringing timeout) with reason no_answer', async () => {
+  const timers: { fn: () => void; ms: number }[] = [];
+  const socket = makeFakeSocket();
+  const signaling = new CallsSignalingClient(socket, () => 'token');
+  const session = new CallSession(
+    {
+      signaling,
+      createPeerConnection: () => makeFakePeerConnection(),
+      getUserMedia: async () => makeFakeStream([makeFakeTrack('audio')]),
+      setTimeoutFn: ((fn: () => void, ms?: number) => { timers.push({ fn, ms: ms ?? 0 }); return timers.length as unknown as ReturnType<typeof setTimeout>; }) as typeof setTimeout,
+      clearTimeoutFn: (() => {}) as typeof clearTimeout,
+    },
+    { callId: 'call-1', callType: 'voice', direction: 'outgoing' },
+  );
+  const ring = timers.find((t) => t.ms === 45000);
+  assert.ok(ring);
+  ring!.fn();
+  assert.equal(session.getState().phase, 'ended');
+  assert.equal(session.getState().endReason, 'no_answer');
+  assert.deepEqual(socket.emitted.find((e) => e.event === 'call:end')!.payload, { callId: 'call-1' });
+  assert.equal(describeEndReason('no_answer'), 'No answer');
+});
+
+test('the no-answer timer does nothing once the call was accepted', async () => {
+  const timers: { fn: () => void; ms: number }[] = [];
+  const socket = makeFakeSocket();
+  const signaling = new CallsSignalingClient(socket, () => 'token');
+  const session = new CallSession(
+    {
+      signaling,
+      createPeerConnection: () => makeFakePeerConnection(),
+      getUserMedia: async () => makeFakeStream([makeFakeTrack('audio')]),
+      setTimeoutFn: ((fn: () => void, ms?: number) => { timers.push({ fn, ms: ms ?? 0 }); return timers.length as unknown as ReturnType<typeof setTimeout>; }) as typeof setTimeout,
+      clearTimeoutFn: (() => {}) as typeof clearTimeout,
+    },
+    { callId: 'call-1', callType: 'voice', direction: 'outgoing' },
+  );
+  socket.fire('call:accept', { callId: 'call-1' });
+  await flush();
+  timers.find((t) => t.ms === 45000)!.fn();
+  assert.equal(session.getState().phase, 'connecting');
+});
