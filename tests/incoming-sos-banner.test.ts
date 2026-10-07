@@ -27,8 +27,9 @@ test('polls listSosAlerts on an interval, not a one-shot load', () => {
   assert.match(banner, /managementApi\.listSosAlerts\(session\.api\)/);
 });
 
-test('shows only active/acknowledged alerts (never resolved/cancelled ones)', () => {
-  assert.match(banner, /a\.status === 'active' \|\| a\.status === 'acknowledged'/);
+test('shows only alerts nobody has responded to yet (owner decision 2026-10-08)', () => {
+  assert.match(banner, /all\.filter\(\(a\) => a\.status === 'active'\)/);
+  assert.doesNotMatch(banner, /a\.status === 'acknowledged'\)\)/);
 });
 
 test('has Acknowledge and Cancel actions calling the real endpoints', () => {

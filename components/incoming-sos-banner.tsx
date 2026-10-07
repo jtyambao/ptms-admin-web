@@ -53,7 +53,10 @@ export function IncomingSosBanner() {
   const poll = useCallback(async () => {
     try {
       const all = await managementApi.listSosAlerts(session.api);
-      setAlerts(all.filter((a) => a.status === 'active' || a.status === 'acknowledged'));
+      // Only SOS alerts nobody has responded to yet. Once someone presses
+      // "I'm responding" the banner goes away; calling back and resolving
+      // continue on the SOS page.
+      setAlerts(all.filter((a) => a.status === 'active'));
     } catch {
       // A poll failure (network blip, token refresh in flight) is silent —
       // the next tick tries again; this banner must never itself be the
