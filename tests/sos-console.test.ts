@@ -98,7 +98,7 @@ test('Call the Site only appears when calls are enabled, deep-linking /calls?sit
 });
 
 test('the global alarm banner links to the console and flashes the tab title while any alert is unacknowledged', () => {
-  assert.match(banner, /Open SOS console/);
+  assert.match(banner, /Open SOS page/);
   assert.match(banner, /SOS - ACTION NEEDED/);
 });
 

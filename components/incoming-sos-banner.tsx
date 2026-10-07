@@ -141,18 +141,18 @@ export function IncomingSosBanner() {
   if (!enabled || alerts.length === 0) return null;
 
   return (
-    <div className="space-y-2 bg-red-600 px-4 py-3 text-white shadow-lg sm:px-8" role="alert">
+    <div className="max-h-[45vh] space-y-2 overflow-y-auto bg-red-600 px-4 py-2 text-white shadow-lg sm:px-8 sm:py-3" role="alert">
       <div className="flex flex-wrap items-center gap-2">
         <PhoneCall className="size-5 shrink-0 animate-pulse" />
         <p className="font-black uppercase tracking-wide">
-          {alerts.length === 1 ? 'Incoming SOS' : `${alerts.length} Incoming SOS Alerts`}
+          {alerts.length === 1 ? 'SOS alert' : `${alerts.length} SOS alerts`}
         </p>
         <Link href="/sos" className="ml-auto rounded-md bg-white/20 px-3 py-1 text-sm font-bold hover:bg-white/30">
-          Open SOS console
+          Open SOS page
         </Link>
         {soundBlocked && hasActive && (
           <Button size="sm" variant="secondary" className="gap-1" onClick={enableSound}>
-            <VolumeX className="size-4" />Click to enable sound
+            <VolumeX className="size-4" />Turn on alarm sound
           </Button>
         )}
         {!soundBlocked && hasActive && <Volume2 className="size-4 shrink-0" aria-hidden="true" />}
@@ -162,7 +162,7 @@ export function IncomingSosBanner() {
         {alerts.map((alert) => (
           <div key={alert.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-black/20 px-3 py-2 text-sm">
             <span className="font-bold">{alert.site_name ?? 'Unknown Site'}</span>
-            <span>{alert.personnel_name ?? 'Unknown Guard'}</span>
+            <span>{alert.personnel_name ?? 'Guard not identified'}</span>
             <span className="text-white/80">{new Date(alert.triggered_at).toLocaleTimeString()}</span>
             {alert.latitude !== null && alert.longitude !== null && (
               <a
@@ -171,18 +171,18 @@ export function IncomingSosBanner() {
                 target="_blank"
                 rel="noreferrer"
               >
-                Location
+                See on map
               </a>
             )}
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase">{alert.status}</span>
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase">{alert.status === 'active' ? 'New' : alert.status === 'acknowledged' ? 'Responding' : alert.status}</span>
             <div className="ml-auto flex gap-2">
               {alert.status === 'active' && (
                 <Button size="sm" variant="secondary" disabled={actingOn === alert.id} onClick={() => void respond(alert.id, 'acknowledge')}>
-                  Acknowledge
+                  I&apos;m responding
                 </Button>
               )}
               <Button size="sm" variant="secondary" disabled={actingOn === alert.id} onClick={() => void respond(alert.id, 'cancel')}>
-                Cancel
+                False alarm
               </Button>
             </div>
           </div>

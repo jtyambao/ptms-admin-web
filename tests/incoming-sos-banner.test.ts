@@ -43,7 +43,7 @@ test('sound only plays while an alert is still active (unacknowledged), not mere
 
 test('has a visible fallback to enable sound when autoplay is blocked', () => {
   assert.match(banner, /soundBlocked/);
-  assert.match(banner, /Click to enable sound/);
+  assert.match(banner, /Turn on alarm sound/);
   assert.match(banner, /onClick=\{enableSound\}/);
 });
 
