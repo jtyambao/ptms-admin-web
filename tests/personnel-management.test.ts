@@ -81,12 +81,12 @@ test('the Assign/Change OIC button is gated by canManageOic, not the broader can
 
 test('Site Personnel UI includes safe list, create, duplicate, delete, and OIC flows', () => {
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
-  assert.match(source, /Personnel and OIC/);
-  assert.match(source, /Register Personnel/);
-  assert.match(source, /This MPIN is already in use at this Site/);
-  assert.match(source, /Delete Personnel\?/);
-  assert.match(source, /Hand over OIC to someone else before deleting/);
-  assert.match(source, /Change OIC|Assign OIC/);
+  assert.match(source, /Guards and Officer in Charge \(OIC\)/);
+  assert.match(source, /Add guard/);
+  assert.match(source, /Another guard at this Site already uses this PIN/);
+  assert.match(source, /Delete this guard\?/);
+  assert.match(source, /Change the Officer in Charge first, then delete this guard/);
+  assert.match(source, /Change OIC|Choose OIC/);
   assert.match(source, /person\.status === 'active'/);
   assert.match(source, /setMpin\(''\)/);
   assert.doesNotMatch(source, /localStorage|sessionStorage/);
@@ -123,9 +123,9 @@ test('light and dark visual treatment remains represented in the Personnel UI', 
 // uncommitted WIP, not reviewed/run yet, so the button stays visible
 // (same allowed/status gate as before — no role check removed) but inert,
 // rather than risk a 404 against prod mid-demo.
-test('Regenerate MPIN is disabled (not wired to a live endpoint) for the dry run', () => {
+test('Reset PIN is not shown at all (no dead button) and nothing opens its dialog yet', () => {
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
-  assert.match(source, /<Button variant="outline" disabled title="Not available yet">\s*<KeyRound \/> Regenerate MPIN/);
+  assert.doesNotMatch(source, /Not available yet|Regenerate MPIN/);
   assert.doesNotMatch(source, /onClick=\{\(\) => setRegenerateTarget\(person\)\}/);
   // Same gate as Deactivate — `allowed` is unchanged from canManagePersonnel();
   // disabling this button does not remove or widen any role check.
@@ -135,8 +135,8 @@ test('Regenerate MPIN is disabled (not wired to a live endpoint) for the dry run
 
 test('Regenerate MPIN confirmation warns the old MPIN stops working immediately', () => {
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
-  assert.match(source, /Regenerate MPIN for \{regenerateTarget\?\.full_name\}\?/);
-  assert.match(source, /current MPIN will stop working immediately/);
+  assert.match(source, /Give \{regenerateTarget\?\.full_name\} a new PIN\?/);
+  assert.match(source, /current PIN stops working right away/);
 });
 
 test('the new MPIN is only ever displayed after a successful regenerate response, never before', () => {
@@ -173,8 +173,8 @@ test('there is no View Existing MPIN capability anywhere in the Personnel UI', (
 
 test('Regenerate MPIN handles 403/404/409 and the generic fallback distinctly', () => {
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
-  assert.match(source, /This Personnel is inactive and cannot receive a new MPIN\./);
-  assert.match(source, /This Personnel could not be found\. The list has been refreshed\./);
+  assert.match(source, /This guard was deleted and cannot get a new PIN\./);
+  assert.match(source, /This guard could not be found\. The list was refreshed\./);
   assert.match(source, /reason instanceof ApiRequestError\s*\?\s*reason\.message\s*$/m);
   assert.match(source, /genericError/);
 });
@@ -203,5 +203,16 @@ test('handoverOic is typed for and surfaces the rotated Site MPIN it has always 
 
   const panel = readFileSync('components/site-personnel-panel.tsx', 'utf8');
   assert.match(panel, /result\.newSiteMpin/);
-  assert.match(panel, /New Site MPIN/);
+  assert.match(panel, /New Site PIN - write it down now/);
+  // The new Site PIN must say the Guard phone has to use it (peer requirement 2026-10-07).
+  assert.match(panel, /Guard phone must sign in\s+with this new PIN/);
+});
+
+test('Add guard can make them Officer in Charge in the same step, and still shows the new Site PIN dialog', () => {
+  const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
+  assert.match(source, /Make this guard the Officer in Charge \(OIC\) now/);
+  assert.match(source, /\{canChangeOic && \(\s*<label htmlFor="personnel-make-oic"/);
+  assert.match(source, /managementApi\.handoverOic\(session\.api, siteId, \{ personnelId: created\.id \}\)/);
+  assert.match(source, /setNewSiteMpin\(result\.newSiteMpin\)/);
+  assert.match(source, /Guard phone must use it/);
 });
