@@ -12,7 +12,7 @@ const dashboard = readFileSync(new URL('../lib/dashboard.ts', import.meta.url), 
 
 test('Reports tab exists on the Site detail page', () => {
   assert.match(page, /import \{ SiteReportsPanel \} from '@\/components\/site-reports-panel';/);
-  assert.match(page, /value="reports"/);
+  assert.match(page, /section === 'reports'/);
   assert.match(page, /<SiteReportsPanel siteId=\{siteId\} \/>/);
 });
 

@@ -30,7 +30,7 @@ test('Rounds panel has a working create/edit/deactivate form, not a placeholder'
   assert.match(panel, /Edit \$\{editTarget/);
   assert.match(panel, /Deactivate/);
   // The Rounds tab itself is preserved.
-  assert.match(page, /value="rounds"/);
+  assert.match(page, /section === 'rounds'/);
 });
 
 test('Rounds write authority reuses canManageSiteOperations; read is broader (org-wide Engineer/Manager)', () => {

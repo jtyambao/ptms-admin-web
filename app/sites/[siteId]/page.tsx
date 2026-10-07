@@ -52,10 +52,11 @@ import {
   setupSteps,
   type SetupSignals,
 } from '@/lib/site-setup';
+import { SITE_GROUPS, groupOf, sectionFromTab, type SiteSection } from '@/lib/site-tabs';
 import type { Site, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
-type Section = 'overview' | 'briefing' | 'people' | 'devices' | 'checkpoints' | 'rounds' | 'emergency-contacts' | 'reports' | 'requests' | 'attendance';
+type Section = SiteSection;
 
 export default function SiteDetailPage() {
   const params = useParams<{ siteId: string }>();
@@ -220,10 +221,27 @@ export default function SiteDetailPage() {
     }
   }
 
+  // /sites/4?tab=rounds (an old section id) or ?tab=patrols (a group) opens
+  // that part directly; the address bar follows the admin's choice so a page
+  // can be bookmarked or shared.
+  useEffect(() => {
+    const wanted = sectionFromTab(new URLSearchParams(window.location.search).get('tab'));
+    if (wanted) setSection(wanted);
+  }, []);
+
   function goTo(next: Section) {
     setSection(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === 'overview') url.searchParams.delete('tab');
+      else url.searchParams.set('tab', next);
+      window.history.replaceState(null, '', url);
+    } catch {
+      // The address bar is a convenience only.
+    }
     void refreshSummary();
   }
+  const activeGroup = groupOf(section);
 
   return (
     <ProtectedPortal>
@@ -280,7 +298,7 @@ export default function SiteDetailPage() {
                         site.status === 'active' ? 'secondary' : 'outline'
                       }
                     >
-                      {site.status}
+                      {site.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </div>
                   <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
@@ -296,42 +314,39 @@ export default function SiteDetailPage() {
                 )}
               </div>
               <Tabs
-                value={section}
-                onValueChange={(value) => goTo(value as Section)}
+                value={activeGroup.id}
+                onValueChange={(value) => {
+                  const group = SITE_GROUPS.find((candidate) => candidate.id === value);
+                  if (group) goTo(group.items[0].section);
+                }}
                 className="mt-6"
               >
-                <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-xl p-1">
-                  <TabsTrigger className="min-h-10 px-4" value="overview">
-                    Overview
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="people">
-                    People
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="devices">
-                    Devices
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="checkpoints">
-                    Checkpoints
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="rounds">
-                    Rounds
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="emergency-contacts">
-                    Emergency Contacts
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="briefing">
-                    Briefing
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="reports">
-                    Reports
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="requests">
-                    Requests
-                  </TabsTrigger>
-                  <TabsTrigger className="min-h-10 px-4" value="attendance">
-                    Attendance
-                  </TabsTrigger>
+                <TabsList className="h-auto w-full justify-start overflow-x-auto overflow-y-hidden rounded-xl p-1">
+                  {SITE_GROUPS.map((group) => (
+                    <TabsTrigger className="min-h-10 shrink-0 px-4" key={group.id} value={group.id}>
+                      {group.label}
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
+                {activeGroup.items.length > 1 && (
+                  <div
+                    aria-label={`${activeGroup.label} sections`}
+                    className="mt-4 flex flex-wrap gap-2"
+                    role="group"
+                  >
+                    {activeGroup.items.map((item) => (
+                      <button
+                        aria-pressed={section === item.section}
+                        className={`min-h-9 rounded-full border px-4 text-sm font-bold transition ${section === item.section ? 'border-[#f36f0a] bg-[#f36f0a] text-white' : 'bg-card text-muted-foreground hover:border-orange-400'}`}
+                        key={item.section}
+                        onClick={() => goTo(item.section)}
+                        type="button"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <TabsContent value="overview" className="mt-6 space-y-7">
                   <section>
                     <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">
@@ -489,43 +504,37 @@ export default function SiteDetailPage() {
                   </section>
                 </TabsContent>
                 <TabsContent value="people" className="mt-6 space-y-8">
-                  <SiteHierarchyPanel
-                    siteId={siteId}
-                    staffing={staffing}
-                    onStaffingChange={(next) => {
-                      setStaffing(next);
-                      setSignals((current) => ({ ...current, staffing: next }));
-                    }}
-                  />
-                  <SitePersonnelPanel
-                    siteId={siteId}
-                    staffing={staffing}
-                    onStaffingChange={setStaffing}
-                  />
+                  {section === 'people' && (
+                    <>
+                      <SiteHierarchyPanel
+                        siteId={siteId}
+                        staffing={staffing}
+                        onStaffingChange={(next) => {
+                          setStaffing(next);
+                          setSignals((current) => ({ ...current, staffing: next }));
+                        }}
+                      />
+                      <SitePersonnelPanel
+                        siteId={siteId}
+                        staffing={staffing}
+                        onStaffingChange={setStaffing}
+                      />
+                    </>
+                  )}
+                  {section === 'devices' && <SiteOperationsPanel siteId={siteId} section="devices" />}
                 </TabsContent>
-                <TabsContent value="devices">
-                  <SiteOperationsPanel siteId={siteId} section="devices" />
+                <TabsContent value="patrols" className="mt-6">
+                  {section === 'checkpoints' && <SiteOperationsPanel siteId={siteId} section="checkpoints" />}
+                  {section === 'rounds' && <SiteRoundsPanel siteId={siteId} />}
                 </TabsContent>
-                <TabsContent value="checkpoints">
-                  <SiteOperationsPanel siteId={siteId} section="checkpoints" />
+                <TabsContent value="handover" className="mt-6">
+                  {section === 'briefing' && <SiteShiftBriefingPanel siteId={siteId} />}
+                  {section === 'emergency-contacts' && <SiteEmergencyContactsPanel siteId={siteId} />}
                 </TabsContent>
-                <TabsContent value="rounds">
-                  <SiteRoundsPanel siteId={siteId} />
-                </TabsContent>
-                <TabsContent value="emergency-contacts">
-                  <SiteEmergencyContactsPanel siteId={siteId} />
-                </TabsContent>
-                <TabsContent value="briefing">
-                  <SiteShiftBriefingPanel siteId={siteId} />
-                </TabsContent>
-                <TabsContent value="reports">
-                  <SiteReportsPanel siteId={siteId} />
-                </TabsContent>
-                <TabsContent value="requests">
-                  <SiteSpecialCheckRequestsPanel siteId={siteId} />
-                </TabsContent>
-                <TabsContent value="attendance">
-                  <SiteAttendancePanel siteId={siteId} />
+                <TabsContent value="requests" className="mt-6">
+                  {section === 'requests' && <SiteSpecialCheckRequestsPanel siteId={siteId} />}
+                  {section === 'reports' && <SiteReportsPanel siteId={siteId} />}
+                  {section === 'attendance' && <SiteAttendancePanel siteId={siteId} />}
                 </TabsContent>
               </Tabs>
             </>

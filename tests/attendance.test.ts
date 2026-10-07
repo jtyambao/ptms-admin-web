@@ -171,6 +171,6 @@ test('the panel view-gates the same as OIC\\/Personnel visibility (canViewPerson
 
 test('the Attendance tab exists on the Site detail page', () => {
   const source = readFileSync('app/sites/[siteId]/page.tsx', 'utf8');
-  assert.match(source, /value="attendance"/);
+  assert.match(source, /section === 'attendance'/);
   assert.match(source, /<SiteAttendancePanel siteId=\{siteId\} \/>/);
 });

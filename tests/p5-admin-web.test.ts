@@ -68,8 +68,8 @@ test('management-api wrappers hit the real, existing P5(b)/(c) backend routes', 
 
 // Pre-Shift Briefing audit (2026-10-07): own tab, history, edit = new entry.
 test('Pre-Shift Briefing has its own Briefing tab on the Site page (no longer buried in Overview)', () => {
-  assert.match(page, /value="briefing"/);
-  assert.match(page, /<TabsContent value="briefing">\s*<SiteShiftBriefingPanel siteId=\{siteId\} \/>/);
+  assert.match(page, /section === 'briefing' && <SiteShiftBriefingPanel siteId=\{siteId\} \/>/);
+  assert.match(readFileSync('lib/site-tabs.ts', 'utf8'), /section: 'briefing'/);
 });
 
 test('Pre-Shift Briefing shows the current briefing, a History list, and edit = publish a new entry pre-filled from the current one', () => {
