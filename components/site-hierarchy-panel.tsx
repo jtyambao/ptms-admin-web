@@ -90,10 +90,10 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
     try {
       await managementApi.deactivateAdminAccount(session.api, siteId, deactivateTarget.user_id, deactivateReason.trim() || undefined);
       onStaffingChange(await managementApi.getStaffing(session.api, siteId));
-      setSuccess('Admin account deactivated.');
+      setSuccess('Admin account deleted.');
       setDeactivateTarget(null);
     } catch (cause) {
-      setError(cause instanceof ApiRequestError ? cause.message : 'The Admin account could not be deactivated.');
+      setError(cause instanceof ApiRequestError ? cause.message : 'The Admin account could not be deleted. Please try again.');
     } finally { setDeactivating(false); }
   }
 
@@ -103,15 +103,15 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
       setHistory(await managementApi.getAssignmentHistory(session.api, siteId));
       setHistoryOpen(true);
     } catch (cause) {
-      setError(cause instanceof ApiRequestError ? cause.message : 'Assignment history could not be loaded.');
+      setError(cause instanceof ApiRequestError ? cause.message : 'The history could not be loaded. Please try again.');
     }
   }
 
   return (
     <section aria-labelledby="hierarchy-heading">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div><p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Site team</p><h2 id="hierarchy-heading" className="mt-1 text-xl font-black">Supervisor and Site Admin</h2></div>
-        <Button variant="outline" onClick={() => void openHistory()}><History />View history</Button>
+        <div><p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Site team</p><h2 id="hierarchy-heading" className="mt-1 text-xl font-black">Supervisor and Admins</h2></div>
+        <Button variant="outline" onClick={() => void openHistory()}><History />History</Button>
       </div>
       {error && <p role="alert" className="mt-4 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100"><AlertTriangle className="size-4" />{error}</p>}
       {success && <p className="mt-4 flex gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"><BadgeCheck className="size-4" />{success}</p>}
@@ -129,7 +129,7 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
       <Dialog open={tier !== null} onOpenChange={(open) => { if (!open) close(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{tier === 'supervisor' ? (staffing?.supervisor ? 'Change Supervisor' : 'Assign Supervisor') : 'Add Admin'}</DialogTitle>
+            <DialogTitle>{tier === 'supervisor' ? (staffing?.supervisor ? 'Change Supervisor' : 'Add Supervisor') : 'Add Admin'}</DialogTitle>
             <DialogDescription>
               {tier === 'supervisor'
                 ? 'Create a sign-in account for the Supervisor of this Site. The previous Supervisor, if any, is replaced but stays in the history.'
@@ -141,16 +141,16 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
               <label htmlFor="hierarchy-full-name" className="grid gap-2 font-bold">Full name<Input id="hierarchy-full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={pendingUserId !== null} required /></label>
               <label htmlFor="hierarchy-email" className="grid gap-2 font-bold">Email<Input id="hierarchy-email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} disabled={pendingUserId !== null} required /></label>
               <label htmlFor="hierarchy-password" className="grid gap-2 font-bold">Temporary password<Input id="hierarchy-password" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} disabled={pendingUserId !== null} required={pendingUserId === null} /><span className="text-xs font-normal text-muted-foreground">At least 8 characters. It is never saved by the portal.</span></label>
-              <label htmlFor="hierarchy-reason" className="grid gap-2 font-bold">Assignment note (optional)<Input id="hierarchy-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} /></label>
+              <label htmlFor="hierarchy-reason" className="grid gap-2 font-bold">Note (optional)<Input id="hierarchy-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} /></label>
             </div>
-            <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={close}>Cancel</Button><Button type="submit" disabled={saving || (!pendingUserId && password.length < 8)}>{saving ? 'Assigning…' : pendingUserId ? 'Retry assignment' : 'Create and assign'}</Button></DialogFooter>
+            <DialogFooter className="mt-5"><Button type="button" variant="outline" onClick={close}>Cancel</Button><Button type="submit" disabled={saving || (!pendingUserId && password.length < 8)}>{saving ? 'Saving…' : pendingUserId ? 'Try again' : 'Create account'}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>Assignment history</DialogTitle><DialogDescription>Previous assignments remain visible for accountability.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Past Supervisors and Admins</DialogTitle><DialogDescription>Everyone who has held these roles at this Site stays listed here.</DialogDescription></DialogHeader>
           <div className="max-h-80 space-y-3 overflow-y-auto">
             {history?.userAssignments.length ? history.userAssignments.map((item) => <div className="rounded-xl border p-3" key={item.id}><div className="flex items-center justify-between gap-3"><p className="font-bold">{item.full_name}</p><Badge variant={item.ended_at ? 'outline' : 'secondary'}>{item.ended_at ? 'Previous' : 'Current'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{item.assignment_role === 'supervisor' ? 'Supervisor' : item.assignment_role === 'site_admin' ? 'Site Admin' : 'Admin'} · Assigned {new Date(item.started_at).toLocaleDateString()}</p></div>) : <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">No assignment history yet.</p>}
           </div>
@@ -161,10 +161,10 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
       <Dialog open={!!deactivateTarget} onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Deactivate Admin account</DialogTitle>
+            <DialogTitle>Delete this Admin account?</DialogTitle>
             <DialogDescription>
-              {deactivateTarget?.full_name} will no longer be able to sign in, and their assignment to this
-              Site ends immediately. This cannot be undone from here — a new Admin would need to be added again.
+              {deactivateTarget?.full_name} can no longer sign in, and their access to this Site ends right away.
+              This cannot be undone from here - to give them access again, add them as a new Admin.
             </DialogDescription>
           </DialogHeader>
           <label htmlFor="deactivate-reason" className="grid gap-2 text-sm font-bold">
@@ -174,7 +174,7 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
           <DialogFooter className="mt-5">
             <Button type="button" variant="outline" onClick={() => setDeactivateTarget(null)}>Cancel</Button>
             <Button type="button" variant="destructive" disabled={deactivating} onClick={() => void confirmDeactivate()}>
-              {deactivating ? 'Deactivating…' : 'Deactivate account'}
+              {deactivating ? 'Deleting…' : 'Delete account'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -202,7 +202,7 @@ function TierCard({ icon, title, name, legacyName, allowed, action, secondaryAct
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{title}</p>
           <p className="mt-1 truncate font-black">{name || legacyName || 'Needs setup'}</p>
-          {legacyName && <p className="mt-0.5 text-xs text-muted-foreground">Legacy Site Admin assignment (read-only)</p>}
+          {legacyName && <p className="mt-0.5 text-xs text-muted-foreground">Older Site Admin (cannot be changed here)</p>}
         </div>
       </div>
       {allowed && <Button className="mt-4 w-full" variant="outline" onClick={action}>{name ? 'Change assignment' : `Set up ${title}`}</Button>}
@@ -238,7 +238,7 @@ function AdminTierCard({ admins, legacyName, allowed, onAdd, onDeactivate }: {
           {admins.length === 0 && legacyName && (
             <>
               <p className="mt-1 truncate font-black">{legacyName}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Legacy Site Admin assignment (read-only)</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Older Site Admin (cannot be changed here)</p>
             </>
           )}
           {admins.map((admin) => (
@@ -246,7 +246,7 @@ function AdminTierCard({ admins, legacyName, allowed, onAdd, onDeactivate }: {
               <p className="min-w-0 truncate font-black">{admin.full_name}</p>
               {allowed && (
                 <Button size="sm" variant="outline" onClick={() => onDeactivate(admin)}>
-                  <UserX className="size-3.5" />Deactivate
+                  <UserX className="size-3.5" />Delete
                 </Button>
               )}
             </div>

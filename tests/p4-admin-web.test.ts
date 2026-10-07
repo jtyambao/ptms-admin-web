@@ -29,7 +29,7 @@ test('Add Admin calls the additive addAdmin endpoint, never the replace-semantic
 
 test('an existing legacy site_admin assignment is still shown, read-only, when there are no admins yet', () => {
   assert.match(hierarchyPanel, /legacyName=\{\(staffing\?\.admins\?\.length \?\? 0\) === 0 \? staffing\?\.siteAdmin\?\.full_name : undefined\}/);
-  assert.match(hierarchyPanel, /Legacy Site Admin assignment \(read-only\)/);
+  assert.match(hierarchyPanel, /Older Site Admin \(cannot be changed here\)/);
 });
 
 test('every active Admin gets its own Deactivate button, gated the same as canSetUpAdmin', () => {
