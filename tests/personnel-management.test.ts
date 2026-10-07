@@ -99,7 +99,8 @@ test('Deleted Personnel are hidden by default behind a Show deleted toggle, same
   const source = readFileSync('components/site-personnel-panel.tsx', 'utf8');
   assert.match(source, /showDeleted/);
   assert.match(source, /Show deleted \(\$\{personnel\.filter\(\(p\) => p\.status !== 'active'\)\.length\}\)/);
-  assert.match(source, /\(showDeleted \? personnel : personnel\.filter\(\(p\) => p\.status === 'active'\)\)\.map/);
+  assert.match(source, /useShowMore\(showDeleted \? personnel : personnel\.filter\(\(p\) => p\.status === 'active'\), 10, 10\)/);
+  assert.match(source, /personnelMore\.visible\.map\(\(person\)/);
 });
 
 test('Personnel list never renders an MPIN or hash field', () => {

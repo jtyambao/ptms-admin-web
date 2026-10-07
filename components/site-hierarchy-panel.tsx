@@ -2,6 +2,7 @@
 
 import { AlertTriangle, BadgeCheck, History, Plus, ShieldCheck, UserCog, UserX } from 'lucide-react';
 import { useEffect, useState, type SyntheticEvent } from 'react';
+import { ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -151,9 +152,7 @@ export function SiteHierarchyPanel({ siteId, staffing, onStaffingChange }: {
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Past Supervisors and Admins</DialogTitle><DialogDescription>Everyone who has held these roles at this Site stays listed here.</DialogDescription></DialogHeader>
-          <div className="max-h-80 space-y-3 overflow-y-auto">
-            {history?.userAssignments.length ? history.userAssignments.map((item) => <div className="rounded-xl border p-3" key={item.id}><div className="flex items-center justify-between gap-3"><p className="font-bold">{item.full_name}</p><Badge variant={item.ended_at ? 'outline' : 'secondary'}>{item.ended_at ? 'Previous' : 'Current'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{item.assignment_role === 'supervisor' ? 'Supervisor' : item.assignment_role === 'site_admin' ? 'Site Admin' : 'Admin'} · Assigned {new Date(item.started_at).toLocaleDateString()}</p></div>) : <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">No assignment history yet.</p>}
-          </div>
+          <AssignmentHistoryList items={history?.userAssignments ?? []} />
           <DialogFooter><Button onClick={() => setHistoryOpen(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -258,6 +257,19 @@ function AdminTierCard({ admins, legacyName, allowed, onAdd, onDeactivate }: {
           <Plus className="size-4" />Add Admin
         </Button>
       )}
+    </div>
+  );
+}
+
+// Past assignments: the newest 5, then "Show more" - never an endless list.
+function AssignmentHistoryList({ items }: { items: SiteUserAssignment[] }) {
+  const { visible, remaining, showMore, step } = useShowMore(items, 5, 10);
+  if (items.length === 0) return <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">No assignment history yet.</p>;
+  return (
+    <div className="max-h-96 space-y-3 overflow-y-auto">
+      {visible.map((item) => <div className="rounded-xl border p-3" key={item.id}><div className="flex items-center justify-between gap-3"><p className="font-bold">{item.full_name}</p><Badge variant={item.ended_at ? 'outline' : 'secondary'}>{item.ended_at ? 'Previous' : 'Current'}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{item.assignment_role === 'supervisor' ? 'Supervisor' : item.assignment_role === 'site_admin' ? 'Site Admin' : 'Admin'} · Assigned {new Date(item.started_at).toLocaleDateString()}</p></div>
+      )}
+      <ShowMore remaining={remaining} onClick={showMore} step={step} />
     </div>
   );
 }

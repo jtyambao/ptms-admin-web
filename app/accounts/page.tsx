@@ -4,7 +4,7 @@ import { AlertTriangle, BadgeCheck, Plus, RefreshCw, ShieldAlert, UserRound, X }
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
-import { PageContainer, PageHeader } from '@/components/page-layout';
+import { PageContainer, PageHeader, ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -122,6 +122,8 @@ export default function AccountsPage() {
       setSaving(false);
     }
   }
+
+  const usersMore = useShowMore(users, 10, 20);
 
   if (!canView) {
     return (
@@ -248,7 +250,7 @@ export default function AccountsPage() {
               </div>
             ) : !error ? (
               <div className="divide-y">
-                {users.map((user) => (
+                {usersMore.visible.map((user) => (
                   <div key={user.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -260,6 +262,7 @@ export default function AccountsPage() {
                     </div>
                   </div>
                 ))}
+                <ShowMore remaining={usersMore.remaining} onClick={usersMore.showMore} step={usersMore.step} />
               </div>
             ) : null}
           </section>

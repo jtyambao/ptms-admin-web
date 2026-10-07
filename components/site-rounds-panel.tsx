@@ -3,6 +3,7 @@
 import { AlertTriangle, BadgeCheck, Clock, Plus, RefreshCw, Route, ShieldAlert } from 'lucide-react';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -412,6 +413,8 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
     finally { setSaving(false); }
   }
 
+  const roundsMore = useShowMore(rounds, 5, 10);
+
   if (!canView) {
     return (
       <section className="rounded-2xl border bg-muted/20 p-5">
@@ -485,7 +488,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
           </div>
         ) : (
           <div className="divide-y">
-            {rounds.map((round) => {
+            {roundsMore.visible.map((round) => {
               const hasInactiveStop = round.stops.some((s) => s.checkpoint_status && s.checkpoint_status !== 'active');
               return (
                 <div key={round.id} className="p-5">
@@ -520,6 +523,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                 </div>
               );
             })}
+            <ShowMore remaining={roundsMore.remaining} onClick={roundsMore.showMore} step={roundsMore.step} />
           </div>
         )}
       </div>

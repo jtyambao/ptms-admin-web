@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Download, RefreshCw, ShieldAlert, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ApiRequestError } from '@/lib/authenticated-api';
@@ -146,8 +147,21 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
         ) : fromDate > toDate ? (
           <p className="p-8 text-center text-sm text-muted-foreground">The end date must be on or after the start date.</p>
         ) : (
-          <div className="divide-y">
-            {days.map((day) => (
+          <AttendanceDays days={days} />
+        )}
+      </div>
+    </section>
+  );
+}
+
+// Newest day first; the first week is shown, "Show more" reveals older days.
+function AttendanceDays({ days }: { days: ReturnType<typeof deriveDailyOicCoverage> }) {
+  const newestFirst = [...days].reverse();
+  const { visible, remaining, showMore, step } = useShowMore(newestFirst, 7, 14);
+  return (
+    <div>
+      <div className="divide-y">
+        {visible.map((day) => (
               <div key={day.date} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-start sm:gap-4">
                 <p className="w-28 shrink-0 font-bold">
                   {new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })}
@@ -180,10 +194,9 @@ export function SiteAttendancePanel({ siteId }: { siteId: number }) {
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+        ))}
       </div>
-    </section>
+      <ShowMore remaining={remaining} onClick={showMore} step={step} />
+    </div>
   );
 }

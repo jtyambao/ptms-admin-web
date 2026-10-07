@@ -1,7 +1,8 @@
 'use client';
 
-import { AlertTriangle, BadgeCheck, History, NotebookPen } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, NotebookPen } from 'lucide-react';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
+import { Disclosure, ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -181,19 +182,25 @@ export function SiteShiftBriefingPanel({ siteId }: { siteId: number }) {
         <p className="text-xs text-muted-foreground">Your role can read the briefing but cannot publish one.</p>
       )}
 
-      {older.length > 0 && (
-        <div className="rounded-2xl border bg-card">
-          <p className="flex items-center gap-2 border-b p-4 font-black"><History className="size-4 text-[#e86405]" />History ({older.length})</p>
-          <div className="divide-y">
-            {older.map((briefing) => (
-              <div key={briefing.id} className="p-4">
-                <p className="mb-1 text-xs text-muted-foreground">{new Date(briefing.created_at).toLocaleString()}</p>
-                <BriefingBody briefing={briefing} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {older.length > 0 && <BriefingHistory older={older} />}
     </section>
+  );
+}
+
+// Older briefings: collapsed by default, newest 5, "Show more" for the rest.
+function BriefingHistory({ older }: { older: ShiftBriefing[] }) {
+  const { visible, remaining, showMore, step } = useShowMore(older, 5, 10);
+  return (
+    <Disclosure title="History" count={older.length}>
+      <div className="divide-y">
+        {visible.map((briefing) => (
+          <div key={briefing.id} className="p-4">
+            <p className="mb-1 text-xs text-muted-foreground">{new Date(briefing.created_at).toLocaleString()}</p>
+            <BriefingBody briefing={briefing} />
+          </div>
+        ))}
+      </div>
+      <ShowMore remaining={remaining} onClick={showMore} step={step} />
+    </Disclosure>
   );
 }

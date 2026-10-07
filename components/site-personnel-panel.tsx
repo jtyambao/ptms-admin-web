@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -327,6 +328,8 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
     }
   }
 
+  const personnelMore = useShowMore(showDeleted ? personnel : personnel.filter((p) => p.status === 'active'), 10, 10);
+
   if (!canView) return (
     <section className="rounded-2xl border bg-muted/20 p-5" aria-labelledby="personnel-heading">
       <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">Guards</p>
@@ -412,7 +415,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
                 </Button>
               </div>
             )}
-            {(showDeleted ? personnel : personnel.filter((p) => p.status === 'active')).map((person) => {
+            {personnelMore.visible.map((person) => {
               const isOic = person.id === currentOicId;
               return (
                 <div key={person.id} className={`flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:px-5 ${person.status === 'active' ? '' : 'opacity-60'}`}>
@@ -440,6 +443,7 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
                 </div>
               );
             })}
+            <ShowMore remaining={personnelMore.remaining} onClick={personnelMore.showMore} step={personnelMore.step} />
           </div>
         )}
       </div>

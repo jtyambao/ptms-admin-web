@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
-import { PageContainer, PageHeader } from '@/components/page-layout';
+import { PageContainer, PageHeader, ShowMore, useShowMore } from '@/components/page-layout';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { managementApi } from '@/lib/management-api';
 import { canCreateSite } from '@/lib/portal-access';
@@ -21,6 +21,7 @@ import { useSession } from '@/lib/session-provider';
 export default function SitesPage() {
   const session = useSession();
   const [sites, setSites] = useState<Site[]>([]);
+  const sitesMore = useShowMore(sites, 10, 20);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -242,7 +243,8 @@ export default function SitesPage() {
                 </p>
               </div>
             ) : !error ? (
-              sites.map((site) => (
+              <>
+              {sitesMore.visible.map((site) => (
                 <Link
                   className="flex items-center gap-4 rounded-2xl border bg-card p-5 transition hover:border-orange-400"
                   href={`/sites/${site.id}`}
@@ -262,7 +264,9 @@ export default function SitesPage() {
                   </span>
                   <ArrowRight className="size-4" />
                 </Link>
-              ))
+              ))}
+              <div className="overflow-hidden rounded-2xl"><ShowMore remaining={sitesMore.remaining} onClick={sitesMore.showMore} step={sitesMore.step} /></div>
+              </>
             ) : null}
           </section>
         </PageContainer>

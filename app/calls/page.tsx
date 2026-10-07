@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SosActionDialog, SosAlertCard, useSosActions } from '@/components/sos-alert-card';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
-import { PageContainer, PageHeader } from '@/components/page-layout';
+import { PageContainer, PageHeader, ShowMore, useShowMore } from '@/components/page-layout';
 import { SectionErrorBoundary } from '@/components/section-error-boundary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -388,6 +388,7 @@ function CallsShell() {
   // call that stopped ringing before it was answered is remembered here
   // until the page is closed.
   const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
+  const missedMore = useShowMore(missedCalls, 5, 10);
   const [ringtone] = useState(() => new Ringtone());
   const [soundEnabled, setSoundEnabled] = useState(false);
   // ICE servers (STUN + short-lived TURN when the backend has it) are
@@ -695,10 +696,10 @@ function CallsShell() {
       {missedCalls.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Missed calls (this session)</CardTitle>
+            <CardTitle className="text-base">Missed calls (this session) <span className="font-normal text-muted-foreground">({missedCalls.length})</span></CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {missedCalls.map((missed) => (
+            {missedMore.visible.map((missed) => (
               <div key={`${missed.callId}-${missed.at}`} className="flex flex-wrap items-center justify-between gap-2">
                 <span><CallerIdentityLine callerContext={missed.callerContext} /></span>
                 <span className="text-xs text-muted-foreground">
@@ -706,6 +707,7 @@ function CallsShell() {
                 </span>
               </div>
             ))}
+            <ShowMore remaining={missedMore.remaining} onClick={missedMore.showMore} step={missedMore.step} />
           </CardContent>
         </Card>
       )}

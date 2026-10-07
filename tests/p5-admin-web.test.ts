@@ -74,7 +74,7 @@ test('Pre-Shift Briefing has its own Briefing tab on the Site page (no longer bu
 
 test('Pre-Shift Briefing shows the current briefing, a History list, and edit = publish a new entry pre-filled from the current one', () => {
   assert.match(briefingPanel, /Current briefing/);
-  assert.match(briefingPanel, /History \(\{older\.length\}\)/);
+  assert.match(briefingPanel, /<Disclosure title="History" count=\{older\.length\}>/);
   assert.match(briefingPanel, /Start from current briefing/);
   assert.match(briefingPanel, /nothing is overwritten/);
 });
