@@ -55,7 +55,7 @@ import {
 import type { Site, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
-type Section = 'overview' | 'people' | 'devices' | 'checkpoints' | 'rounds' | 'emergency-contacts' | 'reports' | 'requests' | 'attendance';
+type Section = 'overview' | 'briefing' | 'people' | 'devices' | 'checkpoints' | 'rounds' | 'emergency-contacts' | 'reports' | 'requests' | 'attendance';
 
 export default function SiteDetailPage() {
   const params = useParams<{ siteId: string }>();
@@ -319,6 +319,9 @@ export default function SiteDetailPage() {
                   <TabsTrigger className="min-h-10 px-4" value="emergency-contacts">
                     Emergency Contacts
                   </TabsTrigger>
+                  <TabsTrigger className="min-h-10 px-4" value="briefing">
+                    Briefing
+                  </TabsTrigger>
                   <TabsTrigger className="min-h-10 px-4" value="reports">
                     Reports
                   </TabsTrigger>
@@ -482,7 +485,6 @@ export default function SiteDetailPage() {
                           onSiteChange={setSite}
                         />
                       )}
-                      <SiteShiftBriefingPanel siteId={siteId} />
                     </div>
                   </section>
                 </TabsContent>
@@ -512,6 +514,9 @@ export default function SiteDetailPage() {
                 </TabsContent>
                 <TabsContent value="emergency-contacts">
                   <SiteEmergencyContactsPanel siteId={siteId} />
+                </TabsContent>
+                <TabsContent value="briefing">
+                  <SiteShiftBriefingPanel siteId={siteId} />
                 </TabsContent>
                 <TabsContent value="reports">
                   <SiteReportsPanel siteId={siteId} />

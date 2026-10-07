@@ -215,6 +215,10 @@ export const managementApi = {
   // admin own Site, org_admin org-wide, super_admin cross-tenant).
   getLatestShiftBriefing: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<ShiftBriefing | null>(`/sites/${siteId}/shift-briefing`),
+  // Pre-Shift Briefing HISTORY (user-authorized 2026-10-07) - staff-
+  // authenticated, newest first; the first row is the current briefing.
+  listShiftBriefingHistory: (api: AuthenticatedApiClient, siteId: number, limit = 30) =>
+    api.request<ShiftBriefing[]>(`/sites/${siteId}/shift-briefings?limit=${limit}`),
   createShiftBriefing: (api: AuthenticatedApiClient, siteId: number, body: CreateShiftBriefingRequest) =>
     api.request<ShiftBriefing>(`/sites/${siteId}/shift-briefing`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

@@ -36,9 +36,9 @@ test('Shift Briefing form is gated by canManageSiteOperations (matches backend r
 });
 
 test('Shift Briefing panel shows the latest briefing and calls the real GET/POST endpoints', () => {
-  assert.match(briefingPanel, /managementApi\.getLatestShiftBriefing\(session\.api, siteId\)/);
+  assert.match(briefingPanel, /managementApi\.listShiftBriefingHistory\(session\.api, siteId\)/);
   assert.match(briefingPanel, /managementApi\.createShiftBriefing\(session\.api, siteId,/);
-  assert.match(briefingPanel, /No Shift Briefing yet for this Site\./);
+  assert.match(briefingPanel, /No briefing yet/);
 });
 
 test('Shift Briefing panel is wired into the Site page', () => {
@@ -64,4 +64,30 @@ test('management-api wrappers hit the real, existing P5(b)/(c) backend routes', 
   assert.equal(calls[1].init, undefined);
   assert.equal(calls[2].init?.method, 'POST');
   assert.deepEqual(JSON.parse(String(calls[2].init?.body)), { handoverNote: 'Quiet night' });
+});
+
+// Pre-Shift Briefing audit (2026-10-07): own tab, history, edit = new entry.
+test('Pre-Shift Briefing has its own Briefing tab on the Site page (no longer buried in Overview)', () => {
+  assert.match(page, /value="briefing"/);
+  assert.match(page, /<TabsContent value="briefing">\s*<SiteShiftBriefingPanel siteId=\{siteId\} \/>/);
+});
+
+test('Pre-Shift Briefing shows the current briefing, a History list, and edit = publish a new entry pre-filled from the current one', () => {
+  assert.match(briefingPanel, /Current briefing/);
+  assert.match(briefingPanel, /History \(\{older\.length\}\)/);
+  assert.match(briefingPanel, /Start from current briefing/);
+  assert.match(briefingPanel, /nothing is overwritten/);
+});
+
+test('the long handover note is a multi-line Textarea and the short fields show their 255-character counters', () => {
+  assert.match(briefingPanel, /<Textarea id="briefing-handover"/);
+  assert.match(briefingPanel, /\{equipmentCheckNote\.length\}\/\{SHORT_MAX\}/);
+  assert.match(briefingPanel, /\{weatherAdvisory\.length\}\/\{SHORT_MAX\}/);
+});
+
+test('history wrapper hits the staff-authenticated, bounded GET /sites/:id/shift-briefings', async () => {
+  const paths: string[] = [];
+  const api = { request: async (path: string) => { paths.push(path); return []; } } as never;
+  await managementApi.listShiftBriefingHistory(api, 4);
+  assert.deepEqual(paths, ['/sites/4/shift-briefings?limit=30']);
 });
