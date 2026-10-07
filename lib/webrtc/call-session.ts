@@ -82,6 +82,10 @@ export class CallSession {
   private pc: PeerConnectionLike | null = null;
   private readonly pendingCandidates: RTCIceCandidateInit[] = [];
   private remoteDescriptionSet = false;
+  // Resolves once local media is attached (or has failed), so an incoming
+  // call never answers before its own microphone track is on the
+  // connection — otherwise the caller hears nothing from this side.
+  private mediaReady: Promise<void> | null = null;
   private hasSentConnected = false;
   private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private unsubscribeSignaling: (() => void) | null = null;
@@ -132,7 +136,7 @@ export class CallSession {
     // An incoming call has already been accepted (via the ringing overlay)
     // before this session is constructed — see app/calls/page.tsx — so it
     // goes straight to setting up media and waiting for the offer.
-    if (params.direction === 'incoming') void this.setupLocalMedia();
+    if (params.direction === 'incoming') this.mediaReady = this.setupLocalMedia();
   }
 
   getState(): CallSessionState {
@@ -277,6 +281,7 @@ export class CallSession {
         // round trip, giving the callee's media a head start — but this
         // is exactly the kind of timing this groundwork has not been
         // exercised against a real network for.
+        if (this.mediaReady) await this.mediaReady;
         this.ensurePeerConnection();
         const pc = this.pc!;
         await pc.setRemoteDescription(event.sdp);
