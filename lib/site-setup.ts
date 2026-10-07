@@ -53,16 +53,16 @@ export function setupSteps(signals: SetupSignals) {
       complete:
         signals.activePersonnel === null ? null : signals.activePersonnel > 0,
     },
-    { label: 'OIC', complete: !!signals.staffing?.oic },
+    { label: 'Officer in Charge', complete: !!signals.staffing?.oic },
     {
-      label: 'Device',
+      label: 'Guard phone',
       complete:
         signals.activeDevices === null
           ? null
           : signals.activeDevices > 0 && signals.hasPrimaryDevice === true,
     },
     {
-      label: 'Checkpoints / NFC',
+      label: 'Checkpoints & NFC tags',
       complete:
         signals.activeCheckpoints === null
           ? null

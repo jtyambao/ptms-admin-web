@@ -34,7 +34,7 @@ export function SitePatrolActivationToggle({ siteId, site, onSiteChange }: {
     try {
       onSiteChange(await managementApi.setPatrolActivation(session.api, siteId, { active }));
     } catch (reason) {
-      setError(reason instanceof ApiRequestError ? reason.message : 'Patrol activation could not be changed.');
+      setError(reason instanceof ApiRequestError ? reason.message : 'Patrols could not be switched. Please try again.');
     } finally { setSaving(false); }
   }
 
@@ -42,18 +42,19 @@ export function SitePatrolActivationToggle({ siteId, site, onSiteChange }: {
     <div className="rounded-2xl border bg-card p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Patrol Operations</p>
-          <p className="mt-1 font-black">{site.patrol_operations_active ? 'Active' : 'Inactive'}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Patrols at this Site</p>
+          <p className="mt-1 font-black">{site.patrol_operations_active ? 'On' : 'Off'}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Switch on when the Site is ready for guards to start patrols.</p>
         </div>
         <Switch
           checked={site.patrol_operations_active}
           onCheckedChange={(checked) => void toggle(checked)}
           disabled={!canToggle || saving}
-          aria-label="Toggle patrol operations"
+          aria-label="Turn patrols on or off"
         />
       </div>
       {!canToggle && (
-        <p className="mt-3 text-xs text-muted-foreground">Your role cannot change this under current production RBAC.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Ask the Site Supervisor to turn patrols on or off.</p>
       )}
       {error && (
         <p role="alert" className="mt-3 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">

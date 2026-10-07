@@ -87,7 +87,7 @@ export default function SiteDetailPage() {
     if (session.status !== 'authenticated') return;
     if (!Number.isInteger(siteId) || siteId < 1) {
       setError(
-        'This Site address is invalid. Return to Sites and choose an authorized Site.',
+        'This Site link is not valid. Go back to Sites and pick a Site from the list.',
       );
       setLoading(false);
       return;
@@ -148,7 +148,7 @@ export default function SiteDetailPage() {
       setError(
         reason instanceof ApiRequestError
           ? reason.message
-          : 'Site details could not be loaded.',
+          : 'This Site could not be loaded. Check your connection and try again.',
       );
     } finally {
       setLoading(false);
@@ -191,13 +191,13 @@ export default function SiteDetailPage() {
     const hasLat = latitude.trim() !== '';
     const hasLng = longitude.trim() !== '';
     if (hasLat !== hasLng) {
-      setError('Enter both latitude and longitude, or leave both blank.');
+      setError('Fill in both the latitude and the longitude, or leave both empty.');
       return;
     }
     const lat = Number(latitude);
     const lng = Number(longitude);
     if (hasLat && (lat < -90 || lat > 90 || lng < -180 || lng > 180)) {
-      setError('Latitude must be -90 to 90 and longitude must be -180 to 180.');
+      setError('Latitude must be between -90 and 90, and longitude between -180 and 180.');
       return;
     }
     setSaving(true);
@@ -214,7 +214,7 @@ export default function SiteDetailPage() {
       setError(
         reason instanceof ApiRequestError
           ? reason.message
-          : 'Site information could not be updated.',
+          : 'The Site information could not be saved. Please try again.',
       );
     } finally {
       setSaving(false);
@@ -277,14 +277,13 @@ export default function SiteDetailPage() {
               aria-live="polite"
               className="mt-8 text-sm text-muted-foreground"
             >
-              Loading authorized Site…
+              Loading this Site…
             </p>
           ) : !site ? (
             <div className="mt-8 rounded-2xl border p-8 text-center">
               <p className="font-bold">Site unavailable</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Return to the Sites list and choose a Site in your authorized
-                scope.
+                Go back to the Sites list and pick a Site you have access to.
               </p>
             </div>
           ) : (
@@ -350,14 +349,14 @@ export default function SiteDetailPage() {
                 <TabsContent value="overview" className="mt-6 space-y-7">
                   <section>
                     <p className="text-xs font-bold uppercase tracking-[.14em] text-[#e86405]">
-                      Setup status
+                      Getting started
                     </p>
                     <h2 className="mt-1 text-xl font-black">
                       Site setup guide
                     </h2>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      This guide shows configuration progress only. It does not
-                      activate patrol operations.
+                      Tick off each step to get this Site ready. Finishing the steps
+                      does not start patrols by itself.
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       {steps.map((step, index) => (
@@ -406,14 +405,14 @@ export default function SiteDetailPage() {
                     </div>
                   </section>
                   <section>
-                    <h2 className="text-xl font-black">Overview</h2>
+                    <h2 className="text-xl font-black">At a glance</h2>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       <Summary
                         label="Location"
                         value={
                           hasCoordinates(site.latitude, site.longitude)
                             ? `${site.latitude}, ${site.longitude}`
-                            : 'Coordinates not set'
+                            : 'Map location not set'
                         }
                         complete={hasCoordinates(site.latitude, site.longitude)}
                       />
@@ -432,12 +431,12 @@ export default function SiteDetailPage() {
                         complete={!!(staffing?.admin || staffing?.siteAdmin)}
                       />
                       <Summary
-                        label="Current OIC"
+                        label="Officer in Charge"
                         value={staffing?.oic?.full_name || 'Needs setup'}
                         complete={!!staffing?.oic}
                       />
                       <Summary
-                        label="Active Personnel"
+                        label="Guards"
                         value={
                           signals.activePersonnel === null
                             ? 'Managed by Site team'
@@ -450,11 +449,11 @@ export default function SiteDetailPage() {
                         }
                       />
                       <Summary
-                        label="Devices"
+                        label="Guard phones"
                         value={
                           signals.activeDevices === null
                             ? 'Managed by Site team'
-                            : `${signals.activeDevices} active · ${signals.hasPrimaryDevice ? 'Primary set' : 'No Primary'}`
+                            : `${signals.activeDevices} added · ${signals.hasPrimaryDevice ? 'main phone set' : 'no main phone yet'}`
                         }
                         complete={
                           signals.activeDevices === null
@@ -468,7 +467,7 @@ export default function SiteDetailPage() {
                         value={
                           signals.activeCheckpoints === null
                             ? 'Managed by Site team'
-                            : `${signals.activeCheckpoints} active`
+                            : `${signals.activeCheckpoints} added`
                         }
                         complete={
                           signals.activeCheckpoints === null
@@ -477,11 +476,11 @@ export default function SiteDetailPage() {
                         }
                       />
                       <Summary
-                        label="NFC"
+                        label="NFC tags"
                         value={
                           signals.nfcReadyCheckpoints === null
                             ? 'Managed by Site team'
-                            : `${signals.nfcReadyCheckpoints} of ${signals.activeCheckpoints} ready`
+                            : `${signals.nfcReadyCheckpoints} of ${signals.activeCheckpoints} checkpoints ready`
                         }
                         complete={
                           signals.activeCheckpoints === null
@@ -545,8 +544,8 @@ export default function SiteDetailPage() {
             <DialogHeader>
               <DialogTitle>Edit Site information</DialogTitle>
               <DialogDescription>
-                Coordinates are optional, but latitude and longitude must be
-                entered together.
+                The map location is optional. If you fill it in, enter both the
+                latitude and the longitude.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={updateSite}>
@@ -614,7 +613,7 @@ export default function SiteDetailPage() {
                   htmlFor="edit-site-duty-end-time"
                   className="grid gap-2 font-bold"
                 >
-                  Duty-end / catch-up cutoff time
+                  Time the shift ends
                   <Input
                     id="edit-site-duty-end-time"
                     type="time"
@@ -622,9 +621,9 @@ export default function SiteDetailPage() {
                     onChange={(e) => setDutyEndTime(e.target.value)}
                   />
                   <span className="text-xs font-normal text-muted-foreground">
-                    Local time this Site&apos;s duty ends, in the
-                    organization&apos;s own timezone. Leave blank to disable
-                    Missed Checkpoint Random Catch-Up for this Site.
+                    When the guards&apos; shift ends at this Site (local time). Missed
+                    checkpoints can be made up before this time. Leave empty to
+                    turn that off.
                   </span>
                 </label>
               </div>
@@ -637,7 +636,7 @@ export default function SiteDetailPage() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={saving || !name.trim()}>
-                  {saving ? 'Saving…' : 'Save changes'}
+                  {saving ? 'Saving…' : 'Save'}
                 </Button>
               </DialogFooter>
             </form>
