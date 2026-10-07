@@ -49,6 +49,11 @@ export function useCallsSocket(enabled: boolean): CallsSocketState {
     client: null,
   });
   const clientRef = useRef<CallsSignalingClient | null>(null);
+  // The session context value is a new object on every provider render; keeping the
+  // latest one in a ref (instead of as an effect dependency) stops the socket being
+  // torn down and rebuilt each time the session re-renders (e.g. a token refresh).
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
 
   useEffect(() => {
     if (!enabled) {
@@ -58,8 +63,15 @@ export function useCallsSocket(enabled: boolean): CallsSocketState {
     if (session.status !== 'authenticated') return;
 
     setState((current) => ({ ...current, status: 'connecting', error: null }));
-    const socket: Socket = io(socketOrigin(), { transports: ['websocket'], reconnection: true });
-    const client = new CallsSignalingClient(socket, () => session.getAccessToken());
+    let socket: Socket;
+    try {
+      socket = io(socketOrigin(), { transports: ['websocket'], reconnection: true });
+    } catch (reason) {
+      // Never let a connection problem take the whole page down - show it as a status instead.
+      setState({ status: 'error', error: reason instanceof Error ? reason.message : 'Could not start the call connection.', client: null });
+      return;
+    }
+    const client = new CallsSignalingClient(socket, () => sessionRef.current.getAccessToken());
     clientRef.current = client;
 
     const unsubscribe = client.on((event: SignalingEvent) => {
@@ -77,7 +89,7 @@ export function useCallsSocket(enabled: boolean): CallsSocketState {
       socket.disconnect();
       clientRef.current = null;
     };
-  }, [enabled, session, session.status]);
+  }, [enabled, session.status]);
 
   return state;
 }

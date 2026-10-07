@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { SectionErrorBoundary } from '@/components/section-error-boundary';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -518,7 +519,9 @@ export default function CallsPage() {
   return (
     <ProtectedPortal>
       <PortalShell active="calls">
-        <CallsShell />
+        <SectionErrorBoundary title="Calls">
+          <CallsShell />
+        </SectionErrorBoundary>
       </PortalShell>
     </ProtectedPortal>
   );
