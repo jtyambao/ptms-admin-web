@@ -1,6 +1,7 @@
 'use client';
 
 import { PhoneCall, Volume2, VolumeX } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ApiRequestError } from '@/lib/authenticated-api';
@@ -108,6 +109,19 @@ export function IncomingSosBanner() {
 
   useEffect(() => stopBeep, [stopBeep]);
 
+  // A browser tab in the background can't beep loudly enough to be missed
+  // - flash the tab title too, so a dispatcher working in another tab sees it.
+  useEffect(() => {
+    if (!hasActive) return;
+    const original = document.title;
+    let on = false;
+    const timer = window.setInterval(() => {
+      on = !on;
+      document.title = on ? 'SOS - ACTION NEEDED' : original;
+    }, 1000);
+    return () => { window.clearInterval(timer); document.title = original; };
+  }, [hasActive]);
+
   function enableSound() {
     const ctx = ensureAudioContext();
     if (!ctx) return;
@@ -133,12 +147,15 @@ export function IncomingSosBanner() {
         <p className="font-black uppercase tracking-wide">
           {alerts.length === 1 ? 'Incoming SOS' : `${alerts.length} Incoming SOS Alerts`}
         </p>
+        <Link href="/sos" className="ml-auto rounded-md bg-white/20 px-3 py-1 text-sm font-bold hover:bg-white/30">
+          Open SOS console
+        </Link>
         {soundBlocked && hasActive && (
-          <Button size="sm" variant="secondary" className="ml-auto gap-1" onClick={enableSound}>
+          <Button size="sm" variant="secondary" className="gap-1" onClick={enableSound}>
             <VolumeX className="size-4" />Click to enable sound
           </Button>
         )}
-        {!soundBlocked && hasActive && <Volume2 className="ml-auto size-4 shrink-0" aria-hidden="true" />}
+        {!soundBlocked && hasActive && <Volume2 className="size-4 shrink-0" aria-hidden="true" />}
       </div>
       {error && <p className="text-sm font-bold">{error}</p>}
       <div className="space-y-2">

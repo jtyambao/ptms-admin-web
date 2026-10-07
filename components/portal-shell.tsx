@@ -9,6 +9,7 @@ import {
   Moon,
   PhoneCall,
   Settings,
+  Siren,
   Sun,
   User,
   Users,
@@ -59,13 +60,16 @@ const links = [
   // default), which it is everywhere until someone deliberately flips it
   // for testing.
   { href: '/calls', label: 'Calls', icon: PhoneCall, active: 'calls' as const },
+  // SOS receiver console (2026-10-07) - same always-shown-nav/gate-inside-
+  // page convention; the page says "not available for this role" itself.
+  { href: '/sos', label: 'SOS', icon: Siren, active: 'sos' as const },
 ];
 export function PortalShell({
   active,
   children,
   siteName,
 }: {
-  active: 'dashboard' | 'sites' | 'accounts' | 'settings' | 'account' | 'calls';
+  active: 'dashboard' | 'sites' | 'accounts' | 'settings' | 'account' | 'calls' | 'sos';
   children: ReactNode;
   siteName?: string;
 }) {

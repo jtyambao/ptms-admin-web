@@ -637,6 +637,11 @@ export type SosAlertEntry = {
   resolved_at: string | null;
   personnel_name: string | null;
   site_name: string | null;
+  // GET /sos-alerts joins these on existing columns (2026-10-07);
+  // resolution_note exists after backend sql/053.
+  acknowledged_by_name?: string | null;
+  cancelled_by_name?: string | null;
+  resolution_note?: string | null;
 };
 
 // Special Check Requests create page (branch release/dry-run-ops) —

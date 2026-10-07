@@ -105,6 +105,11 @@ export const managementApi = {
   // unchanged. `reason` matches CancelSosAlertDto.reason (optional).
   acknowledgeSos: (api: AuthenticatedApiClient, id: number) =>
     api.request<SosAlertEntry>(`/sos-alerts/${id}/acknowledge`, { method: 'POST' }),
+  // Staff Resolve with an optional note (2026-10-07, backend sql/053).
+  resolveSos: (api: AuthenticatedApiClient, id: number, note?: string) =>
+    api.request<SosAlertEntry>(`/sos-alerts/${id}/resolve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(note ? { note } : {}),
+    }),
   cancelSos: (api: AuthenticatedApiClient, id: number, reason?: string) =>
     api.request<SosAlertEntry>(`/sos-alerts/${id}/cancel`, {
       method: 'POST',

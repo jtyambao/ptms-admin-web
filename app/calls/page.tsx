@@ -350,6 +350,17 @@ function CallsShell() {
     });
   }, [client, activeCall, incomingInvite, dialing, ringtone]);
 
+  // /calls?siteId=N (the SOS console's "Call the Site" button) preselects
+  // that Site once the list has loaded - once only, so it never fights the
+  // dispatcher's own choice afterwards.
+  const preselected = useRef(false);
+  useEffect(() => {
+    if (preselected.current || sites.length === 0) return;
+    preselected.current = true;
+    const wanted = Number(new URLSearchParams(window.location.search).get('siteId'));
+    if (wanted && sites.some((site) => site.siteId === wanted)) setDialSiteId(wanted);
+  }, [sites]);
+
   useEffect(() => () => ringtone.dispose(), [ringtone]);
 
   function enableSound() {
