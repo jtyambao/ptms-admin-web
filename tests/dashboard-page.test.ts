@@ -16,27 +16,17 @@ test('1. Dashboard no longer depends on the undeployed summary endpoint', () => 
   assert.doesNotMatch(source, /managementApi\.[a-zA-Z]*[Ss]ummary/);
 });
 
-test('2. Each per-Site metric loads and renders independently — one failing metric never blocks the others', () => {
+test('2. Per-Site cards load only what the Today tiles above do not already show (patrols + phones), each independently', () => {
   assert.match(source, /managementApi\.listSites\(session\.api\)/);
-  assert.match(source, /managementApi\.getStaffing\(session\.api, siteId\)/);
   assert.match(source, /managementApi\.getRoundStatus\(session\.api, siteId\)/);
-  assert.match(source, /managementApi\.listMissedCheckpoints\(session\.api, siteId\)/);
   assert.match(source, /managementApi\.listDevices\(session\.api, siteId\)/);
-  assert.match(source, /managementApi\.listIncidents\(session\.api\)/);
-  assert.match(source, /managementApi\.listSosAlerts\(session\.api\)/);
-  // Six independent .then/.catch chains inside SiteStatusCard's effect —
-  // a rejection in one can never throw out of the effect and skip the rest.
+  // Missed checkpoints, SOS, incidents and OIC moved to the Today tiles
+  // (components/dashboard-overview.tsx) - no duplicate per-Site copies.
+  assert.doesNotMatch(source, /listMissedCheckpoints|listIncidents|listSosAlerts|getStaffing/);
   const cardStart = source.indexOf('function SiteStatusCard');
   const cardEnd = source.indexOf('\nfunction Tile');
   const cardBody = source.slice(cardStart, cardEnd);
-  const catchCount = (cardBody.match(/\.catch\(\(reason\) => \{/g) ?? []).length;
-  assert.equal(catchCount, 6);
-});
-
-test('3. An unavailable/skipped metric never renders a fabricated zero — shows a plain role note instead', () => {
-  assert.match(source, /skipped\?/);
-  assert.match(source, /Not available to your role\./);
-  assert.doesNotMatch(source, /kind: 'loaded', data: 0/);
+  assert.equal((cardBody.match(/\.catch\(\(reason\) => \{/g) ?? []).length, 2);
 });
 
 test('4/5. Errors render the real ApiRequestError message, distinct from skipped/empty', () => {
@@ -52,15 +42,6 @@ test('6. A Site with no Sites assigned renders an explicit empty message, not an
 test('7. Site scope comes only from what the backend actually returns — no client-side organizationId or siteId override', () => {
   assert.doesNotMatch(source, /organizationId/);
   assert.match(source, /canViewSitesOverview\(role\)/);
-});
-
-test('8. Incidents/SOS "today"/"active" counts are derived from real widget data, never hardcoded', () => {
-  assert.match(source, /data\.filter\(\(i\) => i\.site_id === siteId && isToday\(i\.occurred_at\)\)\.length/);
-  assert.match(source, /data\.filter\(\(a\) => a\.site_id === siteId && \(a\.status === 'active' \|\| a\.status === 'acknowledged'\)\)\.length/);
-});
-
-test('9. Missed-today count is computed client-side from missed_at, same "today = viewer\'s local day" convention as isToday elsewhere', () => {
-  assert.match(source, /missed\.data\.filter\(\(m\) => isToday\(m\.missed_at\)\)\.length/);
 });
 
 test('10. Patrol status reads patrol_operations_active straight off the already-fetched Site row, not a second redundant call', () => {

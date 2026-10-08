@@ -4,12 +4,9 @@ import {
   Building2,
   Clock,
   Lock,
-  PhoneCall,
   RefreshCw,
-  ShieldAlert,
   ShieldCheck,
   Smartphone,
-  UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,9 +19,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { ApiRequestError } from '@/lib/authenticated-api';
-import { canRespondToSos, canViewIncidents, canViewSitesOverview, deviceOnlineStatus, isToday } from '@/lib/dashboard';
+import { canViewSitesOverview, deviceOnlineStatus } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
-import type { MissedCheckpointTap, RoundStatus, Site, SiteDevice, StaffingStatus, UserRole } from '@/lib/ptms-api';
+import type { RoundStatus, Site, SiteDevice, UserRole } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
 // P2 Dashboard redesign (branch feat/admin-oic-management) — replaces
@@ -144,48 +141,20 @@ function Failed({ message }: { message: string }) {
 function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
   const session = useSession();
 
-  const [staffing, setStaffing] = useState<Widget<StaffingStatus>>({ kind: 'loading' });
   const [roundStatus, setRoundStatus] = useState<Widget<RoundStatus>>({ kind: 'loading' });
-  const [missed, setMissed] = useState<Widget<MissedCheckpointTap[]>>({ kind: 'loading' });
   const [devices, setDevices] = useState<Widget<SiteDevice[]>>({ kind: 'loading' });
-  const [incidentsToday, setIncidentsToday] = useState<Widget<number>>({ kind: 'loading' });
-  const [activeSos, setActiveSos] = useState<Widget<number>>({ kind: 'loading' });
 
   useEffect(() => {
     let active = true;
     const siteId = site.id;
 
-    managementApi.getStaffing(session.api, siteId)
-      .then((data) => { if (active) setStaffing({ kind: 'loaded', data }); })
-      .catch((reason) => { if (active) setStaffing({ kind: 'error', message: errorMessage(reason) }); });
-
     managementApi.getRoundStatus(session.api, siteId)
       .then((data) => { if (active) setRoundStatus({ kind: 'loaded', data }); })
       .catch((reason) => { if (active) setRoundStatus({ kind: 'error', message: errorMessage(reason) }); });
 
-    managementApi.listMissedCheckpoints(session.api, siteId)
-      .then((data) => { if (active) setMissed({ kind: 'loaded', data }); })
-      .catch((reason) => { if (active) setMissed({ kind: 'error', message: errorMessage(reason) }); });
-
     managementApi.listDevices(session.api, siteId)
       .then((data) => { if (active) setDevices({ kind: 'loaded', data }); })
       .catch((reason) => { if (active) setDevices({ kind: 'error', message: errorMessage(reason) }); });
-
-    if (role && canViewIncidents(role)) {
-      managementApi.listIncidents(session.api)
-        .then((data) => { if (active) setIncidentsToday({ kind: 'loaded', data: data.filter((i) => i.site_id === siteId && isToday(i.occurred_at)).length }); })
-        .catch((reason) => { if (active) setIncidentsToday({ kind: 'error', message: errorMessage(reason) }); });
-    } else {
-      setIncidentsToday({ kind: 'skipped', reason: 'Not available to your role.' });
-    }
-
-    if (role && canRespondToSos(role)) {
-      managementApi.listSosAlerts(session.api)
-        .then((data) => { if (active) setActiveSos({ kind: 'loaded', data: data.filter((a) => a.site_id === siteId && (a.status === 'active' || a.status === 'acknowledged')).length }); })
-        .catch((reason) => { if (active) setActiveSos({ kind: 'error', message: errorMessage(reason) }); });
-    } else {
-      setActiveSos({ kind: 'skipped', reason: 'Not available to your role.' });
-    }
 
     return () => { active = false; };
   }, [session.api, site.id, role]);
@@ -210,7 +179,7 @@ function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Tile
             icon={ShieldCheck}
             label="Patrols"
@@ -223,35 +192,6 @@ function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
                   : 'No patrol scheduled'
                 : roundStatus.kind === 'loading' ? 'Loading…' : null
             }
-          />
-          <Tile
-            icon={ShieldAlert}
-            label="Missed checkpoints today"
-            value={missed.kind === 'loaded' ? String(missed.data.filter((m) => isToday(m.missed_at)).length) : missed.kind === 'loading' ? '…' : '—'}
-            valueClassName={missed.kind === 'loaded' && missed.data.some((m) => isToday(m.missed_at)) ? 'text-amber-700 dark:text-amber-400' : undefined}
-            error={missed.kind === 'error' ? missed.message : undefined}
-          />
-          <Tile
-            icon={PhoneCall}
-            label="SOS alerts now"
-            value={activeSos.kind === 'loaded' ? String(activeSos.data) : activeSos.kind === 'skipped' ? '—' : activeSos.kind === 'loading' ? '…' : '—'}
-            valueClassName={activeSos.kind === 'loaded' && activeSos.data > 0 ? 'text-red-700 dark:text-red-400' : undefined}
-            skipped={activeSos.kind === 'skipped' ? activeSos.reason : undefined}
-            error={activeSos.kind === 'error' ? activeSos.message : undefined}
-          />
-          <Tile
-            icon={AlertTriangle}
-            label="Incidents today"
-            value={incidentsToday.kind === 'loaded' ? String(incidentsToday.data) : incidentsToday.kind === 'skipped' ? '—' : incidentsToday.kind === 'loading' ? '…' : '—'}
-            valueClassName={incidentsToday.kind === 'loaded' && incidentsToday.data > 0 ? 'text-amber-700 dark:text-amber-400' : undefined}
-            skipped={incidentsToday.kind === 'skipped' ? incidentsToday.reason : undefined}
-            error={incidentsToday.kind === 'error' ? incidentsToday.message : undefined}
-          />
-          <Tile
-            icon={UserRound}
-            label="Officer in Charge"
-            value={staffing.kind === 'loaded' ? (staffing.data.oic?.full_name ?? 'Not chosen yet') : staffing.kind === 'loading' ? '…' : '—'}
-            error={staffing.kind === 'error' ? staffing.message : undefined}
           />
           <Tile
             icon={Smartphone}
