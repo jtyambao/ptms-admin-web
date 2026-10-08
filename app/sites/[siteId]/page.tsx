@@ -25,6 +25,7 @@ import { SiteHierarchyPanel } from '@/components/site-hierarchy-panel';
 import { SitePersonnelPanel } from '@/components/site-personnel-panel';
 import { SiteOperationsPanel } from '@/components/site-operations-panel';
 import { SiteRoundsPanel } from '@/components/site-rounds-panel';
+import { SiteCheckpointScansPanel } from '@/components/site-checkpoint-scans-panel';
 import { SitePatrolActivationToggle } from '@/components/site-patrol-activation-toggle';
 import { SiteShiftBriefingPanel } from '@/components/site-shift-briefing-panel';
 import { SiteEmergencyContactsPanel } from '@/components/site-emergency-contacts-panel';
@@ -525,6 +526,7 @@ export default function SiteDetailPage() {
                 <TabsContent value="patrols" className="mt-6">
                   {section === 'checkpoints' && <SiteOperationsPanel siteId={siteId} section="checkpoints" />}
                   {section === 'rounds' && <SiteRoundsPanel siteId={siteId} />}
+                  {section === 'scans' && <SiteCheckpointScansPanel siteId={siteId} />}
                 </TabsContent>
                 <TabsContent value="handover" className="mt-6">
                   {section === 'briefing' && <SiteShiftBriefingPanel siteId={siteId} />}

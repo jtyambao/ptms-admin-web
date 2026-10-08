@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SITE_GROUPS, groupOf, sectionFromTab } from '../lib/site-tabs.ts';
 
-test('the Site page groups ten parts into five tabs, and every part is reachable', () => {
+test('the Site page groups eleven parts into five tabs, and every part is reachable', () => {
   assert.equal(SITE_GROUPS.length, 5);
   const sections = SITE_GROUPS.flatMap((group) => group.items.map((item) => item.section));
-  assert.equal(new Set(sections).size, 10);
+  assert.equal(new Set(sections).size, 11);
 });
 
 test('old section ids and group ids both work as ?tab= deep links', () => {

@@ -22,6 +22,7 @@ import type {
   DashboardSummary,
   Incident,
   ManagedRound,
+  CheckpointScanPage,
   SaveRoundRequest,
   RoundStatus,
   MissedCheckpointTap,
@@ -309,6 +310,23 @@ export const managementApi = {
   // listRoundsForRequester/createRoundForRequester/updateRoundForRequester/
   // deactivateRoundForRequester), reusing SiteOperationalAccessService for
   // authorization exactly like the checkpoints/NFC endpoints above.
+  // Checkpoint Scans: what was tapped at a Site, newest first, with photos.
+  // from/to are calendar dates (YYYY-MM-DD) in the organization's timezone;
+  // both omitted means today. At most 31 days; limit 1-100 (default 50).
+  listCheckpointScans: (
+    api: AuthenticatedApiClient,
+    siteId: number,
+    params: { from?: string; to?: string; checkpointId?: number; limit?: number; offset?: number } = {},
+  ) => {
+    const query = new URLSearchParams();
+    if (params.from) query.set('from', params.from);
+    if (params.to) query.set('to', params.to);
+    if (params.checkpointId !== undefined) query.set('checkpointId', String(params.checkpointId));
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    const suffix = query.toString() ? `?${query}` : '';
+    return api.request<CheckpointScanPage>(`/sites/${siteId}/checkpoint-visits${suffix}`);
+  },
   listRounds: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<ManagedRound[]>(`/sites/${siteId}/rounds`),
   createRound: (api: AuthenticatedApiClient, siteId: number, body: SaveRoundRequest) =>

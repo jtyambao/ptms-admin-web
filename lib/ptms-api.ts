@@ -362,6 +362,32 @@ export type RoundStop = {
   checkpoint_status?: string;
 };
 
+// Staff "Checkpoint Scans" (GET /sites/:siteId/checkpoint-visits, 2026-10-08).
+export type CheckpointScan = {
+  id: number;
+  visited_at: string;
+  checkpoint_id: number;
+  checkpoint_name: string;
+  round_name: string | null;
+  is_late: boolean;
+  remarks: string | null;
+  // Short-lived signed link (about 5 minutes); null when there is no photo.
+  photo_view_url: string | null;
+  personnel_name: string | null;
+  oic_name: string | null;
+  synced_from_offline: boolean;
+};
+
+export type CheckpointScanPage = {
+  items: CheckpointScan[];
+  total: number;
+  limit: number;
+  offset: number;
+  from: string;
+  to: string;
+  timezone: string;
+};
+
 export type ManagedRound = {
   id: number;
   organization_id: number;

@@ -11,6 +11,7 @@ export type SiteSection =
   | 'devices'
   | 'checkpoints'
   | 'rounds'
+  | 'scans'
   | 'briefing'
   | 'emergency-contacts'
   | 'reports'
@@ -41,6 +42,7 @@ export const SITE_GROUPS: SiteGroup[] = [
     items: [
       { section: 'checkpoints', label: 'Checkpoints' },
       { section: 'rounds', label: 'Rounds' },
+      { section: 'scans', label: 'Scans' },
     ],
   },
   {
