@@ -1,11 +1,11 @@
 'use client';
 
-import { AlertTriangle, Camera, ChevronLeft, ChevronRight, ExternalLink, ImageOff, Nfc, RefreshCw, UserRound } from 'lucide-react';
+import { AlertTriangle, ImageOff, Nfc, RefreshCw, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExpandableText, Section } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PhotoViewer, type ViewerPhoto } from '@/components/photo-viewer';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { addDays, scanRange, scanTimeLabel, type ScanPreset } from '@/lib/checkpoint-scans';
 import { managementApi } from '@/lib/management-api';
@@ -44,7 +44,6 @@ export function SiteCheckpointScansPanel({ siteId }: { siteId: number }) {
   const [error, setError] = useState('');
   const [loadedAt, setLoadedAt] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [photoFailed, setPhotoFailed] = useState(false);
   const requestId = useRef(0);
 
   const range = useMemo(() => scanRange(preset, today, customFrom, customTo), [preset, today, customFrom, customTo]);
@@ -77,7 +76,6 @@ export function SiteCheckpointScansPanel({ siteId }: { siteId: number }) {
         if (!range.from && !today) setToday(page.to);
         setLoadedAt(Date.now());
         setError('');
-        setPhotoFailed(false);
       } catch (reason) {
         if (mine !== requestId.current) return;
         setError(reason instanceof ApiRequestError ? reason.message : 'The scans could not be loaded. Check your connection and try again.');
@@ -114,37 +112,25 @@ export function SiteCheckpointScansPanel({ siteId }: { siteId: number }) {
     }
   }
 
-  const photoIndexes = useMemo(() => items.map((item, index) => (item.photo_view_url ? index : -1)).filter((index) => index >= 0), [items]);
+  // The photos only (in list order) - the viewer steps through these.
+  const photoItems = useMemo(() => items.filter((item) => item.photo_view_url), [items]);
+  const viewerPhotos: ViewerPhoto[] = useMemo(
+    () => photoItems.map((item) => ({
+      url: item.photo_view_url as string,
+      title: item.checkpoint_name,
+      subtitle: `${scanTimeLabel(item.visited_at, timezone, true)}${item.round_name ? ` · ${item.round_name}` : ''}`,
+      note: item.remarks,
+    })),
+    [photoItems, timezone],
+  );
 
-  function openViewer(index: number) {
-    setPhotoFailed(false);
-    setViewerIndex(index);
+  function openViewer(scan: CheckpointScan) {
+    setViewerIndex(photoItems.findIndex((item) => item.id === scan.id));
     // Signed links last ~5 minutes: refresh quietly if this list is old.
     if (Date.now() - loadedAt > STALE_LINK_MS) void reload(items.length);
   }
 
-  function step(direction: 1 | -1) {
-    if (viewerIndex === null) return;
-    const position = photoIndexes.indexOf(viewerIndex);
-    const next = photoIndexes[position + direction];
-    if (next !== undefined) { setPhotoFailed(false); setViewerIndex(next); }
-  }
-
-  useEffect(() => {
-    if (viewerIndex === null) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'ArrowRight') step(1);
-      else if (event.key === 'ArrowLeft') step(-1);
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewerIndex, photoIndexes]);
-
-  const touchStartX = useRef<number | null>(null);
   const multiDay = rangeLabel.from !== '' && rangeLabel.from !== rangeLabel.to;
-  const viewing = viewerIndex !== null ? items[viewerIndex] : null;
-  const viewerPosition = viewerIndex !== null ? photoIndexes.indexOf(viewerIndex) : -1;
   const remaining = Math.max(0, total - items.length);
   const dayLabel = rangeLabel.from
     ? multiDay ? `${prettyDay(rangeLabel.from)} to ${prettyDay(rangeLabel.to)}` : prettyDay(rangeLabel.from)
@@ -230,13 +216,13 @@ export function SiteCheckpointScansPanel({ siteId }: { siteId: number }) {
           </div>
         ) : (
           <ul className="divide-y">
-            {items.map((scan, index) => (
+            {items.map((scan) => (
               <li className="flex gap-3 p-4" key={scan.id}>
                 {scan.photo_view_url ? (
                   <button
                     aria-label={`View photo from ${scan.checkpoint_name}`}
                     className="group relative size-16 shrink-0 overflow-hidden rounded-xl border bg-muted sm:size-20"
-                    onClick={() => openViewer(index)}
+                    onClick={() => openViewer(scan)}
                     type="button"
                   >
                     {/* Signed, short-lived storage link - a plain img is intentional (next/image would proxy and cache it). */}
@@ -281,51 +267,7 @@ export function SiteCheckpointScansPanel({ siteId }: { siteId: number }) {
         )}
       </div>
 
-      <Dialog onOpenChange={(open) => { if (!open) setViewerIndex(null); }} open={viewerIndex !== null}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Camera className="size-4" />{viewing?.checkpoint_name ?? 'Photo'}</DialogTitle>
-            <DialogDescription>
-              {viewing ? scanTimeLabel(viewing.visited_at, timezone, true) : ''}
-              {viewing?.round_name ? ` · ${viewing.round_name}` : ''}
-              {photoIndexes.length > 1 && viewerPosition >= 0 ? ` · photo ${viewerPosition + 1} of ${photoIndexes.length}` : ''}
-            </DialogDescription>
-          </DialogHeader>
-          {viewing?.photo_view_url && (
-            <div
-              className="grid place-items-center overflow-hidden rounded-xl border bg-black"
-              onTouchEnd={(event) => {
-                const start = touchStartX.current;
-                touchStartX.current = null;
-                if (start === null) return;
-                const delta = event.changedTouches[0].clientX - start;
-                if (Math.abs(delta) > 50) step(delta < 0 ? 1 : -1);
-              }}
-              onTouchStart={(event) => { touchStartX.current = event.touches[0].clientX; }}
-            >
-              {photoFailed ? (
-                <div className="grid gap-3 p-10 text-center text-sm text-white">
-                  <p>This photo link has expired.</p>
-                  <Button onClick={() => void reload(items.length)} variant="secondary">Refresh the photo</Button>
-                </div>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt={`Photo from ${viewing.checkpoint_name}`} className="max-h-[65dvh] w-auto max-w-full object-contain" onError={() => setPhotoFailed(true)} src={viewing.photo_view_url} />
-              )}
-            </div>
-          )}
-          {viewing?.remarks && <div className="text-sm"><ExpandableText text={viewing.remarks} /></div>}
-          <div className="flex items-center justify-between gap-2">
-            <Button disabled={viewerPosition <= 0} onClick={() => step(-1)} variant="outline"><ChevronLeft />Previous</Button>
-            {viewing?.photo_view_url && (
-              <a className="inline-flex items-center gap-1 text-sm font-bold text-[#e86405] hover:underline" href={viewing.photo_view_url} rel="noreferrer" target="_blank">
-                <ExternalLink className="size-4" />Open full size
-              </a>
-            )}
-            <Button disabled={viewerPosition < 0 || viewerPosition >= photoIndexes.length - 1} onClick={() => step(1)} variant="outline">Next<ChevronRight /></Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PhotoViewer index={viewerIndex} onClose={() => setViewerIndex(null)} onIndexChange={setViewerIndex} onRefresh={() => void reload(items.length)} photos={viewerPhotos} />
     </Section>
   );
 }

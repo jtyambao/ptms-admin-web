@@ -12,9 +12,10 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProtectedPortal } from '@/components/protected-portal';
 import { PortalShell } from '@/components/portal-shell';
+import { DashboardOverview } from '@/components/dashboard-overview';
 import { PageContainer, PageHeader } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,9 @@ export default function DashboardPage() {
   const [sites, setSites] = useState<Widget<Site[]>>({ kind: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Keep the tiles (and whichever detail is open) on screen while a refresh reloads the Site list.
+  const knownSites = useRef<Site[]>([]);
+  if (sites.kind === 'loaded') knownSites.current = sites.data;
 
   const load = useCallback(async () => {
     if (!role || !canViewSitesOverview(role)) {
@@ -96,6 +100,8 @@ export default function DashboardPage() {
               </Button>
             )}
           />
+
+          {knownSites.current.length > 0 && <DashboardOverview refreshKey={refreshKey} sites={knownSites.current} />}
 
           <div className="space-y-6">
             {sites.kind === 'skipped' && <SkippedCard reason={sites.reason} />}

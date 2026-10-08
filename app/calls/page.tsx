@@ -25,6 +25,7 @@ import { ApiRequestError } from '@/lib/authenticated-api';
 import { callsFeatureEnabled } from '@/lib/calls-feature';
 import { canRespondToSos } from '@/lib/dashboard';
 import { canCallSosSender, isOpenSos, parseSosCallParams } from '@/lib/sos-console';
+import { parseCallbackParams } from '@/lib/dashboard-details';
 import type { SosAlertEntry } from '@/lib/ptms-api';
 import { useCallsSocket, type CallsSocketStatus } from '@/lib/calls-socket';
 import { loadCallableSites, type CallableSite } from '@/lib/calls-contacts';
@@ -380,6 +381,9 @@ function CallsShell() {
   const [sosLoaded, setSosLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const sosAutostarted = useRef(false);
+  // "Call back" from the Dashboard call log: /calls?siteId=S&targetSiteDeviceId=D&autostart=1 dials once.
+  const [callbackCtx] = useState(() => (typeof window === 'undefined' ? null : parseCallbackParams(window.location.search)));
+  const callbackAutostarted = useRef(false);
   const canRespond = canRespondToSos(session.user?.role ?? 'auditor');
 
   const [incomingInvite, setIncomingInvite] = useState<IncomingInvite | null>(null);
@@ -507,6 +511,14 @@ function CallsShell() {
     void placeCall();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sosCtx, status, client, activeCall, dialing, incomingInvite, dialSiteId]);
+
+  useEffect(() => {
+    if (!callbackCtx || callbackAutostarted.current) return;
+    if (status !== 'registered' || !client || activeCall || dialing || incomingInvite) return;
+    callbackAutostarted.current = true;
+    void dial(callbackCtx.siteId, callbackCtx.callType, callbackCtx.targetSiteDeviceId !== null ? { targetSiteDeviceId: callbackCtx.targetSiteDeviceId } : undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callbackCtx, status, client, activeCall, dialing, incomingInvite]);
 
   function enableSound() {
     void ringtone.enableSound().then(() => setSoundEnabled(true));

@@ -23,6 +23,9 @@ import type {
   Incident,
   ManagedRound,
   CheckpointScanPage,
+  RoundsDayHistory,
+  SiteLatestPhoto,
+  StaffCallHistoryPage,
   SaveRoundRequest,
   RoundStatus,
   MissedCheckpointTap,
@@ -326,6 +329,24 @@ export const managementApi = {
     if (params.offset !== undefined) query.set('offset', String(params.offset));
     const suffix = query.toString() ? `?${query}` : '';
     return api.request<CheckpointScanPage>(`/sites/${siteId}/checkpoint-visits${suffix}`);
+  },
+  // Dashboard details (2026-10-08). date is a calendar day (YYYY-MM-DD) in the
+  // organization's timezone; omitted means today. summary=true returns counts only.
+  roundsHistory: (api: AuthenticatedApiClient, siteId: number, params: { date?: string; summary?: boolean } = {}) => {
+    const query = new URLSearchParams();
+    if (params.date) query.set('date', params.date);
+    if (params.summary) query.set('summary', '1');
+    const suffix = query.toString() ? `?${query}` : '';
+    return api.request<RoundsDayHistory>(`/sites/${siteId}/rounds/history${suffix}`);
+  },
+  latestSitePhoto: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<SiteLatestPhoto | null>(`/sites/${siteId}/latest-photo`),
+  listStaffCalls: (api: AuthenticatedApiClient, siteId: number, params: { date?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams({ siteId: String(siteId) });
+    if (params.date) query.set('date', params.date);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    return api.request<StaffCallHistoryPage>(`/calls/history?${query}`);
   },
   listRounds: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<ManagedRound[]>(`/sites/${siteId}/rounds`),

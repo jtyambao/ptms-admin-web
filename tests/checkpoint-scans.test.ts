@@ -66,14 +66,17 @@ test('the panel: Today / Yesterday / Last 7 days / Pick dates, a checkpoint filt
   assert.match(panel, /When a guard taps a checkpoint tag with the Guard app, it shows up here with the photo\./);
 });
 
-test('the photo viewer has next/previous (buttons, arrow keys, swipe), full-size link, and survives expired links', () => {
-  assert.match(panel, /ChevronLeft/);
-  assert.match(panel, /event\.key === 'ArrowRight'/);
-  assert.match(panel, /onTouchEnd/);
-  assert.match(panel, /Open full size/);
+test('the shared photo viewer has next/previous (buttons, arrow keys, swipe), full-size link, and survives expired links', () => {
+  const viewer = readFileSync('components/photo-viewer.tsx', 'utf8');
+  assert.match(viewer, /ChevronLeft/);
+  assert.match(viewer, /event\.key === 'ArrowRight'/);
+  assert.match(viewer, /onTouchEnd/);
+  assert.match(viewer, /Open full size/);
+  assert.match(viewer, /This photo link has expired\./);
+  assert.match(viewer, /onError=\{\(\) => setPhotoFailed\(true\)\}/);
+  // The Scans panel uses it, and still reloads a stale list before opening a photo.
+  assert.match(panel, /<PhotoViewer/);
   assert.match(panel, /STALE_LINK_MS/);
-  assert.match(panel, /This photo link has expired\./);
-  assert.match(panel, /onError=\{\(\) => setPhotoFailed\(true\)\}/);
 });
 
 test('the panel uses the layout standard and never stores the signed photo links', () => {

@@ -362,6 +362,72 @@ export type RoundStop = {
   checkpoint_status?: string;
 };
 
+// Dashboard details (2026-10-08).
+export type RoundsDayVisit = {
+  id: number;
+  visited_at: string;
+  checkpoint_id: number;
+  checkpoint_name: string;
+  is_late: boolean;
+  remarks: string | null;
+  photo_view_url: string | null;
+};
+export type RoundsDayEvent = {
+  id: number;
+  revealed_at: string;
+  status: 'pending' | 'acknowledged' | 'failed' | 'completed';
+  round_id: number;
+  round_name: string;
+  oic_name: string | null;
+  any_late: boolean;
+  visits: RoundsDayVisit[];
+};
+export type RoundsDayMissed = {
+  id: number;
+  missed_at: string;
+  checkpoint_id: number;
+  checkpoint_name: string;
+  round_name: string | null;
+  oic_name: string | null;
+  state: 'open' | 'caught_up' | 'catch_up_planned';
+  resolved_at: string | null;
+  late_reason: string | null;
+};
+export type RoundsDayHistory = {
+  date: string;
+  timezone: string;
+  summary: { completed: number; failed: number; in_progress: number; missed: number; missed_open: number };
+  events: RoundsDayEvent[];
+  missed: RoundsDayMissed[];
+};
+export type SiteLatestPhoto = {
+  source: 'checkpoint_scan' | 'lone_worker_checkin' | 'special_request';
+  label: string;
+  taken_at: string;
+  photo_view_url: string | null;
+};
+export type StaffCallEntry = {
+  call_id: string;
+  call_type: 'voice' | 'video';
+  // 'outgoing' = Admin Web called the Site; 'incoming' = a guard phone called Admin Web.
+  direction: 'outgoing' | 'incoming';
+  outcome: 'answered' | 'no_answer' | 'declined' | 'cancelled' | 'ringing';
+  started_at: string;
+  ended_at: string | null;
+  site_device_id: number | null;
+  device_label: string | null;
+  is_primary: boolean | null;
+  devices_rung: number;
+};
+export type StaffCallHistoryPage = {
+  items: StaffCallEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+  date: string;
+  timezone: string;
+};
+
 // Staff "Checkpoint Scans" (GET /sites/:siteId/checkpoint-visits, 2026-10-08).
 export type CheckpointScan = {
   id: number;
@@ -584,6 +650,8 @@ export type Incident = {
   occurred_at: string;
   acknowledged_at: string | null;
   resolved_at: string | null;
+  // Signed, short-lived photo link (staff list, 2026-10-08); null when there is no photo.
+  photo_view_url?: string | null;
 };
 
 // Reports page (branch release/dry-run-ops) — read-only, per-Site,
