@@ -42,7 +42,7 @@ function Thumb({ url, label, onClick }: { url: string | null; label: string; onC
 
 // ---- one day of rounds + missed checkpoints for each Site (cached for a short while) ----
 const dayCache = new Map<string, { at: number; value: RoundsDayHistory }>();
-const CACHE_MS = 30_000;
+const CACHE_MS = 20_000; // shorter than the dashboard's 30s auto-refresh, so an open detail updates too
 
 function useDayHistory(sites: Site[], day: string | null) {
   const session = useSession();

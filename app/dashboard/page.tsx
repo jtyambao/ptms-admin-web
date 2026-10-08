@@ -44,6 +44,8 @@ function errorMessage(reason: unknown): string {
   return reason instanceof ApiRequestError ? reason.message : 'This could not be loaded.';
 }
 
+const AUTO_REFRESH_MS = 30_000;
+
 export default function DashboardPage() {
   const session = useSession();
   const role = session.user?.role ?? null;
@@ -60,7 +62,8 @@ export default function DashboardPage() {
       setSites({ kind: 'skipped', reason: 'Your role does not include the Sites overview.' });
       return;
     }
-    setSites({ kind: 'loading' });
+    // Keep showing the current data during a refresh (no flicker).
+    setSites((current) => (current.kind === 'loaded' ? current : { kind: 'loading' }));
     try {
       setSites({ kind: 'loaded', data: await managementApi.listSites(session.api) });
     } catch (reason) {
@@ -82,6 +85,21 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.status]);
 
+  // Auto-refresh while the page is open and visible: every 30 seconds, and
+  // right away when the tab comes back into view. Paused in a hidden tab.
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  useEffect(() => {
+    if (!refreshing && refreshKey > 0) setUpdatedAt(new Date());
+  }, [refreshing, refreshKey]);
+  useEffect(() => {
+    if (session.status !== 'authenticated') return;
+    const tick = () => { if (!document.hidden) void refresh(); };
+    const timer = window.setInterval(tick, AUTO_REFRESH_MS);
+    const onVisible = () => { if (!document.hidden) void refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [session.status, refresh]);
+
   return (
     <ProtectedPortal>
       <PortalShell active="dashboard">
@@ -89,7 +107,7 @@ export default function DashboardPage() {
           <PageHeader
             eyebrow="Right now"
             title="Operations"
-            subtitle="How each of your Sites is doing at the moment."
+            subtitle={updatedAt ? `How your Sites are doing. Updates on its own every 30 seconds · last ${updatedAt.toLocaleTimeString()}` : 'How your Sites are doing. Updates on its own every 30 seconds.'}
             actions={(
               <Button variant="outline" onClick={() => void refresh()} disabled={refreshing}>
                 <RefreshCw className={refreshing ? 'animate-spin' : ''} />
@@ -108,7 +126,7 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground">You have no Sites yet. Ask the Owner or Engineer to give you access.</p>
             )}
             {sites.kind === 'loaded' && sites.data.map((site) => (
-              <SiteStatusCard key={`${site.id}-${refreshKey}`} site={site} role={role} />
+              <SiteStatusCard key={site.id} site={site} role={role} refreshKey={refreshKey} />
             ))}
           </div>
         </PageContainer>
@@ -138,7 +156,7 @@ function Failed({ message }: { message: string }) {
   );
 }
 
-function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
+function SiteStatusCard({ site, role, refreshKey }: { site: Site; role: UserRole | null; refreshKey: number }) {
   const session = useSession();
 
   const [roundStatus, setRoundStatus] = useState<Widget<RoundStatus>>({ kind: 'loading' });
@@ -157,7 +175,7 @@ function SiteStatusCard({ site, role }: { site: Site; role: UserRole | null }) {
       .catch((reason) => { if (active) setDevices({ kind: 'error', message: errorMessage(reason) }); });
 
     return () => { active = false; };
-  }, [session.api, site.id, role]);
+  }, [session.api, site.id, role, refreshKey]);
 
   const activeDevices = devices.kind === 'loaded' ? devices.data.filter((d) => d.is_active) : [];
   const mostRecentDeviceActivity = activeDevices
