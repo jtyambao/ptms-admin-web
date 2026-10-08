@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ImageOff, Phone, PhoneCall, Smartphone, UserRound } from 'lucide-react';
+import { ImageOff, Phone, PhoneCall, Smartphone, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Disclosure, ExpandableText, ShowMore, useShowMore } from '@/components/page-layout';
@@ -77,7 +77,6 @@ export function RoundsDetail({ sites, day, timezone, onPhotos }: { sites: Site[]
   );
   const failed = perSite.reduce((sum, { history }) => sum + history.summary.failed, 0);
   const more = useShowMore(events, 5, 10);
-  const [openId, setOpenId] = useState<number | null>(null);
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   return (
@@ -91,43 +90,35 @@ export function RoundsDetail({ sites, day, timezone, onPhotos }: { sites: Site[]
         <div className="overflow-hidden rounded-xl border">
           <ul className="divide-y">
             {more.visible.map(({ site, event }) => {
-              const open = openId === event.id;
               const photos: ViewerPhoto[] = event.visits.filter((v) => v.photo_view_url).map((v) => ({
                 url: v.photo_view_url as string, title: v.checkpoint_name, subtitle: `${scanTimeLabel(v.visited_at, timezone, true)} · ${event.round_name}`, note: v.remarks,
               }));
               return (
-                <li className="p-4" key={event.id}>
-                  <button className="flex w-full items-start gap-3 text-left" onClick={() => setOpenId(open ? null : event.id)} type="button">
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-black">{event.round_name}</p>
-                        {event.any_late ? <Badge variant="destructive">Late</Badge> : <Badge variant="secondary">On time</Badge>}
-                      </div>
-                      <p className="text-sm font-bold tabular-nums">{scanTimeLabel(event.revealed_at, timezone, false)} · {site.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {event.oic_name ? `OIC on duty: ${event.oic_name} · ` : ''}{event.visits.length} {event.visits.length === 1 ? 'scan' : 'scans'}
-                      </p>
+                <li className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start" key={event.id}>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-black">{event.round_name}</p>
+                      {event.any_late ? <Badge variant="destructive">Late</Badge> : <Badge variant="secondary">On time</Badge>}
                     </div>
-                    <ChevronDown className={`mt-1 size-4 shrink-0 transition ${open ? 'rotate-180' : ''}`} />
-                  </button>
-                  {open && (
-                    <ul className="mt-3 space-y-2">
-                      {event.visits.length === 0 && <li className="text-sm text-muted-foreground">No scans were recorded for this round.</li>}
-                      {event.visits.map((visit) => {
-                        const photoIndex = photos.findIndex((p) => p.url === visit.photo_view_url);
-                        return (
-                          <li className="flex items-center gap-3" key={visit.id}>
-                            <Thumb label={`View photo from ${visit.checkpoint_name}`} onClick={() => onPhotos(photos, photoIndex)} url={visit.photo_view_url} />
-                            <div className="min-w-0 text-sm">
-                              <p className="font-bold">{visit.checkpoint_name} {visit.is_late && <Badge className="ml-1" variant="destructive">Late</Badge>}</p>
-                              <p className="text-xs text-muted-foreground tabular-nums">{scanTimeLabel(visit.visited_at, timezone, false)}</p>
-                              {visit.remarks && <div className="text-xs"><ExpandableText text={visit.remarks} /></div>}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                    <p className="text-sm font-bold tabular-nums">{scanTimeLabel(event.revealed_at, timezone, false)} · {site.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {event.oic_name ? `OIC on duty: ${event.oic_name} · ` : ""}{event.visits.length} {event.visits.length === 1 ? "scan" : "scans"}
+                    </p>
+                  </div>
+                  {/* Scan photos shown straight away on the right - tap one to open the viewer. */}
+                  <div className="flex flex-wrap gap-2 sm:justify-end">
+                    {event.visits.length === 0 && <p className="text-xs text-muted-foreground">No scans recorded.</p>}
+                    {event.visits.map((visit) => {
+                      const photoIndex = photos.findIndex((p) => p.url === visit.photo_view_url);
+                      return (
+                        <div className="flex w-20 flex-col items-center text-center" key={visit.id}>
+                          <Thumb label={`View photo from ${visit.checkpoint_name}`} onClick={() => onPhotos(photos, photoIndex)} url={visit.photo_view_url} />
+                          <p className="mt-1 truncate text-[11px] font-bold" title={visit.checkpoint_name}>{visit.checkpoint_name}</p>
+                          <p className="text-[11px] text-muted-foreground tabular-nums">{scanTimeLabel(visit.visited_at, timezone, false)}{visit.is_late ? " · Late" : ""}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </li>
               );
             })}
