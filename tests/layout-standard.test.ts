@@ -36,7 +36,7 @@ test('long lists are limited with Show more instead of rendering everything', ()
     ['components/site-hierarchy-panel.tsx', /useShowMore\(items, 5, 10\)/],
     ['components/site-operations-panel.tsx', /checkpointMore = useShowMore/],
     ['components/site-personnel-panel.tsx', /personnelMore = useShowMore/],
-    ['components/site-rounds-panel.tsx', /roundsMore = useShowMore\(rounds, 5, 10\)/],
+    ['components/site-rounds-panel.tsx', /roundsMore = useShowMore\(shownRounds, 5, 10\)/],
     ['app/calls/page.tsx', /missedMore = useShowMore\(missedCalls, 5, 10\)/],
     ['app/accounts/page.tsx', /usersMore = useShowMore/],
     ['app/sites/page.tsx', /sitesMore = useShowMore/],

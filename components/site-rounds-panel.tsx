@@ -413,7 +413,16 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
     finally { setSaving(false); }
   }
 
-  const roundsMore = useShowMore(rounds, 5, 10);
+  // Active rounds in one tab, everything else (deleted, or past its Date
+  // Thru) in History - both newest first.
+  const [roundsTab, setRoundsTab] = useState<'active' | 'history'>('active');
+  const todayLocal = new Date().toLocaleDateString('en-CA');
+  const isCurrent = (round: ManagedRound) => round.is_active && !(round.active_thru && round.active_thru < todayLocal);
+  const newestFirst = (a: ManagedRound, b: ManagedRound) => b.id - a.id;
+  const activeRounds = rounds.filter(isCurrent).sort(newestFirst);
+  const historyRounds = rounds.filter((round) => !isCurrent(round)).sort(newestFirst);
+  const shownRounds = roundsTab === 'active' ? activeRounds : historyRounds;
+  const roundsMore = useShowMore(shownRounds, 5, 10);
 
   if (!canView) {
     return (
@@ -478,13 +487,33 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
       )}
 
       <div className="rounded-2xl border bg-card">
+        <div className="flex gap-1 border-b p-2" role="tablist" aria-label="Rounds">
+          {([['active', `Active (${activeRounds.length})`], ['history', `History (${historyRounds.length})`]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={roundsTab === key}
+              onClick={() => setRoundsTab(key)}
+              className={`rounded-lg px-4 py-2 text-sm font-bold ${roundsTab === key ? 'bg-[#f36f0a] text-white' : 'text-muted-foreground hover:bg-muted'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {loading ? (
           <p className="p-8 text-center text-sm text-muted-foreground">Loading rounds…</p>
-        ) : rounds.length === 0 ? (
+        ) : shownRounds.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground">
             <Route className="mx-auto" />
-            <p className="mt-3 font-bold text-foreground">No rounds yet</p>
-            <p className="mt-1 text-sm">Add a round to set which checkpoints guards visit and how often. Add the checkpoints first if you have not yet.</p>
+            {roundsTab === 'active' ? (
+              <>
+                <p className="mt-3 font-bold text-foreground">No active rounds</p>
+                <p className="mt-1 text-sm">Add a round to set which checkpoints guards visit and how often. Add the checkpoints first if you have not yet.</p>
+              </>
+            ) : (
+              <p className="mt-3 font-bold text-foreground">No past rounds yet</p>
+            )}
           </div>
         ) : (
           <div className="divide-y">
@@ -496,7 +525,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-bold">{round.name}</p>
-                        <Badge variant={round.is_active ? 'secondary' : 'outline'}>{round.is_active ? 'Active' : 'Inactive'}</Badge>
+                        <Badge variant={isCurrent(round) ? 'secondary' : 'outline'}>{isCurrent(round) ? 'Active' : round.is_active ? 'Ended' : 'Deleted'}</Badge>
                         <Badge variant="outline">{frequencyBadgeLabel(round.due_interval_minutes)}</Badge>
                         {formatTiming(round).map((part) => <Badge key={part} variant="outline">{part}</Badge>)}
                         {hasInactiveStop && (
@@ -513,7 +542,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                         ))}
                       </ol>
                     </div>
-                    {canManage && round.is_active && (
+                    {canManage && round.is_active && roundsTab === 'active' && (
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={() => openEdit(round)}>Edit</Button>
                         <Button variant="destructive" onClick={() => setDeactivateTarget(round)}>Delete</Button>
