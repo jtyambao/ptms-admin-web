@@ -489,6 +489,11 @@ function CallsShell() {
   }, [sites]);
 
   useEffect(() => () => ringtone.dispose(), [ringtone]);
+  // Safety net: the ringtone only ever plays while an incoming call is
+  // actually shown, so it can't keep ringing after the invite is gone.
+  useEffect(() => {
+    if (!incomingInvite) ringtone.stop();
+  }, [incomingInvite, ringtone]);
 
   // autostart=1: dial the SOS sender once, as soon as the connection is ready
   // and the alert is known and still open. Never repeats (redial is a button).
