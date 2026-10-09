@@ -368,6 +368,9 @@ export const managementApi = {
   // this client sends one anyway for consistency; the endpoint ignores it.
   getRoundStatus: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<RoundStatus>(`/checkpoint-rounds/site/${siteId}/status`),
+  // The exact number the Guard app's "Checkpoints Done" pill shows (same endpoint).
+  checkpointsDoneToday: (api: AuthenticatedApiClient, siteId: number) =>
+    api.request<{ count: number }>(`/checkpoint-visits/today-count?siteId=${siteId}`).then((r) => r.count),
 
   // Batch 2 — Emergency Contacts. GET is genuinely unauthenticated at the
   // backend (guard-facing). Edit/delete added 2026-10-07 (soft delete).

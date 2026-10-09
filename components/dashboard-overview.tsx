@@ -34,6 +34,7 @@ export function DashboardOverview({ sites, refreshKey }: { sites: Site[]; refres
   const [selected, setSelected] = useState<TileId | null>(null);
   const [viewer, setViewer] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null);
   const [summaries, setSummaries] = useState<Loaded<{ perSite: { site: Site; history: RoundsDayHistory }[] }>>({ state: 'loading' });
+  const [guardCounters, setGuardCounters] = useState<{ done: number; missed: number } | null>(null);
   const [staffing, setStaffing] = useState<Record<number, StaffingStatus>>({});
   const [sos, setSos] = useState<Loaded<SosAlertEntry[]>>(canSos ? { state: 'loading' } : { state: 'unavailable', reason: 'Not available to your role.' });
   const [calls, setCalls] = useState<Loaded<SiteCalls[]>>({ state: 'loading' });
@@ -66,6 +67,22 @@ export function DashboardOverview({ sites, refreshKey }: { sites: Site[]; refres
           ? { state: 'ready', data: { perSite } }
           : { state: 'unavailable', reason: 'Rounds could not be loaded.' });
       });
+
+    // The two counters the Guard app shows, read from the same endpoints so
+    // both screens always agree: Checkpoints Done and Missed Checkpoints.
+    Promise.allSettled(sites.map(async (site) => {
+      const [done, status] = await Promise.all([
+        managementApi.checkpointsDoneToday(api, site.id),
+        managementApi.getRoundStatus(api, site.id),
+      ]);
+      return { done, missed: status.missedCount };
+    })).then((results) => {
+      if (!active) return;
+      const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+      setGuardCounters(ok.length > 0
+        ? { done: ok.reduce((sum, c) => sum + c.done, 0), missed: ok.reduce((sum, c) => sum + c.missed, 0) }
+        : null);
+    });
 
     Promise.allSettled(sites.map((site) => managementApi.getStaffing(api, site.id).then((data) => [site.id, data] as const)))
       .then((results) => {
@@ -121,16 +138,16 @@ export function DashboardOverview({ sites, refreshKey }: { sites: Site[]; refres
 
   const tiles: { id: TileId; label: string; icon: ComponentType<{ className?: string }>; value: string; note: string | null; tone?: 'alert' | 'ok'; hidden?: boolean }[] = [
     {
-      id: 'rounds', label: 'Rounds completed today', icon: ClipboardCheck,
-      value: totals ? String(totals.completed) : '…',
-      note: totals ? (totals.failed > 0 ? `${totals.failed} missed` : 'None missed') : null,
-      tone: totals && totals.failed > 0 ? 'alert' : 'ok',
+      id: 'rounds', label: 'Checkpoints done', icon: ClipboardCheck,
+      value: guardCounters ? String(guardCounters.done) : '…',
+      note: totals ? `${totals.completed} round${totals.completed === 1 ? '' : 's'} finished today` : null,
+      tone: 'ok',
     },
     {
-      id: 'missed', label: 'Missed checkpoints today', icon: ShieldAlert,
-      value: totals ? String(totals.missed) : '…',
-      note: totals ? (totals.missed_open > 0 ? `${totals.missed_open} still open` : 'All caught up') : null,
-      tone: totals && totals.missed_open > 0 ? 'alert' : 'ok',
+      id: 'missed', label: 'Missed checkpoints', icon: ShieldAlert,
+      value: guardCounters ? String(guardCounters.missed) : '…',
+      note: guardCounters ? (guardCounters.missed > 0 ? 'Not yet caught up today' : 'None today') : null,
+      tone: guardCounters && guardCounters.missed > 0 ? 'alert' : 'ok',
     },
     {
       id: 'sos', label: 'SOS right now', icon: Siren, hidden: !canSos,

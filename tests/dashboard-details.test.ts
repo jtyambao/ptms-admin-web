@@ -76,7 +76,7 @@ test('API wrappers: rounds history (summary/date), latest photo, and the staff c
 });
 
 test('the six tiles open their detail BELOW the tiles, one at a time, and hide what the role cannot see', () => {
-  for (const label of ['Rounds completed today', 'Missed checkpoints today', 'SOS right now', 'Officer in Charge', 'Reports today', 'Calls today']) {
+  for (const label of ['Checkpoints done', 'Missed checkpoints', 'SOS right now', 'Officer in Charge', 'Reports today', 'Calls today']) {
     assert.ok(overview.includes(label), label);
   }
   assert.match(overview, /aria-expanded=\{open\}/);

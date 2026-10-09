@@ -137,12 +137,22 @@ export function MissedDetail({ sites, day, timezone }: { sites: Site[]; day: str
     () => perSite.flatMap(({ site, history }) => history.missed.map((item) => ({ site, item }))).sort((a, b) => (a.item.missed_at < b.item.missed_at ? 1 : -1)),
     [perSite],
   );
-  const more = useShowMore(missed, 5, 10);
+  // Default list = the same set the Guard app counts (not yet caught up);
+  // caught-up ones are one tap away.
+  const [showCaughtUp, setShowCaughtUp] = useState(false);
+  const caughtUp = missed.filter(({ item }) => item.state === 'caught_up').length;
+  const shown = showCaughtUp ? missed : missed.filter(({ item }) => item.state !== 'caught_up');
+  const more = useShowMore(shown, 5, 10);
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   return (
     <div className="space-y-3">
       {error && <p className="text-xs text-red-700 dark:text-red-400">Some Sites could not be loaded.</p>}
-      {missed.length === 0 ? <Note>No checkpoints were missed today.</Note> : (
+      {caughtUp > 0 && (
+        <button className="text-sm font-bold text-[#e86405] hover:underline" onClick={() => setShowCaughtUp((v) => !v)} type="button">
+          {showCaughtUp ? 'Hide caught-up ones' : `Also show ${caughtUp} caught up`}
+        </button>
+      )}
+      {shown.length === 0 ? <Note>{missed.length === 0 ? 'No checkpoints were missed today.' : 'Every missed checkpoint today has been caught up.'}</Note> : (
         <div className="overflow-hidden rounded-xl border">
           <ul className="divide-y">
             {more.visible.map(({ site, item }) => (
