@@ -25,6 +25,7 @@ import type {
   CheckpointScanPage,
   RoundsDayHistory,
   SiteLatestPhoto,
+  SiteCheckInPage,
   StaffCallHistoryPage,
   SaveRoundRequest,
   RoundStatus,
@@ -341,6 +342,17 @@ export const managementApi = {
   },
   latestSitePhoto: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<SiteLatestPhoto | null>(`/sites/${siteId}/latest-photo`),
+  // The guard in charge's shift-start Check-In selfies for a Site, newest first.
+  // from/to are calendar days in the organization's timezone; omitted means the last 7 days.
+  listSiteCheckIns: (api: AuthenticatedApiClient, siteId: number, params: { from?: string; to?: string; limit?: number; offset?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.from) query.set('from', params.from);
+    if (params.to) query.set('to', params.to);
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    const suffix = query.toString() ? `?${query}` : '';
+    return api.request<SiteCheckInPage>(`/sites/${siteId}/check-ins${suffix}`);
+  },
   listStaffCalls: (api: AuthenticatedApiClient, siteId: number, params: { date?: string; limit?: number; offset?: number } = {}) => {
     const query = new URLSearchParams({ siteId: String(siteId) });
     if (params.date) query.set('date', params.date);

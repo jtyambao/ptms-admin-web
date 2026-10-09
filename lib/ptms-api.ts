@@ -400,6 +400,24 @@ export type RoundsDayHistory = {
   events: RoundsDayEvent[];
   missed: RoundsDayMissed[];
 };
+// Staff Check-In history (GET /sites/:siteId/check-ins, 2026-10-08): the guard
+// in charge's shift-start Check-In selfie, newest first.
+export type SiteCheckIn = {
+  id: number;
+  checked_in_at: string;
+  photo_view_url: string | null;
+  // The Officer in Charge on record at that moment (a check-in stores no personnel link).
+  oic_name: string | null;
+};
+export type SiteCheckInPage = {
+  items: SiteCheckIn[];
+  total: number;
+  limit: number;
+  offset: number;
+  from: string;
+  to: string;
+  timezone: string;
+};
 export type SiteLatestPhoto = {
   source: 'checkpoint_scan' | 'lone_worker_checkin' | 'special_request';
   label: string;

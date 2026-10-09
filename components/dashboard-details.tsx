@@ -16,7 +16,7 @@ import {
 } from '@/lib/dashboard-details';
 import { managementApi } from '@/lib/management-api';
 import { callSenderUrl, canCallSosSender, isOpenSos } from '@/lib/sos-console';
-import type { CheckpointScan, RoundsDayHistory, Site, SiteDevice, SiteLatestPhoto, SosAlertEntry, StaffCallEntry, StaffingStatus } from '@/lib/ptms-api';
+import type { CheckpointScan, RoundsDayHistory, Site, SiteDevice, SiteCheckIn, SosAlertEntry, StaffCallEntry, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
 // The detail sections under the Dashboard's tiles (2026-10-08). Plain
@@ -296,12 +296,13 @@ export function SosDetail({ alerts, day, timezone, onChanged, unavailable }: { a
 // ---------------- 4. Officer in Charge ----------------
 export function OicDetail({ sites, staffing, timezone, onPhotos }: { sites: Site[]; staffing: Record<number, StaffingStatus>; timezone: string; onPhotos: OpenPhotos }) {
   const session = useSession();
-  const [photos, setPhotos] = useState<Record<number, SiteLatestPhoto | null>>({});
+  // undefined = still loading, null = could not be loaded, [] = no Check-In in the last 7 days.
+  const [checkIns, setCheckIns] = useState<Record<number, SiteCheckIn[] | null>>({});
   const [devices, setDevices] = useState<Record<number, SiteDevice[] | null>>({});
   useEffect(() => {
     let active = true;
     for (const site of sites) {
-      managementApi.latestSitePhoto(session.api, site.id).then((photo) => { if (active) setPhotos((cur) => ({ ...cur, [site.id]: photo })); }).catch(() => { if (active) setPhotos((cur) => ({ ...cur, [site.id]: null })); });
+      managementApi.listSiteCheckIns(session.api, site.id, { limit: 50 }).then((page) => { if (active) setCheckIns((cur) => ({ ...cur, [site.id]: page.items })); }).catch(() => { if (active) setCheckIns((cur) => ({ ...cur, [site.id]: null })); });
       managementApi.listDevices(session.api, site.id).then((rows) => { if (active) setDevices((cur) => ({ ...cur, [site.id]: rows })); }).catch(() => { if (active) setDevices((cur) => ({ ...cur, [site.id]: null })); });
     }
     return () => { active = false; };
@@ -309,48 +310,93 @@ export function OicDetail({ sites, staffing, timezone, onPhotos }: { sites: Site
   const more = useShowMore(sites, 5, 10);
   return (
     <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">The photo is the Check-In selfie the guard in charge takes in the Guard app when the shift starts.</p>
       <ul className="divide-y overflow-hidden rounded-xl border">
-        {more.visible.map((site) => {
-          const oic = staffing[site.id]?.oic ?? null;
-          const photo = photos[site.id];
-          const rows = (devices[site.id] ?? []).filter((d) => d.is_active);
-          const main = rows.find((d) => d.is_primary);
-          const backups = rows.filter((d) => !d.is_primary);
-          return (
-            <li className="flex gap-3 p-4" key={site.id}>
-              <div className="shrink-0">
-                {photo?.photo_view_url ? (
-                  <button
-                    aria-label={`View the latest photo from ${site.name}`}
-                    className="size-20 overflow-hidden rounded-xl border bg-muted"
-                    onClick={() => onPhotos([{ url: photo.photo_view_url as string, title: site.name, subtitle: `${photo.label} · ${scanTimeLabel(photo.taken_at, timezone, true)}` }], 0)}
-                    type="button"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" className="size-full object-cover" loading="lazy" src={photo.photo_view_url} />
-                  </button>
-                ) : (
-                  <div className="grid size-20 place-items-center rounded-xl border border-dashed text-muted-foreground" title="No photo yet"><UserRound className="size-6" /></div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{site.name}</p>
-                <p className="font-black">{oic ? oic.full_name : 'No Officer in Charge chosen'}</p>
-                {oic && <p className="text-xs text-muted-foreground">On duty since {scanTimeLabel(oic.started_at, timezone, true)}</p>}
-                <p className="text-xs text-muted-foreground">
-                  {photo ? `Latest photo from this Site: ${photo.label}, ${scanTimeLabel(photo.taken_at, timezone, true)}` : photo === null ? 'No photo has been sent from this Site yet.' : 'Looking for a photo…'}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <PhoneChip label="Main phone" device={main} />
-                  {backups.length > 0 ? backups.map((d) => <PhoneChip device={d} key={d.id} label="Backup phone" />) : <PhoneChip device={undefined} label="Backup phone" />}
-                </div>
-              </div>
-            </li>
-          );
-        })}
+        {more.visible.map((site) => (
+          <OicSiteCard checkIns={checkIns[site.id]} devices={devices[site.id]} key={site.id} onPhotos={onPhotos} oic={staffing[site.id]?.oic ?? null} site={site} timezone={timezone} />
+        ))}
       </ul>
       <ShowMore onClick={more.showMore} remaining={more.remaining} step={more.step} />
     </div>
+  );
+}
+
+function OicSiteCard({ site, oic, checkIns, devices, timezone, onPhotos }: {
+  site: Site;
+  oic: StaffingStatus['oic'];
+  checkIns: SiteCheckIn[] | null | undefined;
+  devices: SiteDevice[] | null | undefined;
+  timezone: string;
+  onPhotos: OpenPhotos;
+}) {
+  const history = useMemo(() => checkIns ?? [], [checkIns]);
+  const latest = history[0] ?? null;
+  const more = useShowMore(history, 5, 10);
+  const viewerPhotos: ViewerPhoto[] = useMemo(
+    () => history.filter((item) => item.photo_view_url).map((item) => ({
+      url: item.photo_view_url as string,
+      title: site.name,
+      subtitle: `Check-in · ${scanTimeLabel(item.checked_in_at, timezone, true)}${item.oic_name ? ` · ${item.oic_name}` : ''}`,
+    })),
+    [history, site.name, timezone],
+  );
+  const rows = (devices ?? []).filter((d) => d.is_active);
+  const main = rows.find((d) => d.is_primary);
+  const backups = rows.filter((d) => !d.is_primary);
+  return (
+    <li className="space-y-3 p-4">
+      <div className="flex gap-3">
+        <div className="shrink-0">
+          {latest?.photo_view_url ? (
+            <button
+              aria-label={`View the latest Check-In photo from ${site.name}`}
+              className="size-20 overflow-hidden rounded-xl border bg-muted"
+              onClick={() => onPhotos(viewerPhotos, 0)}
+              type="button"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="" className="size-full object-cover" loading="lazy" src={latest.photo_view_url} />
+            </button>
+          ) : (
+            <div className="grid size-20 place-items-center rounded-xl border border-dashed text-muted-foreground" title="No Check-In photo yet"><UserRound className="size-6" /></div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{site.name}</p>
+          <p className="font-black">{oic ? oic.full_name : 'No Officer in Charge chosen'}</p>
+          {oic && <p className="text-xs text-muted-foreground">On duty since {scanTimeLabel(oic.started_at, timezone, true)}</p>}
+          <p className="text-xs text-muted-foreground">
+            {checkIns === undefined ? 'Looking for the latest Check-In…'
+              : checkIns === null ? 'The Check-Ins could not be loaded.'
+                : latest ? `Checked in by guard in charge · ${scanTimeLabel(latest.checked_in_at, timezone, true)}`
+                  : 'No Check-In in the last 7 days.'}
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <PhoneChip label="Main phone" device={main} />
+            {backups.length > 0 ? backups.map((d) => <PhoneChip device={d} key={d.id} label="Backup phone" />) : <PhoneChip device={undefined} label="Backup phone" />}
+          </div>
+        </div>
+      </div>
+      <Disclosure count={history.length} title="Check-in history">
+        {history.length === 0 ? <p className="p-4 text-sm text-muted-foreground">No Check-Ins in the last 7 days.</p> : (
+          <ul className="divide-y">
+            {more.visible.map((item) => {
+              const photoIndex = viewerPhotos.findIndex((p) => p.url === item.photo_view_url);
+              return (
+                <li className="flex items-center gap-3 p-3" key={item.id}>
+                  <Thumb label={`View Check-In photo from ${scanTimeLabel(item.checked_in_at, timezone, true)}`} onClick={() => onPhotos(viewerPhotos, photoIndex)} url={item.photo_view_url} />
+                  <div className="min-w-0 text-sm">
+                    <p className="font-bold tabular-nums">{scanTimeLabel(item.checked_in_at, timezone, true)}</p>
+                    <p className="text-xs text-muted-foreground">{item.oic_name ? `Officer in Charge: ${item.oic_name}` : 'Officer in Charge not recorded'}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <ShowMore onClick={more.showMore} remaining={more.remaining} step={more.step} />
+      </Disclosure>
+    </li>
   );
 }
 

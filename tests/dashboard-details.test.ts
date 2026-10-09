@@ -94,9 +94,23 @@ test('details: lists are capped with Show more, photos open the shared viewer, S
   assert.match(details, /Call sender now/);
   assert.match(details, /Closed today/);
   assert.match(details, /Call back/);
-  assert.match(details, /Latest photo from this Site/);
+  assert.match(details, /Checked in by guard in charge/);
+  assert.match(details, /<Disclosure count=\{history\.length\} title="Check-in history">/);
+  assert.doesNotMatch(details, /latestSitePhoto/);
   assert.match(details, /No Officer in Charge chosen/);
   assert.match(details, /Main phone/);
   assert.match(details, /Backup phone/);
   assert.match(details, /status === 'completed'/);
+});
+
+test('the Officer in Charge tile uses the shift-start Check-In (GET /sites/:id/check-ins), not a generic Site photo', async () => {
+  const paths: string[] = [];
+  const api = { request: async (path: string) => { paths.push(path); return {}; } } as never;
+  await managementApi.listSiteCheckIns(api, 4, { limit: 50 });
+  await managementApi.listSiteCheckIns(api, 4, { from: '2026-10-01', to: '2026-10-03', limit: 5, offset: 5 });
+  assert.deepEqual(paths, ['/sites/4/check-ins?limit=50', '/sites/4/check-ins?from=2026-10-01&to=2026-10-03&limit=5&offset=5']);
+  assert.match(details, /listSiteCheckIns\(session\.api, site\.id, \{ limit: 50 \}\)/);
+  assert.match(details, /The photo is the Check-In selfie the guard in charge takes in the Guard app when the shift starts\./);
+  assert.match(details, /No Check-In in the last 7 days\./);
+  assert.match(details, /useShowMore\(history, 5, 10\)/);
 });
