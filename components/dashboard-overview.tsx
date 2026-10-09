@@ -3,9 +3,9 @@
 import { AlertTriangle, ClipboardCheck, FileText, PhoneCall, ShieldAlert, Siren, UserRound, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
 import { PhotoViewer, type ViewerPhoto } from '@/components/photo-viewer';
-import { Panel } from '@/components/page-layout';
+import { Disclosure, Panel } from '@/components/page-layout';
 import {
-  CallsDetail, MissedDetail, OicDetail, ReportsDetail, RoundsDetail, SosDetail,
+  CallsDetail, CheckpointsDoneDetail, MissedDetail, OicDetail, ReportsDetail, RoundsDetail, SosDetail,
 } from '@/components/dashboard-details';
 import { canRespondToSos, canViewIncidents } from '@/lib/dashboard';
 import {
@@ -210,7 +210,14 @@ export function DashboardOverview({ sites, refreshKey }: { sites: Site[]; refres
           {summaries.state === 'unavailable' && (selected === 'rounds' || selected === 'missed') && (
             <p className="mb-3 flex gap-2 text-sm text-red-700 dark:text-red-400" role="alert"><AlertTriangle className="size-4 shrink-0" />{summaries.reason}</p>
           )}
-          {selected === 'rounds' && <RoundsDetail day={day} onPhotos={(photos, index) => setViewer({ photos, index })} sites={sites} timezone={timezone} />}
+          {selected === 'rounds' && (
+            <div className="space-y-6">
+              <CheckpointsDoneDetail onPhotos={(photos, index) => setViewer({ photos, index })} sites={sites} />
+              <Disclosure title="Rounds finished today">
+                <RoundsDetail day={day} onPhotos={(photos, index) => setViewer({ photos, index })} sites={sites} timezone={timezone} />
+              </Disclosure>
+            </div>
+          )}
           {selected === 'missed' && <MissedDetail day={day} sites={sites} timezone={timezone} />}
           {selected === 'sos' && <SosDetail alerts={sos.state === 'ready' ? sos.data : []} day={day} onChanged={loadSos} timezone={timezone} unavailable={sos.state === 'unavailable' ? sos.reason : null} />}
           {selected === 'oic' && <OicDetail onPhotos={(photos, index) => setViewer({ photos, index })} sites={sites} staffing={staffing} timezone={timezone} />}

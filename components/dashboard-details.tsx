@@ -16,7 +16,7 @@ import {
 } from '@/lib/dashboard-details';
 import { managementApi } from '@/lib/management-api';
 import { callSenderUrl, canCallSosSender, isOpenSos } from '@/lib/sos-console';
-import type { RoundsDayHistory, Site, SiteDevice, SiteLatestPhoto, SosAlertEntry, StaffCallEntry, StaffingStatus } from '@/lib/ptms-api';
+import type { CheckpointScan, RoundsDayHistory, Site, SiteDevice, SiteLatestPhoto, SosAlertEntry, StaffCallEntry, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
 // The detail sections under the Dashboard's tiles (2026-10-08). Plain
@@ -64,6 +64,62 @@ function useDayHistory(sites: Site[], day: string | null) {
     return () => { active = false; };
   }, [session.api, sites, day]);
   return state;
+}
+
+// ---------------- 1a. Checkpoints done today ----------------
+// Every checkpoint tapped today (the same set the Guard app's "Checkpoints
+// Done" counts), newest first, with the photo on the right.
+export function CheckpointsDoneDetail({ sites, onPhotos }: { sites: Site[]; onPhotos: OpenPhotos }) {
+  const session = useSession();
+  const [state, setState] = useState<{ loading: boolean; error: boolean; scans: { site: Site; scan: CheckpointScan }[]; timezone: string }>({ loading: true, error: false, scans: [], timezone: 'Asia/Manila' });
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled(sites.map((site) => managementApi.listCheckpointScans(session.api, site.id, { limit: 100 }).then((page) => ({ site, page })))).then((results) => {
+      if (!active) return;
+      const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+      const scans = ok.flatMap(({ site, page }) => page.items.map((scan) => ({ site, scan }))).sort((a, b) => (a.scan.visited_at < b.scan.visited_at ? 1 : -1));
+      setState({ loading: false, error: results.some((r) => r.status === 'rejected'), scans, timezone: ok[0]?.page.timezone ?? 'Asia/Manila' });
+    });
+    return () => { active = false; };
+  }, [session.api, sites]);
+  const more = useShowMore(state.scans, 10, 10);
+  const photos: ViewerPhoto[] = state.scans.filter(({ scan }) => scan.photo_view_url).map(({ site, scan }) => ({
+    url: scan.photo_view_url as string, title: scan.checkpoint_name, subtitle: `${scanTimeLabel(scan.visited_at, state.timezone, true)} · ${site.name}`, note: scan.remarks,
+  }));
+
+  if (state.loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  return (
+    <div className="space-y-3">
+      {state.error && <p className="text-xs text-red-700 dark:text-red-400">Some Sites could not be loaded.</p>}
+      <p className="text-sm text-muted-foreground">
+        {state.scans.length === 0 ? 'No checkpoints tapped yet today.' : `${state.scans.length} checkpoint${state.scans.length === 1 ? '' : 's'} tapped today, newest first.`}
+      </p>
+      {state.scans.length > 0 && (
+        <div className="overflow-hidden rounded-xl border">
+          <ul className="divide-y">
+            {more.visible.map(({ site, scan }) => (
+              <li className="flex items-start gap-3 p-4" key={`${site.id}-${scan.id}`}>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-black">{scan.checkpoint_name}</p>
+                    {scan.round_name ? (scan.is_late ? <Badge variant="destructive">Late</Badge> : <Badge variant="secondary">On time</Badge>) : null}
+                  </div>
+                  <p className="text-sm font-bold tabular-nums">{scanTimeLabel(scan.visited_at, state.timezone, false)} · {site.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scan.round_name ? `Round: ${scan.round_name}` : 'Not part of a round'}
+                    {scan.oic_name ? ` · OIC on duty: ${scan.oic_name}` : ''}
+                  </p>
+                  {scan.remarks && <div className="text-xs"><ExpandableText text={scan.remarks} /></div>}
+                </div>
+                <Thumb label={`View photo from ${scan.checkpoint_name}`} onClick={() => onPhotos(photos, photos.findIndex((p) => p.url === scan.photo_view_url))} url={scan.photo_view_url} />
+              </li>
+            ))}
+          </ul>
+          <ShowMore onClick={more.showMore} remaining={more.remaining} step={more.step} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------- 1. Rounds completed today ----------------
