@@ -258,6 +258,10 @@ export const managementApi = {
     }),
   deactivatePersonnel: (api: AuthenticatedApiClient, id: number) =>
     api.request<Personnel>(`/personnel/${id}/deactivate`, { method: 'PATCH' }),
+  renamePersonnel: (api: AuthenticatedApiClient, id: number, fullName: string) =>
+    api.request<Personnel>(`/personnel/${id}/name`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fullName }),
+    }),
   // No request body: the server generates the replacement MPIN. It is
   // present exactly once, on this response — never requested or displayed
   // again afterward.

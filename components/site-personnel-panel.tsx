@@ -68,6 +68,8 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
   const [makeOicNow, setMakeOicNow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<Personnel | null>(null);
+  const [renameTarget, setRenameTarget] = useState<Personnel | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const [showDeleted, setShowDeleted] = useState(false);
   const [regenerateTarget, setRegenerateTarget] = useState<Personnel | null>(null);
   // The one-time plaintext MPIN, held only in memory for as long as its
@@ -195,6 +197,25 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
             ? reason.message
             : genericError,
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function renamePersonnel(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!renameTarget || !renameValue.trim()) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      await managementApi.renamePersonnel(session.api, renameTarget.id, renameValue.trim());
+      setRenameTarget(null);
+      await refreshPersonnel();
+      onStaffingChange(await managementApi.getStaffing(session.api, siteId));
+      setSuccess('Name updated.');
+    } catch (reason) {
+      setError(reason instanceof ApiRequestError ? reason.message : genericError);
     } finally {
       setSaving(false);
     }
@@ -435,6 +456,9 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
                       {/* "Reset PIN" is not offered yet: it needs a backend route
                           that is not deployed. Hidden rather than shown dead (UI
                           pass 2026-10-07); the confirm dialogs below stay wired. */}
+                      <Button variant="outline" onClick={() => { setRenameTarget(person); setRenameValue(person.full_name); }}>
+                        Edit name
+                      </Button>
                       <Button variant="destructive" onClick={() => setDeactivateTarget(person)}>
                         <UserRoundX /> Delete
                       </Button>
@@ -523,6 +547,27 @@ export function SitePersonnelPanel({ siteId, staffing, onStaffingChange }: Props
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!renameTarget} onOpenChange={(open) => { if (!open) setRenameTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit name</DialogTitle>
+            <DialogDescription>Correct the guard&apos;s name. Their PIN and records stay the same.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={renamePersonnel} className="grid gap-4">
+            <label htmlFor="rename-personnel" className="grid gap-2 font-bold">
+              Full name
+              <Input id="rename-personnel" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} maxLength={150} required autoFocus />
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRenameTarget(null)}>Cancel</Button>
+              <Button type="submit" disabled={saving || !renameValue.trim() || renameValue.trim() === renameTarget?.full_name}>
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deactivateTarget} onOpenChange={(open) => { if (!open) setDeactivateTarget(null); }}>
         <AlertDialogContent>
