@@ -33,6 +33,12 @@ function when(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString() : '';
 }
 
+// datetime-local value (local time) for a Date.
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   const session = useSession();
   const role = session.user?.role ?? null;
@@ -51,6 +57,8 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   const [urgent, setUrgent] = useState(false);
   const [neededBy, setNeededBy] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
+  // Spot requests: how long the guard has, counted from when it is shown.
+  const [allowMinutes, setAllowMinutes] = useState('30');
   const [picked, setPicked] = useState<number[]>([]);
 
   const activeCheckpoints = checkpoints.filter((c) => c.status === 'active');
@@ -77,7 +85,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   }, [refresh]);
 
   function openCreate(next: Mode) {
-    setTitle(''); setInstructions(''); setUrgent(false); setNeededBy(''); setScheduledAt(''); setPicked([]); setError(''); setMode(next);
+    setTitle(''); setInstructions(''); setUrgent(false); setNeededBy(''); setScheduledAt(''); setAllowMinutes('30'); setPicked([]); setError(''); setMode(next);
   }
 
   function togglePick(id: number) {
@@ -89,7 +97,13 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
     if (!mode || !title.trim()) return;
     // Only a spot request can be scheduled; empty = send now.
     const schedule = mode === 'spot_visit' ? scheduledAt : '';
-    const problem = scheduleProblem(schedule, neededBy);
+    // A spot request expires "Time allowed" after it is shown (the scheduled
+    // time, or now); a normal request uses its own optional Needed by.
+    const spotDeadline = mode === 'spot_visit' && allowMinutes !== 'none'
+      ? new Date((schedule ? new Date(schedule).getTime() : Date.now()) + Number(allowMinutes) * 60_000)
+      : null;
+    const deadlineIso = mode === 'spot_visit' ? spotDeadline?.toISOString() : neededBy ? new Date(neededBy).toISOString() : undefined;
+    const problem = scheduleProblem(schedule, spotDeadline ? toLocalInput(spotDeadline) : mode === 'spot_visit' ? '' : neededBy);
     if (problem) { setError(problem); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
@@ -98,7 +112,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
         title: title.trim(),
         ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
         priority: urgent ? 'urgent' : 'normal',
-        ...(neededBy ? { neededBy: new Date(neededBy).toISOString() } : {}),
+        ...(deadlineIso ? { neededBy: deadlineIso } : {}),
         type: mode,
         ...(mode === 'spot_visit' && picked.length > 0 ? { checkpointIds: picked } : {}),
         ...(schedule ? { scheduledAt: new Date(schedule).toISOString() } : {}),
@@ -228,15 +242,32 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                 More details <span className="font-normal text-muted-foreground">(optional)</span>
                 <Textarea id="scr-instructions" rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} maxLength={1000} />
               </label>
-              <label htmlFor="scr-needed" className="grid gap-2 font-bold">
-                Needed by <span className="font-normal text-muted-foreground">(optional - it expires after this time)</span>
-                <Input id="scr-needed" type="datetime-local" value={neededBy} onChange={(e) => setNeededBy(e.target.value)} />
-              </label>
-              {mode === 'spot_visit' && (
-                <label htmlFor="scr-scheduled" className="grid gap-2 font-bold">
-                  Show to the guard at <span className="font-normal text-muted-foreground">(optional - leave empty to send now)</span>
-                  <Input id="scr-scheduled" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-                  {scheduledAt && <span className="text-xs font-normal text-muted-foreground">The guard will not see or be alerted about this request until then.</span>}
+              {mode === 'spot_visit' ? (
+                <>
+                  <label htmlFor="scr-scheduled" className="grid gap-2 font-bold">
+                    When should the guard do this? <span className="font-normal text-muted-foreground">(leave empty for right now)</span>
+                    <Input id="scr-scheduled" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {scheduledAt
+                        ? 'The guard will not see it or get an alert until this time.'
+                        : 'The guard gets it and is alerted right away.'}
+                    </span>
+                  </label>
+                  <label htmlFor="scr-allow" className="grid gap-2 font-bold">
+                    Time allowed to finish
+                    <select id="scr-allow" className="h-10 rounded-lg border bg-background px-3 font-normal" value={allowMinutes} onChange={(e) => setAllowMinutes(e.target.value)}>
+                      <option value="15">15 minutes</option>
+                      <option value="30">30 minutes</option>
+                      <option value="60">1 hour</option>
+                      <option value="120">2 hours</option>
+                      <option value="none">No time limit</option>
+                    </select>
+                  </label>
+                </>
+              ) : (
+                <label htmlFor="scr-needed" className="grid gap-2 font-bold">
+                  Needed by <span className="font-normal text-muted-foreground">(optional - it expires after this time)</span>
+                  <Input id="scr-needed" type="datetime-local" value={neededBy} onChange={(e) => setNeededBy(e.target.value)} />
                 </label>
               )}
               <label className="flex items-center gap-3 text-sm font-bold">

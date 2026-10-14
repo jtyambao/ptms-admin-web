@@ -63,13 +63,15 @@ test('staff list wrapper hits the JWT endpoint, not the Guard-facing unauthentic
 });
 
 // Scheduled Spot requests (2026-10-14, sql/056).
-test('Spot mode offers "Show to the guard at" (empty = send now), never for a standard request, and sends scheduledAt as ISO', () => {
-  assert.match(panel, /Show to the guard at/);
-  assert.match(panel, /optional - leave empty to send now/);
-  assert.match(panel, /\{mode === 'spot_visit' && \(\s*<label htmlFor="scr-scheduled"/);
-  assert.match(panel, /const schedule = mode === 'spot_visit' \? scheduledAt : ''/);
-  assert.match(panel, /\.\.\.\(schedule \? \{ scheduledAt: new Date\(schedule\)\.toISOString\(\) \} : \{\}\)/);
-  assert.match(panel, /Needed by/); // "Needed by" stays as the expiry
+test('Spot mode asks "When should the guard do this?" (empty = now) plus "Time allowed to finish"; a standard request keeps "Needed by"', () => {
+  assert.ok(panel.includes('When should the guard do this?'));
+  assert.ok(panel.includes('leave empty for right now'));
+  assert.ok(panel.includes('Time allowed to finish'));
+  assert.ok(panel.includes("const schedule = mode === 'spot_visit' ? scheduledAt : ''"));
+  assert.ok(panel.includes('...(schedule ? { scheduledAt: new Date(schedule).toISOString() } : {})'));
+  // The spot deadline is counted from when the guard is shown it.
+  assert.ok(panel.includes('(schedule ? new Date(schedule).getTime() : Date.now()) + Number(allowMinutes) * 60_000'));
+  assert.match(panel, /Needed by/);
 });
 
 test('a scheduled request that is not due yet reads "Scheduled for <time> — not yet shown to the guard", then the normal status', () => {
@@ -94,5 +96,5 @@ test('the form checks the schedule in plain words before sending (future, before
   assert.match(scheduleProblem('2026-10-15T09:00', '2026-10-15T09:00', now)!, /must be later than/);
   assert.match(scheduleProblem('2026-10-15T09:00', '2026-10-15T08:00', now)!, /must be later than/);
   assert.match(scheduleProblem('2026-12-31T09:00', '', now)!, /at most 30 days/);
-  assert.match(panel, /scheduleProblem\(schedule, neededBy\)/);
+  assert.ok(panel.includes('scheduleProblem(schedule, '));
 });
