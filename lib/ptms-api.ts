@@ -811,6 +811,12 @@ export type SpecialCheckRequest = {
   completed_at: string | null;
   completion_remarks: string | null;
   selfie_url: string | null;
+  created_at?: string;
+  // Scheduled Spot request (sql/056, 2026-10-14). Absent/null = shown to the guard immediately.
+  // When scheduled, sent_at equals scheduled_at (the moment it becomes visible); notified_at is
+  // when the due alert went out.
+  scheduled_at?: string | null;
+  notified_at?: string | null;
 };
 
 // Staff list row (GET /special-check-requests/site/:siteId, 2026-10-07):
@@ -819,6 +825,8 @@ export type SpecialCheckRequest = {
 export type SpecialCheckRequestDetailed = SpecialCheckRequest & {
   sender_name: string | null;
   target_checkpoints: { id: number; name: string }[];
+  // true while a scheduled request is still waiting for its time - NOT yet shown to the guard.
+  scheduled_pending?: boolean;
 };
 
 export type CreateSpecialCheckRequest = {
@@ -828,6 +836,8 @@ export type CreateSpecialCheckRequest = {
   priority?: 'normal' | 'urgent';
   neededBy?: string;
   type?: 'standard' | 'spot_visit';
+  // Spot Site Visit only (sql/056): when to show it to the guard. Omit to send now.
+  scheduledAt?: string;
   // Spot Site Visit only; the guard may scan any ONE of these (sql/054).
   checkpointIds?: number[];
 };

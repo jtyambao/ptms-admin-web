@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, BadgeCheck, ClipboardCheck, MapPin, Plus, RefreshCw, Siren } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, CalendarClock, ClipboardCheck, MapPin, Plus, RefreshCw, Siren } from 'lucide-react';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { ExpandableText, ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { canSendSpecialCheckRequest } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
-import { requestStatusLabel, requestStatusSteps } from '@/lib/special-requests';
+import { requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice } from '@/lib/special-requests';
 import type { ManagedCheckpoint, SpecialCheckRequestDetailed } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
@@ -50,6 +50,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   const [instructions, setInstructions] = useState('');
   const [urgent, setUrgent] = useState(false);
   const [neededBy, setNeededBy] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
   const [picked, setPicked] = useState<number[]>([]);
 
   const activeCheckpoints = checkpoints.filter((c) => c.status === 'active');
@@ -76,7 +77,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   }, [refresh]);
 
   function openCreate(next: Mode) {
-    setTitle(''); setInstructions(''); setUrgent(false); setNeededBy(''); setPicked([]); setError(''); setMode(next);
+    setTitle(''); setInstructions(''); setUrgent(false); setNeededBy(''); setScheduledAt(''); setPicked([]); setError(''); setMode(next);
   }
 
   function togglePick(id: number) {
@@ -86,6 +87,10 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   async function submitCreate(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!mode || !title.trim()) return;
+    // Only a spot request can be scheduled; empty = send now.
+    const schedule = mode === 'spot_visit' ? scheduledAt : '';
+    const problem = scheduleProblem(schedule, neededBy);
+    if (problem) { setError(problem); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
       await managementApi.createSpecialCheckRequest(session.api, {
@@ -96,10 +101,15 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
         ...(neededBy ? { neededBy: new Date(neededBy).toISOString() } : {}),
         type: mode,
         ...(mode === 'spot_visit' && picked.length > 0 ? { checkpointIds: picked } : {}),
+        ...(schedule ? { scheduledAt: new Date(schedule).toISOString() } : {}),
       });
       setMode(null);
       await refresh();
-      setSuccess(mode === 'spot_visit' ? 'Spot request sent. Guards at this Site will see it now.' : 'Request sent. Guards at this Site will see it now.');
+      setSuccess(
+        schedule
+          ? `Spot request scheduled. Guards at this Site will see it on ${when(new Date(schedule).toISOString())}.`
+          : mode === 'spot_visit' ? 'Spot request sent. Guards at this Site will see it now.' : 'Request sent. Guards at this Site will see it now.',
+      );
     } catch (reason) {
       setError(reason instanceof ApiRequestError ? reason.message : operationError);
     } finally { setSaving(false); }
@@ -154,13 +164,14 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
           <div className="divide-y">
             {more.visible.map((request) => {
               const steps = requestStatusSteps(request);
+              const notice = scheduledNotice(request, when);
               return (
                 <div key={request.id} className="p-5">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="min-w-0 flex-1 font-bold">{request.title}</p>
                     {request.priority === 'urgent' && <Badge variant="destructive" className="gap-1 uppercase"><Siren className="size-3" />Urgent</Badge>}
                     <Badge variant="outline">{request.type === 'spot_visit' ? 'Spot request' : 'Request'}</Badge>
-                    <Badge variant={request.status === 'completed' ? 'secondary' : 'outline'}>{requestStatusLabel(request.status)}</Badge>
+                    <Badge variant={request.status === 'completed' ? 'secondary' : 'outline'}>{requestStatusLabel(request.status, request.scheduled_pending)}</Badge>
                   </div>
                   {request.instructions && <div className="mt-2 text-sm text-muted-foreground"><ExpandableText text={request.instructions} /></div>}
                   {request.type === 'spot_visit' && (
@@ -169,6 +180,11 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                       {request.target_checkpoints?.length > 0
                         ? <>Must scan: {request.target_checkpoints.map((c) => <Badge key={c.id} variant="secondary">{c.name}</Badge>)}</>
                         : <span className="text-muted-foreground">Any checkpoint at this Site</span>}
+                    </p>
+                  )}
+                  {notice && (
+                    <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                      <CalendarClock className="size-3.5 shrink-0" />{notice}
                     </p>
                   )}
                   <ol className="mt-3 space-y-1 text-xs text-muted-foreground">
@@ -216,6 +232,13 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                 Needed by <span className="font-normal text-muted-foreground">(optional - it expires after this time)</span>
                 <Input id="scr-needed" type="datetime-local" value={neededBy} onChange={(e) => setNeededBy(e.target.value)} />
               </label>
+              {mode === 'spot_visit' && (
+                <label htmlFor="scr-scheduled" className="grid gap-2 font-bold">
+                  Show to the guard at <span className="font-normal text-muted-foreground">(optional - leave empty to send now)</span>
+                  <Input id="scr-scheduled" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+                  {scheduledAt && <span className="text-xs font-normal text-muted-foreground">The guard will not see or be alerted about this request until then.</span>}
+                </label>
+              )}
               <label className="flex items-center gap-3 text-sm font-bold">
                 <Checkbox checked={urgent} onCheckedChange={(v) => setUrgent(v === true)} />
                 Urgent
@@ -250,7 +273,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
             </div>
             <DialogFooter className="mt-5">
               <Button type="button" variant="outline" onClick={() => setMode(null)}>Cancel</Button>
-              <Button type="submit" disabled={saving || !title.trim()}>{saving ? 'Sending…' : 'Send'}</Button>
+              <Button type="submit" disabled={saving || !title.trim()}>{saving ? 'Sending…' : mode === 'spot_visit' && scheduledAt ? 'Schedule' : 'Send'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

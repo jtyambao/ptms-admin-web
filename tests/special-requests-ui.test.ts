@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { managementApi } from '../lib/management-api.ts';
-import { requestStatusLabel, requestStatusSteps } from '../lib/special-requests.ts';
+import { requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice } from '../lib/special-requests.ts';
 import type { SpecialCheckRequestDetailed } from '../lib/ptms-api.ts';
 
 const panel = readFileSync('components/site-special-check-requests-panel.tsx', 'utf8');
@@ -60,4 +60,39 @@ test('staff list wrapper hits the JWT endpoint, not the Guard-facing unauthentic
   const api = { request: async (p: string) => { paths.push(p); return []; } } as never;
   await managementApi.listSpecialCheckRequestsStaff(api, 4);
   assert.deepEqual(paths, ['/special-check-requests/site/4']);
+});
+
+// Scheduled Spot requests (2026-10-14, sql/056).
+test('Spot mode offers "Show to the guard at" (empty = send now), never for a standard request, and sends scheduledAt as ISO', () => {
+  assert.match(panel, /Show to the guard at/);
+  assert.match(panel, /optional - leave empty to send now/);
+  assert.match(panel, /\{mode === 'spot_visit' && \(\s*<label htmlFor="scr-scheduled"/);
+  assert.match(panel, /const schedule = mode === 'spot_visit' \? scheduledAt : ''/);
+  assert.match(panel, /\.\.\.\(schedule \? \{ scheduledAt: new Date\(schedule\)\.toISOString\(\) \} : \{\}\)/);
+  assert.match(panel, /Needed by/); // "Needed by" stays as the expiry
+});
+
+test('a scheduled request that is not due yet reads "Scheduled for <time> — not yet shown to the guard", then the normal status', () => {
+  const pending = { ...base, scheduled_at: '2026-10-20T01:30:00.000Z', scheduled_pending: true, created_at: '2026-10-14T01:00:00.000Z' };
+  assert.equal(scheduledNotice(pending, () => 'Oct 20, 9:30 AM'), 'Scheduled for Oct 20, 9:30 AM — not yet shown to the guard');
+  assert.equal(requestStatusLabel('sent', true), 'Scheduled');
+  assert.equal(requestStatusSteps(pending)[0].label, 'Created');
+  const due = { ...base, scheduled_at: '2026-10-20T01:30:00.000Z', scheduled_pending: false };
+  assert.equal(scheduledNotice(due, () => 'x'), null);
+  assert.equal(requestStatusLabel('sent', false), 'Pending');
+  assert.equal(requestStatusSteps(due)[0].label, 'Sent');
+  assert.equal(scheduledNotice(base, () => 'x'), null); // unscheduled rows are unchanged
+  assert.match(panel, /scheduledNotice\(request, when\)/);
+});
+
+test('the form checks the schedule in plain words before sending (future, before "Needed by", within 30 days)', () => {
+  const now = new Date('2026-10-14T00:00:00').getTime();
+  assert.equal(scheduleProblem('', '', now), null);
+  assert.equal(scheduleProblem('2026-10-15T09:00', '', now), null);
+  assert.equal(scheduleProblem('2026-10-15T09:00', '2026-10-15T18:00', now), null);
+  assert.match(scheduleProblem('2026-10-13T09:00', '', now)!, /must be in the future/);
+  assert.match(scheduleProblem('2026-10-15T09:00', '2026-10-15T09:00', now)!, /must be later than/);
+  assert.match(scheduleProblem('2026-10-15T09:00', '2026-10-15T08:00', now)!, /must be later than/);
+  assert.match(scheduleProblem('2026-12-31T09:00', '', now)!, /at most 30 days/);
+  assert.match(panel, /scheduleProblem\(schedule, neededBy\)/);
 });
