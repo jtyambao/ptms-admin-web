@@ -12,7 +12,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { canSendSpecialCheckRequest } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
-import { requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice } from '@/lib/special-requests';
+import {
+  ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes,
+  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice,
+} from '@/lib/special-requests';
 import type { ManagedCheckpoint, SpecialCheckRequestDetailed } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
@@ -31,12 +34,6 @@ type Mode = 'standard' | 'spot_visit';
 
 function when(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString() : '';
-}
-
-// datetime-local value (local time) for a Date.
-function toLocalInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
@@ -59,6 +56,11 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   const [scheduledAt, setScheduledAt] = useState('');
   // Spot requests: how long the guard has, counted from when it is shown.
   const [allowMinutes, setAllowMinutes] = useState('30');
+  // Edit the time allowed of a spot that is not finished yet.
+  const [editing, setEditing] = useState<SpecialCheckRequestDetailed | null>(null);
+  const [editChoice, setEditChoice] = useState('30');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
   const [picked, setPicked] = useState<number[]>([]);
 
   const activeCheckpoints = checkpoints.filter((c) => c.status === 'active');
@@ -97,13 +99,11 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
     if (!mode || !title.trim()) return;
     // Only a spot request can be scheduled; empty = send now.
     const schedule = mode === 'spot_visit' ? scheduledAt : '';
-    // A spot request expires "Time allowed" after it is shown (the scheduled
-    // time, or now); a normal request uses its own optional Needed by.
-    const spotDeadline = mode === 'spot_visit' && allowMinutes !== 'none'
-      ? new Date((schedule ? new Date(schedule).getTime() : Date.now()) + Number(allowMinutes) * 60_000)
-      : null;
-    const deadlineIso = mode === 'spot_visit' ? spotDeadline?.toISOString() : neededBy ? new Date(neededBy).toISOString() : undefined;
-    const problem = scheduleProblem(schedule, spotDeadline ? toLocalInput(spotDeadline) : mode === 'spot_visit' ? '' : neededBy);
+    // A spot request is a regular Checkpoint Due Soon: "Time allowed to finish" is the tap timer AFTER the
+    // guard presses Acknowledge (sent as allowedMinutes); only a normal request has a Needed by.
+    const allowedMinutes = mode === 'spot_visit' ? allowedMinutesFromChoice(allowMinutes) : null;
+    const deadlineIso = mode === 'standard' && neededBy ? new Date(neededBy).toISOString() : undefined;
+    const problem = scheduleProblem(schedule, '');
     if (problem) { setError(problem); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
@@ -114,6 +114,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
         priority: urgent ? 'urgent' : 'normal',
         ...(deadlineIso ? { neededBy: deadlineIso } : {}),
         type: mode,
+        ...(allowedMinutes ? { allowedMinutes } : {}),
         ...(mode === 'spot_visit' && picked.length > 0 ? { checkpointIds: picked } : {}),
         ...(schedule ? { scheduledAt: new Date(schedule).toISOString() } : {}),
       });
@@ -127,6 +128,24 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
     } catch (reason) {
       setError(reason instanceof ApiRequestError ? reason.message : operationError);
     } finally { setSaving(false); }
+  }
+
+  function openEditAllowed(request: SpecialCheckRequestDetailed) {
+    setEditChoice(choiceFromAllowedMinutes(request.allowed_minutes)); setEditError(''); setEditing(request);
+  }
+
+  async function submitEditAllowed(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    setEditSaving(true); setEditError('');
+    try {
+      await managementApi.updateSpecialCheckRequestAllowedTime(session.api, editing.id, allowedMinutesFromChoice(editChoice));
+      setEditing(null);
+      await refresh();
+      setSuccess('Time allowed updated. If the guard already pressed Acknowledge, their timer was updated too.');
+    } catch (reason) {
+      setEditError(reason instanceof ApiRequestError ? reason.message : 'The time could not be changed. Please try again.');
+    } finally { setEditSaving(false); }
   }
 
   const more = useShowMore(requests, 5, 10);
@@ -196,6 +215,14 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                         : <span className="text-muted-foreground">Every checkpoint at this Site</span>}
                     </p>
                   )}
+                  {request.type === 'spot_visit' && (
+                    <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">Time allowed after Acknowledge: <strong className="text-foreground">{allowedTimeLabel(request.allowed_minutes)}</strong></span>
+                      {canSend && (request.status === 'sent' || request.status === 'acknowledged') && (
+                        <Button type="button" size="sm" variant="outline" onClick={() => openEditAllowed(request)}>Change time</Button>
+                      )}
+                    </p>
+                  )}
                   {notice && (
                     <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
                       <CalendarClock className="size-3.5 shrink-0" />{notice}
@@ -221,6 +248,31 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
         )}
         <ShowMore remaining={more.remaining} onClick={more.showMore} step={more.step} />
       </div>
+
+      <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Time allowed to finish</DialogTitle>
+            <DialogDescription>
+              How long the guard has to scan after pressing Acknowledge on this spot request&apos;s Checkpoint Due Soon alert.
+              If they already pressed Acknowledge, their timer is recalculated from that moment.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitEditAllowed}>
+            <label htmlFor="scr-edit-allow" className="grid gap-2 font-bold">
+              {editing?.title}
+              <select id="scr-edit-allow" className="h-10 rounded-lg border bg-background px-3 font-normal" value={editChoice} onChange={(e) => setEditChoice(e.target.value)}>
+                {ALLOWED_TIME_CHOICES.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+              </select>
+            </label>
+            {editError && <p role="alert" className="mt-3 flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100"><AlertTriangle className="size-4 shrink-0" />{editError}</p>}
+            <DialogFooter className="mt-5">
+              <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button type="submit" disabled={editSaving}>{editSaving ? 'Saving…' : 'Save'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) setMode(null); }}>
         <DialogContent className="max-h-[92dvh] overflow-y-auto">
@@ -256,14 +308,11 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                   <label htmlFor="scr-allow" className="grid gap-2 font-bold">
                     Time allowed to finish
                     <select id="scr-allow" className="h-10 rounded-lg border bg-background px-3 font-normal" value={allowMinutes} onChange={(e) => setAllowMinutes(e.target.value)}>
-                      <option value="15">15 minutes</option>
-                      <option value="30">30 minutes</option>
-                      <option value="60">1 hour</option>
-                      <option value="120">2 hours</option>
-                      <option value="none">No time limit</option>
+                      {ALLOWED_TIME_CHOICES.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
                     </select>
                     <span className="text-xs font-normal text-muted-foreground">
-                      The guard gets the normal Checkpoint Due Soon countdown; this is the latest it can still be done.
+                      The guard first gets the regular Checkpoint Due Soon alert with the Acknowledge button. After they press
+                      Acknowledge, this is how long they have to scan. You can change it later while it is not finished.
                     </span>
                   </label>
                 </>

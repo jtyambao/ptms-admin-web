@@ -823,6 +823,9 @@ export type SpecialCheckRequest = {
   // when the due alert went out.
   scheduled_at?: string | null;
   notified_at?: string | null;
+  // Spot request (sql/058): the tap timer after the guard presses Acknowledge, in minutes;
+  // null/absent = the regular Checkpoint Due Soon tap window.
+  allowed_minutes?: number | null;
 };
 
 // Staff list row (GET /special-check-requests/site/:siteId, 2026-10-07):
@@ -844,6 +847,8 @@ export type CreateSpecialCheckRequest = {
   type?: 'standard' | 'spot_visit';
   // Spot Site Visit only (sql/056): when to show it to the guard. Omit to send now.
   scheduledAt?: string;
+  // Spot Site Visit only (sql/058): minutes the guard has to scan after pressing Acknowledge. Omit = regular Due Soon time.
+  allowedMinutes?: number;
   // Spot Site Visit only; the guard may scan any ONE of these (sql/054).
   checkpointIds?: number[];
 };

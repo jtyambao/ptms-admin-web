@@ -74,6 +74,35 @@ export function scheduledNotice(request: SpecialCheckRequestDetailed, format: (i
   return `Scheduled for ${format(request.scheduled_at)} — not yet shown to the guard`;
 }
 
+// "Time allowed to finish" for a spot request = the tap timer after the guard presses Acknowledge on the
+// regular Checkpoint Due Soon alert. 'regular' = no custom time (the regular Due Soon tap window).
+export const ALLOWED_TIME_CHOICES: { value: string; label: string }[] = [
+  { value: '15', label: '15 minutes' },
+  { value: '30', label: '30 minutes' },
+  { value: '60', label: '1 hour' },
+  { value: '120', label: '2 hours' },
+  { value: 'regular', label: 'Same as a regular Due Soon' },
+];
+
+/** The minutes to store for a choice, or null for the regular Due Soon time. */
+export function allowedMinutesFromChoice(choice: string): number | null {
+  const minutes = Number(choice);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+}
+
+/** The choice that represents a stored value (for editing). */
+export function choiceFromAllowedMinutes(minutes: number | null | undefined): string {
+  return minutes && ALLOWED_TIME_CHOICES.some((c) => c.value === String(minutes)) ? String(minutes) : minutes ? String(minutes) : 'regular';
+}
+
+/** Plain words for a stored value. */
+export function allowedTimeLabel(minutes: number | null | undefined): string {
+  if (!minutes) return 'the regular Due Soon time';
+  if (minutes === 60) return '1 hour';
+  if (minutes % 60 === 0 && minutes < 1440) return `${minutes / 60} hours`;
+  return `${minutes} minutes`;
+}
+
 const MAX_SCHEDULE_DAYS = 30;
 
 // Checks the two datetime-local values (local time, 'YYYY-MM-DDTHH:mm') before sending, in plain

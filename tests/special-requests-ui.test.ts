@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { managementApi } from '../lib/management-api.ts';
-import { requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice } from '../lib/special-requests.ts';
+import {
+  ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes,
+  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice,
+} from '../lib/special-requests.ts';
 import type { SpecialCheckRequestDetailed } from '../lib/ptms-api.ts';
 
 const panel = readFileSync('components/site-special-check-requests-panel.tsx', 'utf8');
@@ -69,8 +72,9 @@ test('Spot mode asks "When should the guard do this?" (empty = now) plus "Time a
   assert.ok(panel.includes('Time allowed to finish'));
   assert.ok(panel.includes("const schedule = mode === 'spot_visit' ? scheduledAt : ''"));
   assert.ok(panel.includes('...(schedule ? { scheduledAt: new Date(schedule).toISOString() } : {})'));
-  // The spot deadline is counted from when the guard is shown it.
-  assert.ok(panel.includes('(schedule ? new Date(schedule).getTime() : Date.now()) + Number(allowMinutes) * 60_000'));
+  // The time allowed is the TAP timer after Acknowledge, sent as allowedMinutes - no longer a deadline counted from when it is shown.
+  assert.ok(panel.includes('...(allowedMinutes ? { allowedMinutes } : {})'));
+  assert.doesNotMatch(panel, /spotDeadline/);
   assert.match(panel, /Needed by/);
 });
 
@@ -140,4 +144,39 @@ test('Missed Checkpoints and the rounds history label a spot miss "Spot"; the mi
   assert.match(reports, /\{tap\.is_spot && <Badge variant="outline">Spot<\/Badge>\}/);
   assert.match(api, /missed\?includeSpot=1/);
   assert.match(api, /\/checkpoint-rounds\/site\/\$\{siteId\}\/missed\/governed/); // the governed list is untouched
+});
+
+// Spot request = a regular Checkpoint Due Soon: the time allowed is the tap timer after Acknowledge (2026-10-15).
+test('time allowed to finish: choices, stored minutes and plain words', () => {
+  assert.deepEqual(ALLOWED_TIME_CHOICES.map((c) => c.value), ['15', '30', '60', '120', 'regular']);
+  assert.equal(allowedMinutesFromChoice('30'), 30);
+  assert.equal(allowedMinutesFromChoice('regular'), null);
+  assert.equal(choiceFromAllowedMinutes(null), 'regular');
+  assert.equal(choiceFromAllowedMinutes(60), '60');
+  assert.equal(allowedTimeLabel(null), 'the regular Due Soon time');
+  assert.equal(allowedTimeLabel(45), '45 minutes');
+  assert.equal(allowedTimeLabel(60), '1 hour');
+  assert.equal(allowedTimeLabel(120), '2 hours');
+});
+
+test('the spot form explains the Acknowledge-then-tap flow and sends no deadline for a spot', () => {
+  assert.match(panel, /regular Checkpoint Due Soon alert with the Acknowledge button/);
+  assert.match(panel, /After they press\s+Acknowledge, this is how long they have to scan/);
+  assert.match(panel, /const deadlineIso = mode === 'standard' && neededBy/);
+  assert.match(panel, /scheduleProblem\(schedule, ''\)/);
+  assert.doesNotMatch(panel, /No time limit/);
+});
+
+test('a spot request that is not finished can have its time changed from the list (PATCH), the open alert is recalculated by the server', async () => {
+  assert.match(panel, /Time allowed after Acknowledge:/);
+  assert.match(panel, /request\.status === 'sent' \|\| request\.status === 'acknowledged'\) && \(\s*<Button type="button" size="sm" variant="outline" onClick=\{\(\) => openEditAllowed\(request\)\}>Change time<\/Button>/);
+  assert.match(panel, /managementApi\.updateSpecialCheckRequestAllowedTime\(session\.api, editing\.id, allowedMinutesFromChoice\(editChoice\)\)/);
+  const calls: { path: string; init: { method?: string; body?: string } }[] = [];
+  const api = { request: async (path: string, init: { method?: string; body?: string }) => { calls.push({ path, init }); return {}; } } as never;
+  await managementApi.updateSpecialCheckRequestAllowedTime(api, 31, 45);
+  await managementApi.updateSpecialCheckRequestAllowedTime(api, 31, null);
+  assert.deepEqual(calls.map((c) => [c.path, c.init.method, c.init.body]), [
+    ['/special-check-requests/31', 'PATCH', '{"allowedMinutes":45}'],
+    ['/special-check-requests/31', 'PATCH', '{"allowedMinutes":null}'],
+  ]);
 });

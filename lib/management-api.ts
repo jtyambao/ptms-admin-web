@@ -131,6 +131,13 @@ export const managementApi = {
   // unlike the Guard-facing list above.
   listSpecialCheckRequestsStaff: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<SpecialCheckRequestDetailed[]>(`/special-check-requests/site/${siteId}`),
+  // Spot request: change the time allowed to finish (null = the regular Due Soon time).
+  updateSpecialCheckRequestAllowedTime: (api: AuthenticatedApiClient, id: number, allowedMinutes: number | null) =>
+    api.request<SpecialCheckRequest>(`/special-check-requests/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ allowedMinutes }),
+    }),
   createSpecialCheckRequest: (api: AuthenticatedApiClient, body: CreateSpecialCheckRequest) =>
     api.request<SpecialCheckRequest>('/special-check-requests', {
       method: 'POST',
