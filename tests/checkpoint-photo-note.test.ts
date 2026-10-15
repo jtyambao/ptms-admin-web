@@ -12,3 +12,10 @@ test('Add checkpoint no longer asks "Guard must take a photo" / "Guard must writ
   assert.match(panel, /createCheckpoint\(session\.api, siteId, \{ name: checkpointName\.trim\(\) \}\)/);
   assert.match(panel, /Register its NFC tag next/); // the rest of the form is unchanged
 });
+
+// Dark mode: native date/time pickers (calendar icon), dropdown lists and scrollbars must follow the theme.
+test('dark theme sets color-scheme: dark so the date field calendar icon is visible', () => {
+  const css = readFileSync('app/globals.css', 'utf8');
+  assert.match(css, /\.dark \{ color-scheme: dark; \}/);
+  assert.match(css, /:root \{ color-scheme: light; \}/);
+});
