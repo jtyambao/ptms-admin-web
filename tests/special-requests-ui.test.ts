@@ -4,7 +4,7 @@ import test from 'node:test';
 import { managementApi } from '../lib/management-api.ts';
 import {
   ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes, regularClashNotice,
-  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice, spotTimerNote,
+  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduleTimeProblem, scheduledNotice, spotTimerNote, todayAtTime,
 } from '../lib/special-requests.ts';
 import type { SpecialCheckRequestDetailed } from '../lib/ptms-api.ts';
 
@@ -66,8 +66,8 @@ test('staff list wrapper hits the JWT endpoint, not the Guard-facing unauthentic
 });
 
 // Scheduled Spot requests (2026-10-14, sql/056).
-test('Spot mode asks "When should the guard do this?" (empty = now) plus "Time allowed to finish"; a standard request keeps "Needed by"', () => {
-  assert.ok(panel.includes('When should the guard do this?'));
+test('Spot mode asks "What time today should the guard do this?" (empty = now) plus "Time allowed to finish"; a standard request keeps "Needed by"', () => {
+  assert.ok(panel.includes('What time today should the guard do this?'));
   assert.ok(panel.includes('leave empty for right now'));
   assert.ok(panel.includes('Time allowed to finish'));
   assert.ok(panel.includes("const schedule = mode === 'spot_visit' ? scheduledAt : ''"));
@@ -230,4 +230,22 @@ test('the regular-schedule check calls the staff endpoint with the time and allo
     '/special-check-requests/site/4/regular-schedule',
     '/special-check-requests/site/4/regular-schedule?at=2026-10-20T01%3A00%3A00.000Z&allowedMinutes=30',
   ]);
+});
+
+// A spot is scheduled for a time TODAY only: a time picker, no date picker (owner, 2026-10-16).
+test('the spot schedule is a time of day today: a time input, no date picker, and a time that already passed is refused', () => {
+  const now = new Date(2026, 9, 16, 14, 30); // local 2:30 PM
+  assert.equal(todayAtTime('', now), '');
+  assert.equal(todayAtTime('16:45', now), '2026-10-16T16:45');
+  assert.equal(todayAtTime('garbage', now), '');
+  assert.equal(scheduleTimeProblem('', now), null);
+  assert.equal(scheduleTimeProblem('16:45', now), null);
+  assert.match(scheduleTimeProblem('09:00', now)!, /already passed today/);
+  assert.match(scheduleTimeProblem('14:30', now)!, /already passed today/);
+  assert.match(panel, /<Input id="scr-scheduled" type="time" value=\{scheduledTime\}/);
+  assert.doesNotMatch(panel, /id="scr-scheduled" type="datetime-local"/);
+  assert.match(panel, /What time today should the guard do this\?/);
+  assert.match(panel, /scheduleTimeProblem\(mode === 'spot_visit' \? scheduledTime : ''\) \?\? scheduleProblem\(schedule, ''\)/);
+  // the scheduled request still goes to the API as an ISO instant (today at that time, local)
+  assert.match(panel, /scheduledAt: new Date\(schedule\)\.toISOString\(\)/);
 });

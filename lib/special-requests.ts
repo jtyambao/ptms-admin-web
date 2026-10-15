@@ -131,6 +131,27 @@ export function spotTimerNote(request: SpecialCheckRequestDetailed, format: (iso
   return `The guard has until ${format(event.tap_deadline_at)} to scan.${shortened ? ' Shortened so it does not clash with a regular Checkpoint Due Soon.' : ''}`;
 }
 
+// A spot request is scheduled for a TIME TODAY only (no date picker): the admin picks a time of day and it is
+// shown to the guard at that time on today's date (local time). Empty = right now.
+export function localDateString(d: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** 'HH:MM' picked today -> the datetime-local string ('YYYY-MM-DDTHH:MM') the rest of the form works with, or '' when empty. */
+export function todayAtTime(time: string, now: Date = new Date()): string {
+  return /^\d{2}:\d{2}$/.test(time) ? `${localDateString(now)}T${time}` : '';
+}
+
+/** Plain-words problem with a time-of-day pick (already passed today), or null when fine / empty. */
+export function scheduleTimeProblem(time: string, now: Date = new Date()): string | null {
+  if (!time) return null;
+  const at = todayAtTime(time, now);
+  if (!at || Number.isNaN(new Date(at).getTime())) return 'Please pick a valid time.';
+  if (new Date(at).getTime() <= now.getTime()) return 'That time has already passed today. Pick a later time today, or leave it empty to send now.';
+  return null;
+}
+
 const MAX_SCHEDULE_DAYS = 30;
 
 // Checks the two datetime-local values (local time, 'YYYY-MM-DDTHH:mm') before sending, in plain

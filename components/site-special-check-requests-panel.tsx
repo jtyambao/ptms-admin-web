@@ -14,7 +14,7 @@ import { canSendSpecialCheckRequest } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
 import {
   ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes, regularClashNotice,
-  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice, spotTimerNote,
+  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduleTimeProblem, scheduledNotice, spotTimerNote, todayAtTime,
 } from '@/lib/special-requests';
 import type { ManagedCheckpoint, RegularScheduleCheck, SpecialCheckRequestDetailed } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
@@ -53,7 +53,9 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   const [instructions, setInstructions] = useState('');
   const [urgent, setUrgent] = useState(false);
   const [neededBy, setNeededBy] = useState('');
-  const [scheduledAt, setScheduledAt] = useState('');
+  // Spot requests: a time of day TODAY (no date picker); empty = right now.
+  const [scheduledTime, setScheduledTime] = useState('');
+  const scheduledAt = todayAtTime(scheduledTime);
   // Spot requests: how long the guard has, counted from when it is shown.
   const [allowMinutes, setAllowMinutes] = useState('30');
   // Spot form: does a regular Checkpoint Due Soon fall inside this spot? (the spot yields to the regular schedule)
@@ -89,7 +91,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   }, [refresh]);
 
   function openCreate(next: Mode) {
-    setTitle(''); setInstructions(''); setUrgent(false); setNeededBy(''); setScheduledAt(''); setAllowMinutes('30'); setPicked([]); setError(''); setMode(next);
+    setTitle(''); setInstructions(''); setUrgent(false); setNeededBy(''); setScheduledTime(''); setAllowMinutes('30'); setPicked([]); setError(''); setMode(next);
   }
 
   function togglePick(id: number) {
@@ -105,7 +107,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
     // guard presses Acknowledge (sent as allowedMinutes); only a normal request has a Needed by.
     const allowedMinutes = mode === 'spot_visit' ? allowedMinutesFromChoice(allowMinutes) : null;
     const deadlineIso = mode === 'standard' && neededBy ? new Date(neededBy).toISOString() : undefined;
-    const problem = scheduleProblem(schedule, '');
+    const problem = scheduleTimeProblem(mode === 'spot_visit' ? scheduledTime : '') ?? scheduleProblem(schedule, '');
     if (problem) { setError(problem); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
@@ -124,7 +126,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
       await refresh();
       setSuccess(
         schedule
-          ? `Spot request scheduled. Guards at this Site will see it on ${when(new Date(schedule).toISOString())}.`
+          ? `Spot request scheduled. Guards at this Site will see it today at ${new Date(schedule).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`
           : mode === 'spot_visit' ? 'Spot request sent. Guards at this Site will see it now.' : 'Request sent. Guards at this Site will see it now.',
       );
     } catch (reason) {
@@ -318,11 +320,11 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
               {mode === 'spot_visit' ? (
                 <>
                   <label htmlFor="scr-scheduled" className="grid gap-2 font-bold">
-                    When should the guard do this? <span className="font-normal text-muted-foreground">(leave empty for right now)</span>
-                    <Input id="scr-scheduled" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+                    What time today should the guard do this? <span className="font-normal text-muted-foreground">(leave empty for right now)</span>
+                    <Input id="scr-scheduled" type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
                     <span className="text-xs font-normal text-muted-foreground">
                       {scheduledAt
-                        ? 'The guard will not see it or get an alert until this time.'
+                        ? 'The guard will not see it or get an alert until this time today.'
                         : 'The guard gets it and is alerted right away.'}
                     </span>
                   </label>
