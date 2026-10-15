@@ -154,6 +154,7 @@ export function RoundsDetail({ sites, day, timezone, onPhotos }: { sites: Site[]
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-black">{event.round_name}</p>
+                      {event.is_spot && <Badge variant="outline">Spot</Badge>}
                       {event.any_late ? <Badge variant="destructive">Late</Badge> : <Badge variant="secondary">On time</Badge>}
                     </div>
                     <p className="text-sm font-bold tabular-nums">{scanTimeLabel(event.revealed_at, timezone, false)} · {site.name}</p>
@@ -215,6 +216,7 @@ export function MissedDetail({ sites, day, timezone }: { sites: Site[]; day: str
               <li className="space-y-1 p-4" key={item.id}>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-black">{item.checkpoint_name}</p>
+                  {item.is_spot && <Badge variant="outline">Spot</Badge>}
                   <Badge variant={item.state === 'open' ? 'destructive' : item.state === 'caught_up' ? 'secondary' : 'outline'}>{MISSED_STATE_LABEL[item.state]}</Badge>
                 </div>
                 <p className="text-sm font-bold tabular-nums">Due {scanTimeLabel(item.missed_at, timezone, false)} · {site.name}</p>

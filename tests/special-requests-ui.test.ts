@@ -23,7 +23,7 @@ test('status words an admin understands: sent reads Pending', () => {
 
 test('who/when trail: the SENDER is named, Guard-side steps are honestly the Site device (no person is recorded)', () => {
   const steps = requestStatusSteps({
-    ...base, status: 'completed', acknowledged_at: '2026-10-07T01:05:00.000Z',
+    ...base, type: 'standard', status: 'completed', acknowledged_at: '2026-10-07T01:05:00.000Z',
     completed_at: '2026-10-07T01:20:00.000Z', completion_remarks: 'All clear',
   });
   assert.deepEqual(steps.map((s) => [s.label, s.who]), [
@@ -34,7 +34,7 @@ test('who/when trail: the SENDER is named, Guard-side steps are honestly the Sit
 
 test('a request whose sender is unknown falls back, and an expired one says so', () => {
   assert.equal(requestStatusSteps({ ...base, sender_name: null })[0].who, 'an administrator');
-  assert.equal(requestStatusSteps({ ...base, status: 'expired', needed_by: '2026-10-07T02:00:00.000Z' }).at(-1)!.label, 'Expired');
+  assert.equal(requestStatusSteps({ ...base, type: 'standard', status: 'expired', needed_by: '2026-10-07T02:00:00.000Z' }).at(-1)!.label, 'Expired');
 });
 
 test('two plainly-named actions replace the Type dropdown: Send request / Send spot request', () => {
@@ -45,14 +45,14 @@ test('two plainly-named actions replace the Type dropdown: Send request / Send s
 
 test('the spot request dialog offers a checkpoint picker (none ticked = any checkpoint) and only sends checkpointIds for spot requests', () => {
   assert.match(panel, /Which checkpoint\(s\)\?/);
-  assert.match(panel, /Tick none to accept any checkpoint/);
+  assert.match(panel, /Tick none to include every checkpoint at this Site/);
   assert.match(panel, /mode === 'spot_visit' && picked\.length > 0 \? \{ checkpointIds: picked \}/);
 });
 
 test('the list shows sent requests with status, sender and the targeted checkpoints from the staff endpoint', () => {
   assert.match(panel, /managementApi\.listSpecialCheckRequestsStaff\(session\.api, siteId\)/);
   assert.match(panel, /Must scan:/);
-  assert.match(panel, /Any checkpoint at this Site/);
+  assert.match(panel, /Every checkpoint at this Site/);
 });
 
 test('staff list wrapper hits the JWT endpoint, not the Guard-facing unauthenticated one', async () => {
@@ -82,7 +82,8 @@ test('a scheduled request that is not due yet reads "Scheduled for <time> — no
   const due = { ...base, scheduled_at: '2026-10-20T01:30:00.000Z', scheduled_pending: false };
   assert.equal(scheduledNotice(due, () => 'x'), null);
   assert.equal(requestStatusLabel('sent', false), 'Pending');
-  assert.equal(requestStatusSteps(due)[0].label, 'Sent');
+  assert.equal(requestStatusSteps(due)[0].label, 'Became due'); // a spot request
+  assert.equal(requestStatusSteps({ ...due, type: 'standard' })[0].label, 'Sent');
   assert.equal(scheduledNotice(base, () => 'x'), null); // unscheduled rows are unchanged
   assert.match(panel, /scheduledNotice\(request, when\)/);
 });
@@ -97,4 +98,46 @@ test('the form checks the schedule in plain words before sending (future, before
   assert.match(scheduleProblem('2026-10-15T09:00', '2026-10-15T08:00', now)!, /must be later than/);
   assert.match(scheduleProblem('2026-12-31T09:00', '', now)!, /at most 30 days/);
   assert.ok(panel.includes('scheduleProblem(schedule, '));
+});
+
+// Spot request = an additional Checkpoint Due Soon (2026-10-15).
+test('a spot request reads Scheduled / Due now / Completed / Missed (a standard request keeps Pending / Acknowledged / Completed / Expired)', () => {
+  assert.equal(requestStatusLabel('sent', true, 'spot_visit'), 'Scheduled');
+  assert.equal(requestStatusLabel('sent', false, 'spot_visit'), 'Due now');
+  assert.equal(requestStatusLabel('acknowledged', false, 'spot_visit'), 'Due now');
+  assert.equal(requestStatusLabel('completed', false, 'spot_visit'), 'Completed');
+  assert.equal(requestStatusLabel('expired', false, 'spot_visit'), 'Missed');
+  assert.equal(requestStatusLabel('sent'), 'Pending');
+  assert.equal(requestStatusLabel('sent', false, 'standard'), 'Pending');
+  assert.equal(requestStatusLabel('expired', false, 'standard'), 'Expired');
+  assert.match(panel, /requestStatusLabel\(request\.status, request\.scheduled_pending, request\.type\)/);
+});
+
+test('a spot request trail says Became due -> Completed / Missed, never "Acknowledged by the Site device"', () => {
+  const missed = requestStatusSteps({ ...base, status: 'expired', acknowledged_at: '2026-10-07T01:05:00.000Z' });
+  assert.deepEqual(missed.map((s) => s.label), ['Became due', 'Missed']);
+  assert.match(missed[1].note ?? '', /timer ended/);
+  const done = requestStatusSteps({ ...base, status: 'completed', completed_at: '2026-10-07T01:20:00.000Z' });
+  assert.deepEqual(done.map((s) => [s.label, s.at]), [['Became due', base.sent_at], ['Completed', '2026-10-07T01:20:00.000Z']]);
+  // standard requests are unchanged
+  assert.deepEqual(requestStatusSteps({ ...base, type: 'standard', status: 'expired', needed_by: '2026-10-07T02:00:00.000Z' }).map((s) => s.label), ['Sent', 'Expired']);
+});
+
+test('the spot form describes the Due Soon behaviour: scan EVERY checkpoint (not any one), missed when the timer ends', () => {
+  assert.match(panel, /extra Checkpoint Due Soon alert and must scan every checkpoint/);
+  assert.match(panel, /Tick the checkpoints the guard must scan - all of them/);
+  assert.match(panel, /Every checkpoint at this Site/);
+  assert.doesNotMatch(panel, /any ONE of them/);
+  assert.doesNotMatch(panel, /Guard app does not list the target checkpoints/);
+});
+
+test('Missed Checkpoints and the rounds history label a spot miss "Spot"; the missed report asks for it with includeSpot', () => {
+  const details = readFileSync('components/dashboard-details.tsx', 'utf8');
+  const reports = readFileSync('components/site-reports-panel.tsx', 'utf8');
+  const api = readFileSync('lib/management-api.ts', 'utf8');
+  assert.match(details, /\{event\.is_spot && <Badge variant="outline">Spot<\/Badge>\}/);
+  assert.match(details, /\{item\.is_spot && <Badge variant="outline">Spot<\/Badge>\}/);
+  assert.match(reports, /\{tap\.is_spot && <Badge variant="outline">Spot<\/Badge>\}/);
+  assert.match(api, /missed\?includeSpot=1/);
+  assert.match(api, /\/checkpoint-rounds\/site\/\$\{siteId\}\/missed\/governed/); // the governed list is untouched
 });

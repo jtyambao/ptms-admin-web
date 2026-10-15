@@ -3,10 +3,24 @@ import type { SpecialCheckRequestDetailed } from './ptms-api';
 // Plain-language status for the Requests list. The database/API keep the
 // original lifecycle words (sent -> acknowledged -> completed, or
 // expired); the UI says "Pending" for "sent" because that is how an admin
-// thinks of a request nobody has picked up yet. A scheduled Spot request
-// that is not due yet reads "Scheduled" - the guard cannot see it.
-export function requestStatusLabel(status: SpecialCheckRequestDetailed['status'], scheduledPending = false): string {
+// thinks of a request nobody has picked up yet. A Spot request is an
+// additional Checkpoint Due Soon (2026-10-15): it reads Scheduled until its
+// time, Due now while the guard's alert is running, then Completed, or Missed
+// when the timer ended with no tap.
+export function requestStatusLabel(
+  status: SpecialCheckRequestDetailed['status'],
+  scheduledPending = false,
+  type: SpecialCheckRequestDetailed['type'] = 'standard',
+): string {
   if (scheduledPending && status === 'sent') return 'Scheduled';
+  if (type === 'spot_visit') {
+    switch (status) {
+      case 'sent':
+      case 'acknowledged': return 'Due now';
+      case 'completed': return 'Completed';
+      case 'expired': return 'Missed';
+    }
+  }
   switch (status) {
     case 'sent': return 'Pending';
     case 'acknowledged': return 'Acknowledged';
@@ -28,10 +42,20 @@ export interface RequestStep {
 // "the Site device" rather than guessing a name.
 export function requestStatusSteps(request: SpecialCheckRequestDetailed): RequestStep[] {
   const sender = request.sender_name ?? 'an administrator';
+  const spot = request.type === 'spot_visit';
   // Scheduled and not due yet: it has not been "sent" to the guard, so the trail says it was created.
   const steps: RequestStep[] = request.scheduled_pending
     ? [{ label: 'Created', at: request.created_at ?? null, who: sender, note: null }]
-    : [{ label: 'Sent', at: request.sent_at, who: sender, note: null }];
+    : [{ label: spot ? 'Became due' : 'Sent', at: request.sent_at, who: sender, note: null }];
+  if (spot) {
+    // A spot is done from the guard's Checkpoint Due Soon alert; the request only mirrors the outcome.
+    if (request.status === 'completed') {
+      steps.push({ label: 'Completed', at: request.completed_at, who: 'the Site device', note: 'every checkpoint scanned' });
+    } else if (request.status === 'expired') {
+      steps.push({ label: 'Missed', at: null, who: null, note: 'the timer ended before every checkpoint was scanned' });
+    }
+    return steps;
+  }
   if (request.acknowledged_at) {
     steps.push({ label: 'Acknowledged', at: request.acknowledged_at, who: 'the Site device', note: null });
   }

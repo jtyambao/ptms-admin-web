@@ -180,6 +180,7 @@ export function SiteReportsPanel({ siteId }: { siteId: number }) {
           <ReportList items={data} empty="No missed checkpoints at this Site." render={(tap) => (
           <div key={tap.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
             <p className="min-w-0 flex-1 font-bold">{tap.checkpoint_name}</p>
+            {tap.is_spot && <Badge variant="outline">Spot</Badge>}
             <Badge variant="outline">{tap.round_name}</Badge>
             <span className="text-xs text-muted-foreground">{new Date(tap.missed_at).toLocaleString()}</span>
           </div>

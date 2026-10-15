@@ -185,7 +185,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                     <p className="min-w-0 flex-1 font-bold">{request.title}</p>
                     {request.priority === 'urgent' && <Badge variant="destructive" className="gap-1 uppercase"><Siren className="size-3" />Urgent</Badge>}
                     <Badge variant="outline">{request.type === 'spot_visit' ? 'Spot request' : 'Request'}</Badge>
-                    <Badge variant={request.status === 'completed' ? 'secondary' : 'outline'}>{requestStatusLabel(request.status, request.scheduled_pending)}</Badge>
+                    <Badge variant={request.status === 'completed' ? 'secondary' : request.type === 'spot_visit' && request.status === 'expired' ? 'destructive' : 'outline'}>{requestStatusLabel(request.status, request.scheduled_pending, request.type)}</Badge>
                   </div>
                   {request.instructions && <div className="mt-2 text-sm text-muted-foreground"><ExpandableText text={request.instructions} /></div>}
                   {request.type === 'spot_visit' && (
@@ -193,7 +193,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                       <MapPin className="size-3 text-[#e86405]" />
                       {request.target_checkpoints?.length > 0
                         ? <>Must scan: {request.target_checkpoints.map((c) => <Badge key={c.id} variant="secondary">{c.name}</Badge>)}</>
-                        : <span className="text-muted-foreground">Any checkpoint at this Site</span>}
+                        : <span className="text-muted-foreground">Every checkpoint at this Site</span>}
                     </p>
                   )}
                   {notice && (
@@ -228,7 +228,7 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
             <DialogTitle>{mode === 'spot_visit' ? 'Send spot request' : 'Send request'}</DialogTitle>
             <DialogDescription>
               {mode === 'spot_visit'
-                ? 'The guard must go to a checkpoint and scan its NFC tag to complete this.'
+                ? 'The guard gets it as an extra Checkpoint Due Soon alert and must scan every checkpoint below. If the timer ends first, it counts as a missed checkpoint.'
                 : 'The guard acknowledges it, does the task, and completes it with a selfie.'}
             </DialogDescription>
           </DialogHeader>
@@ -262,6 +262,9 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                       <option value="120">2 hours</option>
                       <option value="none">No time limit</option>
                     </select>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      The guard gets the normal Checkpoint Due Soon countdown; this is the latest it can still be done.
+                    </span>
                   </label>
                 </>
               ) : (
@@ -279,10 +282,10 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                 <div>
                   <p className="font-bold">Which checkpoint(s)?</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Tick the checkpoints the guard may scan - scanning any ONE of them completes it. Tick none to accept any checkpoint at this Site.
+                    Tick the checkpoints the guard must scan - all of them, like a normal Checkpoint Due Soon. Tick none to include every checkpoint at this Site.
                   </p>
                   {activeCheckpoints.length === 0 ? (
-                    <p className="mt-2 text-sm text-muted-foreground">This Site has no active checkpoints yet - any tag will do.</p>
+                    <p className="mt-2 text-sm text-muted-foreground">This Site has no active checkpoints yet - add one before sending a spot request.</p>
                   ) : (
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
                       {activeCheckpoints.map((cp) => (
@@ -292,11 +295,6 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                         </label>
                       ))}
                     </div>
-                  )}
-                  {picked.length > 0 && (
-                    <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-                      The Guard app does not list the target checkpoints yet - if a guard scans the wrong tag it tells them which to scan.
-                    </p>
                   )}
                 </div>
               )}

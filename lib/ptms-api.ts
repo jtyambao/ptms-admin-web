@@ -381,6 +381,8 @@ export type RoundsDayEvent = {
   oic_name: string | null;
   any_late: boolean;
   visits: RoundsDayVisit[];
+  // true when this round is a spot request's one-off Checkpoint Due Soon (labelled "Spot").
+  is_spot?: boolean;
 };
 export type RoundsDayMissed = {
   id: number;
@@ -392,6 +394,8 @@ export type RoundsDayMissed = {
   state: 'open' | 'caught_up' | 'catch_up_planned';
   resolved_at: string | null;
   late_reason: string | null;
+  // true when this missed stop came from a spot request.
+  is_spot?: boolean;
 };
 export type RoundsDayHistory = {
   date: string;
@@ -685,6 +689,8 @@ export type MissedCheckpointTap = {
   checkpoint_name: string;
   round_name: string;
   missed_at: string;
+  // true for a missed spot request (an additional Checkpoint Due Soon); only returned with includeSpot=1.
+  is_spot?: boolean;
 };
 
 // checkpoint-rounds/site/:id/missed/governed —

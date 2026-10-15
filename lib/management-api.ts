@@ -81,7 +81,8 @@ export const managementApi = {
   // Reports page (branch release/dry-run-ops) — read-only, existing
   // endpoints only, no new backend routes.
   listMissedCheckpoints: (api: AuthenticatedApiClient, siteId: number) =>
-    api.request<MissedCheckpointTap[]>(`/checkpoint-rounds/site/${siteId}/missed`),
+    // includeSpot=1: a missed spot request is shown here (labelled "Spot"); the Guard app never asks for it.
+    api.request<MissedCheckpointTap[]>(`/checkpoint-rounds/site/${siteId}/missed?includeSpot=1`),
   listGovernedMissedCheckpoints: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<GovernedMissedCheckpointTap[]>(`/checkpoint-rounds/site/${siteId}/missed/governed`),
   listVisitorLogs: (api: AuthenticatedApiClient, siteId: number) =>
