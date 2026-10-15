@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { managementApi } from '../lib/management-api.ts';
 import {
-  ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes,
-  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice,
+  ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes, regularClashNotice,
+  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice, spotTimerNote,
 } from '../lib/special-requests.ts';
 import type { SpecialCheckRequestDetailed } from '../lib/ptms-api.ts';
 
@@ -178,5 +178,56 @@ test('a spot request that is not finished can have its time changed from the lis
   assert.deepEqual(calls.map((c) => [c.path, c.init.method, c.init.body]), [
     ['/special-check-requests/31', 'PATCH', '{"allowedMinutes":45}'],
     ['/special-check-requests/31', 'PATCH', '{"allowedMinutes":null}'],
+  ]);
+});
+
+// A spot yields to the regular Checkpoint Due Soon schedule (owner choice A, 2026-10-15).
+test('the spot form warns when a regular Checkpoint Due Soon falls inside the spot and says where the timer would end', () => {
+  const fmt = (iso: string) => `T(${iso.slice(11, 16)})`;
+  assert.equal(regularClashNotice(null, fmt), null);
+  assert.deepEqual(regularClashNotice({ at: '2026-10-20T01:00:00.000Z', ends_at: '2026-10-20T02:00:00.000Z', regular: [], shortened_to: null }, fmt), {
+    clash: false, text: 'No regular Checkpoint Due Soon falls inside this spot.',
+  });
+  const clash = regularClashNotice({
+    at: '2026-10-20T01:00:00.000Z', ends_at: '2026-10-20T02:00:00.000Z',
+    regular: [{ round_name: 'Hourly', at: '2026-10-20T01:30:00.000Z' }], shortened_to: '2026-10-20T01:30:00.000Z',
+  }, fmt)!;
+  assert.equal(clash.clash, true);
+  assert.match(clash.text, /due at T\(01:30\), inside this spot/);
+  assert.match(clash.text, /The regular one goes first, so this spot's timer will end at T\(01:30\) instead of the full time/);
+  assert.match(panel, /regularClashNotice\(clashCheck, when\)/);
+  assert.match(panel, /managementApi\s*\.getSpotRegularSchedule\(session\.api, siteId,/);
+});
+
+test('the list shows the guard\'s live timer for a spot and when it was shortened to yield to a regular one', () => {
+  const fmt = (iso: string) => `T(${iso.slice(11, 16)})`;
+  const spot = { ...base, allowed_minutes: 60 };
+  assert.equal(spotTimerNote(spot, fmt), null); // not due yet / no due event
+  assert.equal(
+    spotTimerNote({ ...spot, due_event: { status: 'pending', ack_deadline_at: '2026-10-20T01:01:30.000Z', acknowledged_at: null, tap_deadline_at: null } }, fmt),
+    'Waiting for the guard to press Acknowledge (before T(01:01)).',
+  );
+  const ackOpen = { status: 'acknowledged' as const, ack_deadline_at: '2026-10-20T01:01:30.000Z', acknowledged_at: '2026-10-20T01:00:30.000Z' };
+  assert.equal(
+    spotTimerNote({ ...spot, due_event: { ...ackOpen, tap_deadline_at: '2026-10-20T02:00:30.000Z' } }, fmt),
+    'The guard has until T(02:00) to scan.',
+  );
+  assert.equal(
+    spotTimerNote({ ...spot, due_event: { ...ackOpen, tap_deadline_at: '2026-10-20T01:30:00.000Z' } }, fmt),
+    'The guard has until T(01:30) to scan. Shortened so it does not clash with a regular Checkpoint Due Soon.',
+  );
+  assert.equal(spotTimerNote({ ...spot, due_event: { ...ackOpen, status: 'failed', tap_deadline_at: '2026-10-20T01:30:00.000Z' } }, fmt), null);
+  assert.equal(spotTimerNote({ ...spot, type: 'standard', due_event: { ...ackOpen, tap_deadline_at: '2026-10-20T01:30:00.000Z' } }, fmt), null);
+  assert.match(panel, /spotTimerNote\(request, when\)/);
+});
+
+test('the regular-schedule check calls the staff endpoint with the time and allowed minutes', async () => {
+  const paths: string[] = [];
+  const api = { request: async (p: string) => { paths.push(p); return {}; } } as never;
+  await managementApi.getSpotRegularSchedule(api, 4);
+  await managementApi.getSpotRegularSchedule(api, 4, '2026-10-20T01:00:00.000Z', 30);
+  assert.deepEqual(paths, [
+    '/special-check-requests/site/4/regular-schedule',
+    '/special-check-requests/site/4/regular-schedule?at=2026-10-20T01%3A00%3A00.000Z&allowedMinutes=30',
   ]);
 });

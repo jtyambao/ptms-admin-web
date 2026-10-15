@@ -13,10 +13,10 @@ import { ApiRequestError } from '@/lib/authenticated-api';
 import { canSendSpecialCheckRequest } from '@/lib/dashboard';
 import { managementApi } from '@/lib/management-api';
 import {
-  ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes,
-  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice,
+  ALLOWED_TIME_CHOICES, allowedMinutesFromChoice, allowedTimeLabel, choiceFromAllowedMinutes, regularClashNotice,
+  requestStatusLabel, requestStatusSteps, scheduleProblem, scheduledNotice, spotTimerNote,
 } from '@/lib/special-requests';
-import type { ManagedCheckpoint, SpecialCheckRequestDetailed } from '@/lib/ptms-api';
+import type { ManagedCheckpoint, RegularScheduleCheck, SpecialCheckRequestDetailed } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
 // Requests tab. Two plainly-named actions instead of a "Type" dropdown
@@ -56,6 +56,8 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
   const [scheduledAt, setScheduledAt] = useState('');
   // Spot requests: how long the guard has, counted from when it is shown.
   const [allowMinutes, setAllowMinutes] = useState('30');
+  // Spot form: does a regular Checkpoint Due Soon fall inside this spot? (the spot yields to the regular schedule)
+  const [clashCheck, setClashCheck] = useState<RegularScheduleCheck | null>(null);
   // Edit the time allowed of a spot that is not finished yet.
   const [editing, setEditing] = useState<SpecialCheckRequestDetailed | null>(null);
   const [editChoice, setEditChoice] = useState('30');
@@ -129,6 +131,21 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
       setError(reason instanceof ApiRequestError ? reason.message : operationError);
     } finally { setSaving(false); }
   }
+
+  useEffect(() => {
+    if (mode !== 'spot_visit' || session.status !== 'authenticated') { setClashCheck(null); return; }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      const at = scheduledAt ? new Date(scheduledAt) : null;
+      const valid = !at || (!Number.isNaN(at.getTime()) && at.getTime() > Date.now());
+      if (!valid) { setClashCheck(null); return; }
+      managementApi
+        .getSpotRegularSchedule(session.api, siteId, at ? at.toISOString() : undefined, allowedMinutesFromChoice(allowMinutes) ?? undefined)
+        .then((check) => { if (!cancelled) setClashCheck(check); })
+        .catch(() => { if (!cancelled) setClashCheck(null); });
+    }, 400);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [mode, scheduledAt, allowMinutes, session.api, session.status, siteId]);
 
   function openEditAllowed(request: SpecialCheckRequestDetailed) {
     setEditChoice(choiceFromAllowedMinutes(request.allowed_minutes)); setEditError(''); setEditing(request);
@@ -223,6 +240,10 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                       )}
                     </p>
                   )}
+                  {(() => {
+                    const timerNote = spotTimerNote(request, when);
+                    return timerNote ? <p className="mt-1 text-xs text-muted-foreground">{timerNote}</p> : null;
+                  })()}
                   {notice && (
                     <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
                       <CalendarClock className="size-3.5 shrink-0" />{notice}
@@ -314,6 +335,16 @@ export function SiteSpecialCheckRequestsPanel({ siteId }: { siteId: number }) {
                       The guard first gets the regular Checkpoint Due Soon alert with the Acknowledge button. After they press
                       Acknowledge, this is how long they have to scan. You can change it later while it is not finished.
                     </span>
+                    {(() => {
+                      const notice = regularClashNotice(clashCheck, when);
+                      return notice ? (
+                        <span role="status" className={`rounded-lg p-2 text-xs font-normal ${notice.clash
+                          ? 'bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100'
+                          : 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100'}`}>
+                          {notice.text}
+                        </span>
+                      ) : null;
+                    })()}
                   </label>
                 </>
               ) : (

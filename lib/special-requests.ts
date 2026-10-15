@@ -1,4 +1,4 @@
-import type { SpecialCheckRequestDetailed } from './ptms-api';
+import type { RegularScheduleCheck, SpecialCheckRequestDetailed } from './ptms-api';
 
 // Plain-language status for the Requests list. The database/API keep the
 // original lifecycle words (sent -> acknowledged -> completed, or
@@ -101,6 +101,34 @@ export function allowedTimeLabel(minutes: number | null | undefined): string {
   if (minutes === 60) return '1 hour';
   if (minutes % 60 === 0 && minutes < 1440) return `${minutes / 60} hours`;
   return `${minutes} minutes`;
+}
+
+// A spot yields to the regular schedule (2026-10-15): the form tells the admin when a regular Checkpoint Due Soon
+// falls inside the spot, and where the spot's timer would then end. `format` renders a time for display.
+export function regularClashNotice(check: RegularScheduleCheck | null, format: (iso: string) => string): { clash: boolean; text: string } | null {
+  if (!check) return null;
+  if (check.regular.length === 0) return { clash: false, text: 'No regular Checkpoint Due Soon falls inside this spot.' };
+  const times = check.regular.map((entry) => format(entry.at)).join(', ');
+  const first = format(check.regular[0].at);
+  return {
+    clash: true,
+    text: check.shortened_to
+      ? `A regular Checkpoint Due Soon is due at ${times}, inside this spot. The regular one goes first, so this spot's timer will end at ${format(check.shortened_to)} instead of the full time. Pick another time, or a shorter time allowed, to avoid that.`
+      : `A regular Checkpoint Due Soon is due at ${first}, close to this spot. The regular one goes first.`,
+  };
+}
+
+// The guard's live timer for a spot that has become due, and when it was shortened to give way to a regular one.
+export function spotTimerNote(request: SpecialCheckRequestDetailed, format: (iso: string) => string): string | null {
+  const event = request.due_event;
+  if (request.type !== 'spot_visit' || !event) return null;
+  if (event.status === 'pending') return `Waiting for the guard to press Acknowledge (before ${format(event.ack_deadline_at)}).`;
+  if (event.status !== 'acknowledged' || !event.tap_deadline_at) return null;
+  const full = request.allowed_minutes && event.acknowledged_at
+    ? new Date(event.acknowledged_at).getTime() + request.allowed_minutes * 60_000
+    : null;
+  const shortened = full !== null && new Date(event.tap_deadline_at).getTime() < full - 1000;
+  return `The guard has until ${format(event.tap_deadline_at)} to scan.${shortened ? ' Shortened so it does not clash with a regular Checkpoint Due Soon.' : ''}`;
 }
 
 const MAX_SCHEDULE_DAYS = 30;

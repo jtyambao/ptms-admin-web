@@ -37,6 +37,7 @@ import type {
   LoneWorkerCheckin,
   SosAlertEntry,
   SpecialCheckRequest,
+  RegularScheduleCheck,
   SpecialCheckRequestDetailed,
   CreateSpecialCheckRequest,
   PersonnelMpinRegenerated,
@@ -131,6 +132,14 @@ export const managementApi = {
   // unlike the Guard-facing list above.
   listSpecialCheckRequestsStaff: (api: AuthenticatedApiClient, siteId: number) =>
     api.request<SpecialCheckRequestDetailed[]>(`/special-check-requests/site/${siteId}`),
+  // Spot form: which regular Checkpoint Due Soon times fall inside the spot (it yields to the regular schedule).
+  getSpotRegularSchedule: (api: AuthenticatedApiClient, siteId: number, at?: string, allowedMinutes?: number) => {
+    const query = new URLSearchParams();
+    if (at) query.set('at', at);
+    if (allowedMinutes) query.set('allowedMinutes', String(allowedMinutes));
+    const suffix = query.toString();
+    return api.request<RegularScheduleCheck>(`/special-check-requests/site/${siteId}/regular-schedule${suffix ? `?${suffix}` : ''}`);
+  },
   // Spot request: change the time allowed to finish (null = the regular Due Soon time).
   updateSpecialCheckRequestAllowedTime: (api: AuthenticatedApiClient, id: number, allowedMinutes: number | null) =>
     api.request<SpecialCheckRequest>(`/special-check-requests/${id}`, {

@@ -836,6 +836,22 @@ export type SpecialCheckRequestDetailed = SpecialCheckRequest & {
   target_checkpoints: { id: number; name: string }[];
   // true while a scheduled request is still waiting for its time - NOT yet shown to the guard.
   scheduled_pending?: boolean;
+  // A spot's live Checkpoint Due Soon (its timers), once it has become due.
+  due_event?: {
+    status: 'pending' | 'acknowledged' | 'failed' | 'completed';
+    ack_deadline_at: string;
+    acknowledged_at: string | null;
+    tap_deadline_at: string | null;
+  };
+};
+
+// GET /special-check-requests/site/:id/regular-schedule - the Site's REGULAR Checkpoint Due Soon times that
+// fall inside a spot, and where the spot's timer would be shortened to (a spot yields to the regular schedule).
+export type RegularScheduleCheck = {
+  at: string;
+  ends_at: string;
+  regular: { round_name: string; at: string }[];
+  shortened_to: string | null;
 };
 
 export type CreateSpecialCheckRequest = {
