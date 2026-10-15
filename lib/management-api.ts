@@ -303,6 +303,13 @@ export const managementApi = {
     api.request<SiteDevice>(`/sites/${siteId}/devices`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }),
+  // Rename a Guard phone (only its label; the Phone ID never changes).
+  renameDevice: (api: AuthenticatedApiClient, siteId: number, registrationId: number, label: string) =>
+    api.request<SiteDevice>(`/sites/${siteId}/devices/${registrationId}/label`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label }),
+    }),
   deactivateDevice: (api: AuthenticatedApiClient, siteId: number, registrationId: number) =>
     api.request<SiteDevice>(`/sites/${siteId}/devices/${registrationId}/deactivate`, { method: 'PATCH' }),
   setPrimaryDevice: (api: AuthenticatedApiClient, siteId: number, registrationId: number) =>

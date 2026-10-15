@@ -19,3 +19,21 @@ test('dark theme sets color-scheme: dark so the date field calendar icon is visi
   assert.match(css, /\.dark \{ color-scheme: dark; \}/);
   assert.match(css, /:root \{ color-scheme: light; \}/);
 });
+
+// Guard phones: Edit name + Deactivate (nothing is deleted) - owner, 2026-10-15.
+import { managementApi } from '../lib/management-api.ts';
+
+test('a phone can be renamed (PATCH label) and deactivated; the wording says deactivate, not delete', async () => {
+  const calls: { path: string; init: { method?: string; body?: string } }[] = [];
+  const api = { request: async (path: string, init: { method?: string; body?: string }) => { calls.push({ path, init }); return {}; } } as never;
+  await managementApi.renameDevice(api, 4, 12, 'Gate phone');
+  assert.deepEqual(calls.map((c) => [c.path, c.init.method, c.init.body]), [['/sites/4/devices/12/label', 'PATCH', '{"label":"Gate phone"}']]);
+  assert.match(panel, /Edit name<\/Button>/);
+  assert.match(panel, />Deactivate<\/Button>/);
+  assert.match(panel, /Deactivate this phone\?/);
+  assert.match(panel, /Nothing is deleted: its history is kept/);
+  assert.match(panel, /Phone deactivated\. Its history was kept\./);
+  assert.match(panel, /Show inactive \(/);
+  assert.doesNotMatch(panel, /Delete this phone\?|Phone deleted\./);
+  assert.match(panel, /managementApi\.renameDevice\(session\.api, siteId, renameTarget\.id, renameLabel\.trim\(\)\)/);
+});
