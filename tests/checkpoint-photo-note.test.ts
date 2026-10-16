@@ -37,3 +37,13 @@ test('a phone can be renamed (PATCH label) and deactivated; the wording says dea
   assert.doesNotMatch(panel, /Delete this phone\?|Phone deleted\./);
   assert.match(panel, /managementApi\.renameDevice\(session\.api, siteId, renameTarget\.id, renameLabel\.trim\(\)\)/);
 });
+
+// Overview counts stay current: after a change in the phones / checkpoints panel the Site page reloads them (2026-10-16).
+test('the phones and checkpoints panels tell the Site page to reload the overview counts after every change', () => {
+  const sitePage = readFileSync('app/sites/[siteId]/page.tsx', 'utf8');
+  assert.match(panel, /onChanged\?: \(\) => void/);
+  assert.equal((panel.match(/await refresh\(\); onChanged\?\.\(\);/g) ?? []).length, 8); // add/rename/deactivate phone, add/delete checkpoint, NFC, ...
+  assert.doesNotMatch(panel, /await refresh\(\);(?! onChanged)/);
+  assert.match(sitePage, /<SiteOperationsPanel siteId=\{siteId\} section="devices" onChanged=\{\(\) => void refreshSummary\(\)\} \/>/);
+  assert.match(sitePage, /<SiteOperationsPanel siteId=\{siteId\} section="checkpoints" onChanged=\{\(\) => void refreshSummary\(\)\} \/>/);
+});

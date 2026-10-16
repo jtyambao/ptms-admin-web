@@ -19,7 +19,9 @@ import { useSession } from '@/lib/session-provider';
 type NfcMode = 'provision' | 'replace';
 const operationError = 'The Site operation could not be completed. Please try again.';
 
-export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: number; section?: 'all' | 'devices' | 'checkpoints' }) {
+// onChanged: tells the Site page to reload its overview counts (phones / checkpoints / NFC tags) after a change here,
+// so the overview and the setup guide never show a stale number.
+export function SiteOperationsPanel({ siteId, section = 'all', onChanged }: { siteId: number; section?: 'all' | 'devices' | 'checkpoints'; onChanged?: () => void }) {
   const session = useSession();
   const allowed = !!session.user && canManageSiteOperations(session.user.role);
   const [devices, setDevices] = useState<SiteDevice[]>([]);
@@ -85,7 +87,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
     try {
       await managementApi.registerDevice(session.api, siteId, { deviceId: deviceId.trim(), ...(deviceLabel.trim() ? { label: deviceLabel.trim() } : {}), isPrimary });
       setDeviceId(''); setDeviceLabel(''); setIsPrimary(false); setDeviceOpen(false);
-      await refresh(); setSuccess('Phone added. It can now sign in to this Site.');
+      await refresh(); onChanged?.(); setSuccess('Phone added. It can now sign in to this Site.');
     } catch (reason) { showError(reason, isPrimary ? 'That phone is already added, or this Site already has a main phone.' : 'That phone is already added to a Site. Delete it there first, then add it here.'); }
     finally { setSaving(false); }
   }
@@ -94,7 +96,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
     setSaving(true); setError(''); setSuccess('');
     try {
       await managementApi.setPrimaryDevice(session.api, siteId, device.id);
-      await refresh(); setSuccess(`${device.label} is now the main phone for this Site.`);
+      await refresh(); onChanged?.(); setSuccess(`${device.label} is now the main phone for this Site.`);
     } catch (reason) { showError(reason, 'This phone was changed by someone else. Refresh and try again.'); }
     finally { setSaving(false); }
   }
@@ -105,7 +107,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
     setSaving(true); setError(''); setSuccess('');
     try {
       await managementApi.renameDevice(session.api, siteId, renameTarget.id, renameLabel.trim());
-      setRenameTarget(null); await refresh(); setSuccess('Phone name updated.');
+      setRenameTarget(null); await refresh(); onChanged?.(); setSuccess('Phone name updated.');
     } catch (reason) { setRenameTarget(null); showError(reason, 'This phone was changed by someone else. Refresh and try again.'); }
     finally { setSaving(false); }
   }
@@ -115,7 +117,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
     setSaving(true); setError(''); setSuccess('');
     try {
       await managementApi.deactivateDevice(session.api, siteId, deactivateDevice.id);
-      setDeactivateDevice(null); await refresh(); setSuccess('Phone deactivated. Its history was kept.');
+      setDeactivateDevice(null); await refresh(); onChanged?.(); setSuccess('Phone deactivated. Its history was kept.');
     } catch (reason) { setDeactivateDevice(null); showError(reason, 'This phone was changed by someone else. Refresh and try again.'); }
     finally { setSaving(false); }
   }
@@ -126,7 +128,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
     try {
       const created = await managementApi.createCheckpoint(session.api, siteId, { name: checkpointName.trim() });
       setCheckpointName(''); setCheckpointOpen(false);
-      await refresh();
+      await refresh(); onChanged?.();
       if (registerNfcNext && created?.id) { openNfc(created, 'provision'); setSuccess(`Checkpoint "${created.name}" added. Now register its NFC tag.`); }
       else setSuccess('Checkpoint added. Register its NFC tag when you are ready.');
     } catch (reason) { showError(reason, 'The checkpoint could not be added. Refresh and try again.'); }
@@ -138,7 +140,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
     setSaving(true); setError(''); setSuccess('');
     try {
       await managementApi.deactivateCheckpoint(session.api, siteId, deactivateCheckpoint.id);
-      setDeactivateCheckpoint(null); await refresh(); setSuccess('Checkpoint deleted. Past scans and reports are kept.');
+      setDeactivateCheckpoint(null); await refresh(); onChanged?.(); setSuccess('Checkpoint deleted. Past scans and reports are kept.');
     } catch (reason) { setDeactivateCheckpoint(null); showError(reason, 'This checkpoint was changed by someone else. Refresh and try again.'); }
     finally { setSaving(false); }
   }
@@ -155,7 +157,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
         ? await managementApi.provisionNfc(session.api, siteId, nfcTarget.id, tagUid.trim())
         : await managementApi.replaceNfc(session.api, siteId, nfcTarget.id, tagUid.trim(), replaceReason);
       setWriterCheckpoint(nfcTarget.name); setNfcTarget(null); setTagUid(''); setWriterPayload(payload);
-      await refresh();
+      await refresh(); onChanged?.();
     } catch (reason) {
       setTagUid('');
       showError(reason, 'This NFC tag is already in use, or the checkpoint already has a tag. Nothing was changed.');
@@ -178,7 +180,7 @@ export function SiteOperationsPanel({ siteId, section = 'all' }: { siteId: numbe
     setSaving(true); setError(''); setSuccess('');
     try {
       await managementApi.revokeNfc(session.api, siteId, revokeTarget.id, revokeReason.trim());
-      setRevokeTarget(null); setRevokeReason(''); await refresh(); setSuccess('NFC tag disabled. The physical tag will no longer work.');
+      setRevokeTarget(null); setRevokeReason(''); await refresh(); onChanged?.(); setSuccess('NFC tag disabled. The physical tag will no longer work.');
     } catch (reason) { setRevokeTarget(null); setRevokeReason(''); showError(reason, 'This checkpoint has no NFC tag to disable.'); }
     finally { setSaving(false); }
   }

@@ -521,10 +521,10 @@ export default function SiteDetailPage() {
                       />
                     </>
                   )}
-                  {section === 'devices' && <SiteOperationsPanel siteId={siteId} section="devices" />}
+                  {section === 'devices' && <SiteOperationsPanel siteId={siteId} section="devices" onChanged={() => void refreshSummary()} />}
                 </TabsContent>
                 <TabsContent value="patrols" className="mt-6">
-                  {section === 'checkpoints' && <SiteOperationsPanel siteId={siteId} section="checkpoints" />}
+                  {section === 'checkpoints' && <SiteOperationsPanel siteId={siteId} section="checkpoints" onChanged={() => void refreshSummary()} />}
                   {section === 'rounds' && <SiteRoundsPanel siteId={siteId} />}
                   {section === 'scans' && <SiteCheckpointScansPanel siteId={siteId} />}
                 </TabsContent>
