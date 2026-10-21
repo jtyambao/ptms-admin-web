@@ -542,7 +542,9 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
                         ))}
                       </ol>
                     </div>
-                    {canManage && round.is_active && roundsTab === 'active' && (
+                    {/* An ENDED round (its Date Thru passed) is still stored as active and sits under History: it must stay
+                        editable (e.g. extend its Date Thru) and deletable - a Deleted one (not active) has no actions. */}
+                    {canManage && round.is_active && (
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={() => openEdit(round)}>Edit</Button>
                         <Button variant="destructive" onClick={() => setDeactivateTarget(round)}>Delete</Button>

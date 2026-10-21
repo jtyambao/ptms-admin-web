@@ -393,11 +393,11 @@ export const managementApi = {
   createRound: (api: AuthenticatedApiClient, siteId: number, body: SaveRoundRequest) =>
     api.request<ManagedRound>(`/sites/${siteId}/rounds`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    }),
+    }, { surfaceServerMessage: true }),
   updateRound: (api: AuthenticatedApiClient, siteId: number, roundId: number, body: Partial<SaveRoundRequest>) =>
     api.request<ManagedRound>(`/sites/${siteId}/rounds/${roundId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    }),
+    }, { surfaceServerMessage: true }),
   deactivateRound: (api: AuthenticatedApiClient, siteId: number, roundId: number) =>
     api.request<ManagedRound>(`/sites/${siteId}/rounds/${roundId}/deactivate`, {
       method: 'PATCH',
