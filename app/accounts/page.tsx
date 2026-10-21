@@ -50,6 +50,7 @@ export default function AccountsPage() {
   const [editPassword, setEditPassword] = useState('');
   const [editError, setEditError] = useState('');
   const [statusTarget, setStatusTarget] = useState<User | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
 
   const assignableRoles = role ? assignableRolesFor(role) : [];
   const needsOrganizationId = role ? requiresOrganizationId(role) : false;
@@ -144,7 +145,7 @@ export default function AccountsPage() {
     if (editPassword && !isValidPassword(editPassword)) { setEditError('A new password must be at least 8 characters.'); return; }
     setSaving(true); setEditError(''); setSuccess('');
     try {
-      await managementApi.updateManagerAccount(session.api, editing.id, {
+      await managementApi.updateAccount(session.api, editing.id, {
         ...(editName.trim() !== editing.full_name ? { fullName: editName.trim() } : {}),
         ...(editEmail.trim() !== editing.email ? { email: editEmail.trim() } : {}),
         ...(editPassword ? { password: editPassword } : {}),
@@ -168,14 +169,28 @@ export default function AccountsPage() {
     setSaving(true); setError(''); setSuccess('');
     try {
       await (turningOff
-        ? managementApi.deactivateManagerAccount(session.api, statusTarget.id)
-        : managementApi.reactivateManagerAccount(session.api, statusTarget.id));
+        ? managementApi.deactivateAccount(session.api, statusTarget.id)
+        : managementApi.reactivateAccount(session.api, statusTarget.id));
       setStatusTarget(null);
       await refresh();
       setSuccess(turningOff ? 'Account deactivated. Nothing was deleted.' : 'Account is active again.');
     } catch (reason) {
       setStatusTarget(null);
       setError(reason instanceof ApiRequestError ? reason.message : 'The account could not be changed. Please try again.');
+    } finally { setSaving(false); }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setSaving(true); setError(''); setSuccess('');
+    try {
+      await managementApi.deleteAccount(session.api, deleteTarget.id);
+      setDeleteTarget(null);
+      await refresh();
+      setSuccess('Account deleted.');
+    } catch (reason) {
+      setDeleteTarget(null);
+      setError(reason instanceof ApiRequestError ? reason.message : 'The account could not be deleted. Please try again.');
     } finally { setSaving(false); }
   }
 
@@ -208,7 +223,7 @@ export default function AccountsPage() {
             eyebrow="Who can sign in"
             title="Accounts"
             subtitle={role === 'engineer'
-              ? "Everyone who can sign in to this portal. As an Engineer you can add, edit and deactivate Manager accounts. A Site's Supervisor and Admins are added from that Site's People tab."
+              ? "Everyone who can sign in to this portal. As an Engineer you can add, edit, deactivate and delete Engineer, Manager, Supervisor and Admin accounts. A Site's Supervisor and Admins are added from that Site's People tab."
               : "Everyone who can sign in to this portal. A Site's Supervisor and Admins are added from that Site's People tab. To change or turn off an account, ask the platform team."}
             actions={(
               <>
@@ -321,9 +336,14 @@ export default function AccountsPage() {
                     {role && canManageAccount(role, user.role) && (
                       <div className="flex flex-wrap gap-2">
                         <Button variant="outline" onClick={() => openEdit(user)}>Edit</Button>
-                        <Button variant={user.status === 'active' ? 'destructive' : 'outline'} onClick={() => setStatusTarget(user)}>
-                          {user.status === 'active' ? 'Deactivate' : 'Reactivate'}
-                        </Button>
+                        {user.id !== session.user?.id && (
+                          <>
+                            <Button variant="outline" onClick={() => setStatusTarget(user)}>
+                              {user.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                            </Button>
+                            <Button variant="destructive" onClick={() => setDeleteTarget(user)}>Delete</Button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -335,7 +355,7 @@ export default function AccountsPage() {
           <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Manager account</DialogTitle>
+                <DialogTitle>Edit account</DialogTitle>
                 <DialogDescription>Change the name or email, or set a new password. Leave the password empty to keep the current one.</DialogDescription>
               </DialogHeader>
               <form onSubmit={saveEdit}>
@@ -359,6 +379,22 @@ export default function AccountsPage() {
                   <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
                 </DialogFooter>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete this account?</DialogTitle>
+                <DialogDescription>
+                  {deleteTarget?.full_name} ({deleteTarget?.email}) will be removed for good. This only works for an account that has no history yet
+                  (no requests sent, no Site assignments, no SOS records). If it has history, use Deactivate instead.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                <Button type="button" variant="destructive" disabled={saving} onClick={() => void confirmDelete()}>{saving ? 'Deleting…' : 'Delete'}</Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
 

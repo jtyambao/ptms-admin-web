@@ -109,12 +109,12 @@ test('Accounts nav link exists and role-gates the page content, not the navigati
 });
 
 // Engineer administration of Manager accounts (owner request 2026-10-21).
-test('an Engineer can add Manager accounts only, and edit / deactivate only Manager accounts', () => {
+test('an Engineer can add and manage Engineer / Manager / Supervisor / Admin accounts only', () => {
   assert.equal(canCreateUsers('engineer'), true);
-  assert.deepEqual(assignableRolesFor('engineer'), ['manager']);
+  assert.deepEqual(assignableRolesFor('engineer'), ['engineer', 'manager', 'supervisor', 'admin']);
   assert.equal(requiresOrganizationId('engineer'), false); // the server uses the Engineer's own organization
-  assert.equal(canManageAccount('engineer', 'manager'), true);
-  for (const other of ['engineer', 'org_admin', 'supervisor', 'admin', 'site_admin', 'super_admin'] as const) {
+  for (const managed of ['engineer', 'manager', 'supervisor', 'admin'] as const) assert.equal(canManageAccount('engineer', managed), true);
+  for (const other of ['org_admin', 'site_admin', 'site_manager', 'auditor', 'client_viewer', 'super_admin'] as const) {
     assert.equal(canManageAccount('engineer', other), false);
   }
   for (const requester of ['super_admin', 'org_admin', 'manager', 'supervisor', 'admin'] as const) {
@@ -122,21 +122,26 @@ test('an Engineer can add Manager accounts only, and edit / deactivate only Mana
   }
 });
 
-test('the Accounts page gives an Engineer Edit and Deactivate / Reactivate on Manager rows, calling the real endpoints', async () => {
+test('the Accounts page gives an Engineer Edit, Deactivate / Reactivate and Delete on managed rows (never on their own), calling the real endpoints', async () => {
   const page = readFileSync('app/accounts/page.tsx', 'utf8');
   assert.match(page, /role && canManageAccount\(role, user\.role\)/);
   assert.match(page, />Edit<\/Button>/);
   assert.match(page, /\{user\.status === 'active' \? 'Deactivate' : 'Reactivate'\}/);
   assert.match(page, /Nothing is deleted/);
-  assert.match(page, /managementApi\.updateManagerAccount\(session\.api, editing\.id,/);
+  assert.match(page, /user\.id !== session\.user\?\.id/);
+  assert.match(page, /onClick=\{\(\) => setDeleteTarget\(user\)\}>Delete<\/Button>/);
+  assert.match(page, /This only works for an account that has no history yet/);
+  assert.match(page, /managementApi\.updateAccount\(session\.api, editing\.id,/);
   const calls: { path: string; init?: { method?: string; body?: string } }[] = [];
   const api = { request: async (path: string, init?: { method?: string; body?: string }) => { calls.push({ path, init }); return {}; } } as never;
-  await managementApi.updateManagerAccount(api, 30, { fullName: 'Maria', password: 'NewPass123' });
-  await managementApi.deactivateManagerAccount(api, 30);
-  await managementApi.reactivateManagerAccount(api, 30);
+  await managementApi.updateAccount(api, 30, { fullName: 'Maria', password: 'NewPass123' });
+  await managementApi.deactivateAccount(api, 30);
+  await managementApi.reactivateAccount(api, 30);
+  await managementApi.deleteAccount(api, 30);
   assert.deepEqual(calls.map((c) => [c.path, c.init?.method, c.init?.body]), [
     ['/users/30', 'PATCH', '{"fullName":"Maria","password":"NewPass123"}'],
     ['/users/30/deactivate', 'PATCH', undefined],
     ['/users/30/reactivate', 'PATCH', undefined],
+    ['/users/30', 'DELETE', undefined],
   ]);
 });

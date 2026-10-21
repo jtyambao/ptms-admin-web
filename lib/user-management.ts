@@ -11,16 +11,18 @@ import type { UserRole } from './ptms-api';
 // Batch 2. Generic platform/organization account screen, distinct from the
 // Supervisor/Admin hierarchy accounts managed via site-hierarchy-panel.tsx.
 //
-// Engineer (owner request 2026-10-21, PTMS_FINAL_ROLE_PERMISSION_POLICY §2 "Engineer creates Manager"): an Engineer
-// opens this screen too and may add, edit and deactivate MANAGER accounts of their own organization - nothing else
-// (UsersService enforces the same on the server).
+// Engineer (owner request 2026-10-21): an Engineer opens this screen too and may add, edit, deactivate and delete
+// Engineer / Manager / Supervisor / Admin accounts of their own organization - nothing else (UsersService enforces
+// the same on the server). Owner is not a role in the database yet, so it is not offered.
 export const canViewUsers = (role: UserRole) =>
   role === 'super_admin' || role === 'org_admin' || role === 'engineer';
 export const canCreateUsers = canViewUsers;
 
-/** Which accounts the signed-in role may edit / deactivate: an Engineer, and only Manager accounts. */
+export const ENGINEER_MANAGED_ROLES: UserRole[] = ['engineer', 'manager', 'supervisor', 'admin'];
+
+/** Which accounts the signed-in role may edit / deactivate / delete: an Engineer, among the four managed roles. */
 export const canManageAccount = (requesterRole: UserRole, accountRole: UserRole) =>
-  requesterRole === 'engineer' && accountRole === 'manager';
+  requesterRole === 'engineer' && ENGINEER_MANAGED_ROLES.includes(accountRole);
 
 // Verified (2026-09-26) against origin/main's UsersService.create(): the
 // hierarchy carve-out now also blocks the new `admin` role (alongside the
@@ -43,7 +45,7 @@ const NON_SUPER_ADMIN_ROLES: UserRole[] = [
  */
 export function assignableRolesFor(requesterRole: UserRole): UserRole[] {
   if (requesterRole === 'super_admin') return NON_SUPER_ADMIN_ROLES;
-  if (requesterRole === 'engineer') return ['manager'];
+  if (requesterRole === 'engineer') return ENGINEER_MANAGED_ROLES;
   return NON_SUPER_ADMIN_ROLES.filter((role) => !HIERARCHY_ROLES.includes(role));
 }
 

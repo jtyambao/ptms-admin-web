@@ -439,17 +439,20 @@ export const managementApi = {
   // regardless of what's sent, unchanged since Batch 2).
   listUsers: (api: AuthenticatedApiClient, organizationId?: number) =>
     api.request<User[]>(organizationId ? `/users?organizationId=${organizationId}` : '/users'),
-  // Engineer administration of Manager accounts (name / email / new password; deactivate keeps the account).
-  updateManagerAccount: (api: AuthenticatedApiClient, id: number, body: { fullName?: string; email?: string; password?: string }) =>
+  // Engineer administration of accounts (name / email / new password; deactivate keeps the account; delete only
+  // works while the account has no history - the server answers 409 otherwise).
+  updateAccount: (api: AuthenticatedApiClient, id: number, body: { fullName?: string; email?: string; password?: string }) =>
     api.request<User>(`/users/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
-  deactivateManagerAccount: (api: AuthenticatedApiClient, id: number) =>
+  deactivateAccount: (api: AuthenticatedApiClient, id: number) =>
     api.request<User>(`/users/${id}/deactivate`, { method: 'PATCH' }),
-  reactivateManagerAccount: (api: AuthenticatedApiClient, id: number) =>
+  reactivateAccount: (api: AuthenticatedApiClient, id: number) =>
     api.request<User>(`/users/${id}/reactivate`, { method: 'PATCH' }),
+  deleteAccount: (api: AuthenticatedApiClient, id: number) =>
+    api.request<null>(`/users/${id}`, { method: 'DELETE' }),
   createUser: (api: AuthenticatedApiClient, body: CreateUserRequest) =>
     api.request<User>('/users', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
