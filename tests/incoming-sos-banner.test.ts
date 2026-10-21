@@ -17,9 +17,9 @@ test('mounted globally in PortalShell, not on any one page', () => {
   assert.match(shell, /<IncomingSosBanner \/>/);
 });
 
-test('gated by canRespondToSos (alias of canViewSos — same role set as backend RESPONDER_ROLES)', () => {
+test('gated by canRespondToSos (canViewSos minus the monitoring-only Owner — same role set as backend RESPONDER_ROLES)', () => {
   assert.match(banner, /canRespondToSos\(role\)/);
-  assert.match(dashboard, /export const canRespondToSos = canViewSos;/);
+  assert.match(dashboard, /export const canRespondToSos = \(role: UserRole\) => role !== 'owner' && canViewSos\(role\);/);
 });
 
 test('polls listSosAlerts on an interval, not a one-shot load', () => {

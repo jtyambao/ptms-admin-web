@@ -14,6 +14,7 @@ import type { UserRole } from './ptms-api';
 // assigned Site here too.
 export const canViewSitesOverview = (role: UserRole) =>
   role === 'super_admin' ||
+  role === 'owner' ||
   role === 'engineer' ||
   role === 'manager' ||
   role === 'supervisor' ||
@@ -50,6 +51,7 @@ export const canViewIncidents = (role: UserRole) =>
 // Incoming SOS banner.
 export const canViewSos = (role: UserRole) =>
   role === 'super_admin' ||
+  role === 'owner' || // view only (the backend list admits owner); never acknowledge / cancel / resolve
   role === 'org_admin' ||
   role === 'site_manager' ||
   role === 'supervisor' ||
@@ -60,8 +62,9 @@ export const canViewSos = (role: UserRole) =>
 // this role is currently viewing can also be acknowledged/cancelled by
 // that same role (SosController's RESPONDER_ROLES has no narrower
 // "read-only" subset, unlike Incidents), so this is deliberately an alias
-// of canViewSos rather than a separately-drifting predicate.
-export const canRespondToSos = canViewSos;
+// of canViewSos rather than a separately-drifting predicate - EXCEPT Owner (monitoring only), which may view the
+// list but never act on an alert.
+export const canRespondToSos = (role: UserRole) => role !== 'owner' && canViewSos(role);
 
 // Special Check Requests create page (branch release/dry-run-ops) —
 // verified against SpecialCheckRequestsController's SENDER_ROLES constant

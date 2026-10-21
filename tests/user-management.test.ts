@@ -109,11 +109,11 @@ test('Accounts nav link exists and role-gates the page content, not the navigati
 });
 
 // Engineer administration of Manager accounts (owner request 2026-10-21).
-test('an Engineer can add and manage Engineer / Manager / Supervisor / Admin accounts only', () => {
+test('an Engineer can add and manage Owner / Engineer / Manager / Supervisor / Admin accounts only', () => {
   assert.equal(canCreateUsers('engineer'), true);
-  assert.deepEqual(assignableRolesFor('engineer'), ['engineer', 'manager', 'supervisor', 'admin']);
+  assert.deepEqual(assignableRolesFor('engineer'), ['owner', 'engineer', 'manager', 'supervisor', 'admin']);
   assert.equal(requiresOrganizationId('engineer'), false); // the server uses the Engineer's own organization
-  for (const managed of ['engineer', 'manager', 'supervisor', 'admin'] as const) assert.equal(canManageAccount('engineer', managed), true);
+  for (const managed of ['owner', 'engineer', 'manager', 'supervisor', 'admin'] as const) assert.equal(canManageAccount('engineer', managed), true);
   for (const other of ['org_admin', 'site_admin', 'site_manager', 'auditor', 'client_viewer', 'super_admin'] as const) {
     assert.equal(canManageAccount('engineer', other), false);
   }
@@ -144,4 +144,27 @@ test('the Accounts page gives an Engineer Edit, Deactivate / Reactivate and Dele
     ['/users/30/reactivate', 'PATCH', undefined],
     ['/users/30', 'DELETE', undefined],
   ]);
+});
+
+// Owner (sql/060): a monitoring-only role - visible views, no actions.
+import { canRespondToSos, canViewSos, canViewSitesOverview } from '../lib/dashboard.ts';
+import { canViewPersonnel, canManagePersonnel } from '../lib/personnel-management.ts';
+import { canEditSiteOperationalSettings, canViewSiteOperationalSettings } from '../lib/operational-settings.ts';
+import { canManageSiteOperations } from '../lib/site-operations.ts';
+import { canSendSpecialCheckRequest } from '../lib/dashboard.ts';
+
+test('Owner can view Sites, personnel, settings and the SOS list, but cannot edit or act on anything', () => {
+  assert.equal(canViewSitesOverview('owner'), true);
+  assert.equal(canViewPersonnel('owner'), true);
+  assert.equal(canViewSiteOperationalSettings('owner'), true);
+  assert.equal(canViewSos('owner'), true);
+  // no write / action capability
+  assert.equal(canRespondToSos('owner'), false);
+  assert.equal(canManagePersonnel('owner'), false);
+  assert.equal(canEditSiteOperationalSettings('owner'), false);
+  assert.equal(canManageSiteOperations('owner'), false);
+  assert.equal(canSendSpecialCheckRequest('owner'), false);
+  assert.equal(canCreateUsers('owner'), false);
+  // the roles that could respond before still can
+  for (const responder of ['super_admin', 'org_admin', 'supervisor', 'admin', 'site_admin'] as const) assert.equal(canRespondToSos(responder), true);
 });

@@ -12,13 +12,13 @@ import type { UserRole } from './ptms-api';
 // Supervisor/Admin hierarchy accounts managed via site-hierarchy-panel.tsx.
 //
 // Engineer (owner request 2026-10-21): an Engineer opens this screen too and may add, edit, deactivate and delete
-// Engineer / Manager / Supervisor / Admin accounts of their own organization - nothing else (UsersService enforces
-// the same on the server). Owner is not a role in the database yet, so it is not offered.
+// Owner / Engineer / Manager / Supervisor / Admin accounts of their own organization - nothing else (UsersService
+// enforces the same on the server). Owner (sql/060) is a monitoring-only role.
 export const canViewUsers = (role: UserRole) =>
   role === 'super_admin' || role === 'org_admin' || role === 'engineer';
 export const canCreateUsers = canViewUsers;
 
-export const ENGINEER_MANAGED_ROLES: UserRole[] = ['engineer', 'manager', 'supervisor', 'admin'];
+export const ENGINEER_MANAGED_ROLES: UserRole[] = ['owner', 'engineer', 'manager', 'supervisor', 'admin'];
 
 /** Which accounts the signed-in role may edit / deactivate / delete: an Engineer, among the four managed roles. */
 export const canManageAccount = (requesterRole: UserRole, accountRole: UserRole) =>
@@ -29,9 +29,9 @@ export const canManageAccount = (requesterRole: UserRole, accountRole: UserRole)
 // pre-existing engineer/manager/supervisor/site_admin) for any
 // non-super_admin caller — `admin` accounts must go through
 // createSiteAdminAccount instead, same as site_admin always did.
-const HIERARCHY_ROLES: UserRole[] = ['engineer', 'manager', 'supervisor', 'site_admin', 'admin'];
+const HIERARCHY_ROLES: UserRole[] = ['owner', 'engineer', 'manager', 'supervisor', 'site_admin', 'admin'];
 const NON_SUPER_ADMIN_ROLES: UserRole[] = [
-  'engineer', 'manager', 'org_admin', 'site_admin', 'site_manager', 'supervisor', 'admin', 'auditor', 'client_viewer',
+  'owner', 'engineer', 'manager', 'org_admin', 'site_admin', 'site_manager', 'supervisor', 'admin', 'auditor', 'client_viewer',
 ];
 
 /**

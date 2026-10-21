@@ -37,6 +37,7 @@ export const API_BASE_URL =
 // org_admin=Owner, site_admin=Admin, or site_manager=Manager from this file.
 export type UserRole =
   | 'super_admin'
+  | 'owner'
   | 'engineer'
   | 'manager'
   | 'org_admin'

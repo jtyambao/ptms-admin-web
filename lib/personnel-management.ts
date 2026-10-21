@@ -41,6 +41,7 @@ export const canManageOic = (role: UserRole) =>
 // unchanged, `admin` still has no personnel create/deactivate authority).
 export const canViewPersonnel = (role: UserRole) =>
   role === 'super_admin' ||
+  role === 'owner' ||
   role === 'engineer' ||
   role === 'manager' ||
   role === 'supervisor' ||

@@ -12,7 +12,7 @@ import { ROLE_LABELS, roleLabel } from '../lib/role-labels.ts';
 // real, committed 10-value UserRole (origin/main:src/auth/jwt-payload.interface.ts).
 test('every currently deployed role has a label', () => {
   const realRoles = [
-    'super_admin', 'engineer', 'manager', 'org_admin', 'site_admin',
+    'super_admin', 'owner', 'engineer', 'manager', 'org_admin', 'site_admin',
     'site_manager', 'supervisor', 'admin', 'auditor', 'client_viewer',
   ] as const;
   for (const role of realRoles) {
@@ -30,11 +30,11 @@ test('site_admin keeps a distinguishing label — it is legacy, not deleted; bot
   assert.match(roleLabel('site_admin'), /legacy/i);
 });
 
-test('owner has no label yet — not because it is fictional, but because it is the approved future business role and is not yet part of the currently deployed UserRole this app authorizes against', () => {
-  assert.equal('owner' in ROLE_LABELS, false);
+test('owner has a label now that sql/060 adds the role (monitoring only)', () => {
+  assert.equal(roleLabel('owner'), 'Owner');
 });
 
-test('a role label is cosmetic only — the currently deployed UserRole type carries all 10 committed values, not the future five-role design', () => {
+test('a role label is cosmetic only — the UserRole type carries all 11 values (the 10 committed ones plus owner, sql/060)', () => {
   const source = readFileSync('lib/ptms-api.ts', 'utf8');
   const start = source.indexOf('export type UserRole =');
   const end = source.indexOf(';', start);
@@ -49,5 +49,5 @@ test('a role label is cosmetic only — the currently deployed UserRole type car
   assert.match(declaration, /'admin'/);
   assert.match(declaration, /'auditor'/);
   assert.match(declaration, /'client_viewer'/);
-  assert.doesNotMatch(declaration, /'owner'/);
+  assert.match(declaration, /'owner'/);
 });

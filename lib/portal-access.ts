@@ -19,6 +19,7 @@ import type { UserRole } from './ptms-api';
 // its LOCAL/UNCOMMITTED/UNDEPLOYED status).
 export const PORTAL_ROLES: UserRole[] = [
   'super_admin',
+  'owner', // monitoring only (sql/060): read everything of its organization, edit nothing
   'engineer',
   'manager',
   'supervisor',

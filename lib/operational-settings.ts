@@ -31,6 +31,7 @@ export const requiresOrganizationIdForSettings = (role: UserRole) => role === 's
 // their own assigned Site; Engineer/Manager cannot edit.
 export const canViewSiteOperationalSettings = (role: UserRole) =>
   role === 'super_admin' ||
+  role === 'owner' ||
   role === 'org_admin' ||
   role === 'engineer' ||
   role === 'manager' ||

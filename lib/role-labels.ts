@@ -13,6 +13,7 @@ import type { UserRole } from './ptms-api';
 // a shorter on-screen name, not a claim of business-role equivalence.
 export const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Admin / Internal Platform Role',
+  owner: 'Owner',
   engineer: 'Engineer',
   manager: 'Manager',
   org_admin: 'Organization Admin',

@@ -281,7 +281,7 @@ export function SiteRoundsPanel({ siteId }: { siteId: number }) {
   const canManage = !!role && canManageSiteOperations(role);
   // Read access mirrors the backend's requireReadAccess: everyone who can
   // manage can also read, plus Engineer/Manager get org-wide read-only.
-  const canView = canManage || role === 'engineer' || role === 'manager';
+  const canView = canManage || role === 'engineer' || role === 'manager' || role === 'owner';
 
   const [rounds, setRounds] = useState<ManagedRound[]>([]);
   const [checkpoints, setCheckpoints] = useState<ManagedCheckpoint[]>([]);

@@ -20,10 +20,10 @@ test('operational portal access matches the verified backend roles', () => {
   assert.equal(canAccessOperationalPortal('client_viewer'), false);
 });
 
-test('PORTAL_ROLES contains exactly the six roles with an approved Admin Web access basis', () => {
+test('PORTAL_ROLES contains exactly the roles with an approved Admin Web access basis (Owner is monitoring-only)', () => {
   assert.deepEqual(
     [...PORTAL_ROLES].sort(),
-    ['admin', 'engineer', 'manager', 'site_admin', 'super_admin', 'supervisor'],
+    ['admin', 'engineer', 'manager', 'owner', 'site_admin', 'super_admin', 'supervisor'],
   );
 });
 
@@ -66,7 +66,7 @@ test('recognizing a role does not automatically broaden its permissions', () => 
   assert.equal(canAccessOperationalPortal('site_manager'), false);
 });
 
-test('Owner cannot be represented — it does not exist in the real, deployed UserRole enum yet', () => {
-  const source = readFileSync('lib/portal-access.ts', 'utf8');
-  assert.doesNotMatch(source, /'owner'/);
+test('Owner (sql/060) gets portal access to MONITOR, and no create / edit capability anywhere', () => {
+  assert.equal(canAccessOperationalPortal('owner'), true);
+  assert.equal(canCreateSite('owner'), false);
 });
