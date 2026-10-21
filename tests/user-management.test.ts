@@ -168,3 +168,16 @@ test('Owner can view Sites, personnel, settings and the SOS list, but cannot edi
   // the roles that could respond before still can
   for (const responder of ['super_admin', 'org_admin', 'supervisor', 'admin', 'site_admin'] as const) assert.equal(canRespondToSos(responder), true);
 });
+
+// A failed action (delete / deactivate / add) must not hide the account list, and shows the backend's sentence.
+test('the Accounts page keeps the list visible when an action fails, and opts in to the backend sentences', () => {
+  const page = readFileSync('app/accounts/page.tsx', 'utf8');
+  const api = readFileSync('lib/management-api.ts', 'utf8');
+  assert.match(page, /const \[listFailed, setListFailed\] = useState\(false\)/);
+  assert.match(page, /!listFailed && users\.length === 0/);
+  assert.match(page, /\) : !listFailed \? \(/);
+  assert.doesNotMatch(page, /\) : !error \? \(/);
+  for (const call of ['deactivateAccount', 'reactivateAccount', 'deleteAccount']) {
+    assert.match(api, new RegExp(`${call}: [^\n]*\n[^\n]*surfaceServerMessage: true`));
+  }
+});

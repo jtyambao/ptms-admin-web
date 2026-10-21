@@ -16,9 +16,13 @@ export class ApiRequestError extends Error {
   readonly kind: ApiErrorKind;
   readonly status?: number;
 
-  constructor(kind: ApiErrorKind, status?: number) {
+  // serverMessage: set ONLY for calls that explicitly opt in (see RequestOptions.surfaceServerMessage) - a plain
+  // sentence the backend wrote for the person using the screen (e.g. "Deactivate it instead"). Every other call
+  // keeps the generic text and never exposes backend detail.
+  constructor(kind: ApiErrorKind, status?: number, serverMessage?: string) {
     super(
-      kind === 'validation'
+      serverMessage ??
+      (kind === 'validation'
         ? 'Please check the submitted information.'
         : kind === 'session-expired'
           ? 'Your session has expired. Please sign in again.'
@@ -30,7 +34,7 @@ export class ApiRequestError extends Error {
                 ? 'This action conflicts with the current operational state.'
               : kind === 'network'
                 ? 'The service is unreachable. Check your connection and try again.'
-                : 'The service is temporarily unavailable.',
+                : 'The service is temporarily unavailable.'),
     );
     this.name = 'ApiRequestError';
     this.kind = kind;
@@ -46,8 +50,14 @@ type ClientOptions = {
   apiBaseUrl?: string;
 };
 
+export type RequestOptions = {
+  // Show the backend's own sentence for a 400 / 403 / 409 instead of the generic text. Opt-in, per call: only for
+  // screens whose backend messages are written for the person using them (accounts, spot request edits).
+  surfaceServerMessage?: boolean;
+};
+
 export type AuthenticatedApiClient = {
-  request<T>(path: string, init?: RequestInit): Promise<T>;
+  request<T>(path: string, init?: RequestInit, options?: RequestOptions): Promise<T>;
 };
 
 export function createAuthenticatedApiClient(options: ClientOptions): AuthenticatedApiClient {
@@ -71,7 +81,7 @@ export function createAuthenticatedApiClient(options: ClientOptions): Authentica
     return refreshPromise;
   }
 
-  async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
+  async function request<T>(path: string, init: RequestInit = {}, retried = false, surface = false): Promise<T> {
     const token = options.getAccessToken();
     const headers = new Headers(init.headers);
     headers.set('Accept', 'application/json');
@@ -85,7 +95,7 @@ export function createAuthenticatedApiClient(options: ClientOptions): Authentica
     }
 
     if (response.status === 401 && !retried) {
-      if (await refreshOnce()) return request<T>(path, init, true);
+      if (await refreshOnce()) return request<T>(path, init, true, surface);
       if (!expiryHandled) {
         expiryHandled = true;
         options.onSessionExpired();
@@ -94,7 +104,17 @@ export function createAuthenticatedApiClient(options: ClientOptions): Authentica
     }
 
     if (!response.ok) {
-      if (response.status === 400) throw new ApiRequestError('validation', 400);
+      // Only when the call opted in, and only a plain-string message (a validation error array stays generic).
+      let serverMessage: string | undefined;
+      if (surface && (response.status === 400 || response.status === 403 || response.status === 409)) {
+        try {
+          const body = (await response.clone().json()) as { message?: unknown };
+          if (typeof body.message === 'string' && body.message.trim()) serverMessage = body.message.trim();
+        } catch {
+          serverMessage = undefined;
+        }
+      }
+      if (response.status === 400) throw new ApiRequestError('validation', 400, serverMessage);
       if (response.status === 401) {
         if (!expiryHandled) {
           expiryHandled = true;
@@ -102,9 +122,9 @@ export function createAuthenticatedApiClient(options: ClientOptions): Authentica
         }
         throw new ApiRequestError('session-expired', 401);
       }
-      if (response.status === 403) throw new ApiRequestError('forbidden', 403);
+      if (response.status === 403) throw new ApiRequestError('forbidden', 403, serverMessage);
       if (response.status === 404) throw new ApiRequestError('not-found', 404);
-      if (response.status === 409) throw new ApiRequestError('conflict', 409);
+      if (response.status === 409) throw new ApiRequestError('conflict', 409, serverMessage);
       throw new ApiRequestError('service', response.status);
     }
 
@@ -118,5 +138,5 @@ export function createAuthenticatedApiClient(options: ClientOptions): Authentica
     return envelope.data;
   }
 
-  return { request };
+  return { request: (path, init, options) => request(path, init, false, options?.surfaceServerMessage === true) };
 }

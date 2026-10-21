@@ -146,13 +146,13 @@ export const managementApi = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ allowedMinutes }),
-    }),
+    }, { surfaceServerMessage: true }),
   createSpecialCheckRequest: (api: AuthenticatedApiClient, body: CreateSpecialCheckRequest) =>
     api.request<SpecialCheckRequest>('/special-check-requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }),
+    }, { surfaceServerMessage: true }),
   listSites: (api: AuthenticatedApiClient) =>
     api.request<Site[]>('/management/sites'),
   getSite: (api: AuthenticatedApiClient, id: number) =>
@@ -446,17 +446,17 @@ export const managementApi = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }),
+    }, { surfaceServerMessage: true }),
   deactivateAccount: (api: AuthenticatedApiClient, id: number) =>
-    api.request<User>(`/users/${id}/deactivate`, { method: 'PATCH' }),
+    api.request<User>(`/users/${id}/deactivate`, { method: 'PATCH' }, { surfaceServerMessage: true }),
   reactivateAccount: (api: AuthenticatedApiClient, id: number) =>
-    api.request<User>(`/users/${id}/reactivate`, { method: 'PATCH' }),
+    api.request<User>(`/users/${id}/reactivate`, { method: 'PATCH' }, { surfaceServerMessage: true }),
   deleteAccount: (api: AuthenticatedApiClient, id: number) =>
-    api.request<null>(`/users/${id}`, { method: 'DELETE' }),
+    api.request<null>(`/users/${id}`, { method: 'DELETE' }, { surfaceServerMessage: true }),
   createUser: (api: AuthenticatedApiClient, body: CreateUserRequest) =>
     api.request<User>('/users', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    }),
+    }, { surfaceServerMessage: true }),
 
   // Batch 3 correction (2026-09-26): reverted a 2026-09-24 edit that
   // assumed this had become always site-scoped with Supervisor/Admin

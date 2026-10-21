@@ -129,3 +129,29 @@ test('409 is exposed as a conflict without returning backend internals', async (
       !error.message.includes('backend detail'),
   );
 });
+
+// Opt-in backend sentences (2026-10-21): only for screens whose backend messages are written for people.
+test('a call that opts in shows the backend\'s own sentence for 409 / 403 / 400, while the default stays generic', async () => {
+  const respond = (status: number, message: unknown) => createAuthenticatedApiClient({
+    apiBaseUrl: 'https://api.example',
+    fetcher: async () => new Response(JSON.stringify({ message }), { status }),
+    getAccessToken: () => 'token',
+    refreshSession: async () => false,
+    onSessionExpired: () => undefined,
+  });
+  const text = 'This account has history (requests, assignments or SOS records), so it cannot be deleted. Deactivate it instead.';
+  await assert.rejects(respond(409, text).request('/x', {}, { surfaceServerMessage: true }),
+    (error: unknown) => error instanceof ApiRequestError && error.kind === 'conflict' && error.message === text);
+  await assert.rejects(respond(403, 'You cannot delete your own account.').request('/x', {}, { surfaceServerMessage: true }),
+    (error: unknown) => error instanceof ApiRequestError && error.kind === 'forbidden' && error.message === 'You cannot delete your own account.');
+  await assert.rejects(respond(400, 'The guard has already used more time than that. Choose a longer time.').request('/x', {}, { surfaceServerMessage: true }),
+    (error: unknown) => error instanceof ApiRequestError && error.kind === 'validation' && /already used more time/.test(error.message));
+  // a validation-pipe array is technical: stays generic even when opted in
+  await assert.rejects(respond(400, ['allowedMinutes must be an integer number']).request('/x', {}, { surfaceServerMessage: true }),
+    (error: unknown) => error instanceof ApiRequestError && error.message === 'Please check the submitted information.');
+  // not opted in: generic, no backend text
+  await assert.rejects(respond(409, text).request('/x'),
+    (error: unknown) => error instanceof ApiRequestError && error.message === 'This action conflicts with the current operational state.');
+  await assert.rejects(respond(404, 'Account not found.').request('/x', {}, { surfaceServerMessage: true }),
+    (error: unknown) => error instanceof ApiRequestError && error.message === 'The requested resource is unavailable.');
+});

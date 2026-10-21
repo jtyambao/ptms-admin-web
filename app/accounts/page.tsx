@@ -35,6 +35,8 @@ export default function AccountsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // true only when the LIST could not be loaded; an error from an action (delete, deactivate, add) never hides the list.
+  const [listFailed, setListFailed] = useState(false);
   const [success, setSuccess] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [organizationId, setOrganizationId] = useState('');
@@ -61,8 +63,10 @@ export default function AccountsPage() {
     try {
       setUsers(await managementApi.listUsers(session.api));
       setError('');
+      setListFailed(false);
     } catch (reason) {
       setError(reason instanceof ApiRequestError ? reason.message : genericError);
+      setListFailed(true);
     } finally {
       setLoading(false);
     }
@@ -316,12 +320,12 @@ export default function AccountsPage() {
           <section className="overflow-hidden rounded-2xl border bg-card">
             {loading ? (
               <p className="p-8 text-center text-sm text-muted-foreground">Loading accounts…</p>
-            ) : !error && users.length === 0 ? (
+            ) : !listFailed && users.length === 0 ? (
               <div className="p-10 text-center">
                 <UserRound className="mx-auto size-9 text-muted-foreground" />
                 <p className="mt-4 font-bold">No accounts yet</p>
               </div>
-            ) : !error ? (
+            ) : !listFailed ? (
               <div className="divide-y">
                 {usersMore.visible.map((user) => (
                   <div key={user.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
