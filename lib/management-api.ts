@@ -439,6 +439,17 @@ export const managementApi = {
   // regardless of what's sent, unchanged since Batch 2).
   listUsers: (api: AuthenticatedApiClient, organizationId?: number) =>
     api.request<User[]>(organizationId ? `/users?organizationId=${organizationId}` : '/users'),
+  // Engineer administration of Manager accounts (name / email / new password; deactivate keeps the account).
+  updateManagerAccount: (api: AuthenticatedApiClient, id: number, body: { fullName?: string; email?: string; password?: string }) =>
+    api.request<User>(`/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  deactivateManagerAccount: (api: AuthenticatedApiClient, id: number) =>
+    api.request<User>(`/users/${id}/deactivate`, { method: 'PATCH' }),
+  reactivateManagerAccount: (api: AuthenticatedApiClient, id: number) =>
+    api.request<User>(`/users/${id}/reactivate`, { method: 'PATCH' }),
   createUser: (api: AuthenticatedApiClient, body: CreateUserRequest) =>
     api.request<User>('/users', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

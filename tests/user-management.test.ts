@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { managementApi } from '../lib/management-api.ts';
 import {
   assignableRolesFor,
   canCreateUsers,
+  canManageAccount,
   canViewUsers,
   isValidEmail,
   isValidPassword,
@@ -15,10 +17,10 @@ import {
 // organizationId removed) was already live in production. Restored to
 // match a fresh origin/main read of CURRENT PRODUCTION TECHNICAL RBAC
 // (users.controller.ts, create-user.dto.ts: unchanged since Batch 2).
-test('Accounts: view/create is limited to super_admin and org_admin, matching UsersController exactly', () => {
+test('Accounts: view/create is limited to super_admin, org_admin and Engineer (Manager accounts only), matching UsersController', () => {
   assert.equal(canViewUsers('super_admin'), true);
   assert.equal(canViewUsers('org_admin'), true);
-  assert.equal(canViewUsers('engineer'), false);
+  assert.equal(canViewUsers('engineer'), true);
   assert.equal(canViewUsers('manager'), false);
   assert.equal(canViewUsers('supervisor'), false);
   assert.equal(canViewUsers('site_admin'), false);
@@ -104,4 +106,37 @@ test('Accounts nav link exists and role-gates the page content, not the navigati
   const page = readFileSync('app/accounts/page.tsx', 'utf8');
   assert.match(page, /canViewUsers/);
   assert.match(page, /Your role cannot manage accounts/);
+});
+
+// Engineer administration of Manager accounts (owner request 2026-10-21).
+test('an Engineer can add Manager accounts only, and edit / deactivate only Manager accounts', () => {
+  assert.equal(canCreateUsers('engineer'), true);
+  assert.deepEqual(assignableRolesFor('engineer'), ['manager']);
+  assert.equal(requiresOrganizationId('engineer'), false); // the server uses the Engineer's own organization
+  assert.equal(canManageAccount('engineer', 'manager'), true);
+  for (const other of ['engineer', 'org_admin', 'supervisor', 'admin', 'site_admin', 'super_admin'] as const) {
+    assert.equal(canManageAccount('engineer', other), false);
+  }
+  for (const requester of ['super_admin', 'org_admin', 'manager', 'supervisor', 'admin'] as const) {
+    assert.equal(canManageAccount(requester, 'manager'), false);
+  }
+});
+
+test('the Accounts page gives an Engineer Edit and Deactivate / Reactivate on Manager rows, calling the real endpoints', async () => {
+  const page = readFileSync('app/accounts/page.tsx', 'utf8');
+  assert.match(page, /role && canManageAccount\(role, user\.role\)/);
+  assert.match(page, />Edit<\/Button>/);
+  assert.match(page, /\{user\.status === 'active' \? 'Deactivate' : 'Reactivate'\}/);
+  assert.match(page, /Nothing is deleted/);
+  assert.match(page, /managementApi\.updateManagerAccount\(session\.api, editing\.id,/);
+  const calls: { path: string; init?: { method?: string; body?: string } }[] = [];
+  const api = { request: async (path: string, init?: { method?: string; body?: string }) => { calls.push({ path, init }); return {}; } } as never;
+  await managementApi.updateManagerAccount(api, 30, { fullName: 'Maria', password: 'NewPass123' });
+  await managementApi.deactivateManagerAccount(api, 30);
+  await managementApi.reactivateManagerAccount(api, 30);
+  assert.deepEqual(calls.map((c) => [c.path, c.init?.method, c.init?.body]), [
+    ['/users/30', 'PATCH', '{"fullName":"Maria","password":"NewPass123"}'],
+    ['/users/30/deactivate', 'PATCH', undefined],
+    ['/users/30/reactivate', 'PATCH', undefined],
+  ]);
 });

@@ -8,12 +8,14 @@ import { PageContainer, PageHeader, ShowMore, useShowMore } from '@/components/p
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ApiRequestError } from '@/lib/authenticated-api';
 import { managementApi } from '@/lib/management-api';
 import { roleLabel } from '@/lib/role-labels';
 import {
   assignableRolesFor,
   canCreateUsers,
+  canManageAccount,
   canViewUsers,
   isValidEmail,
   isValidPassword,
@@ -41,6 +43,13 @@ export default function AccountsPage() {
   const [fullName, setFullName] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
   const [saving, setSaving] = useState(false);
+  // Engineer: edit / deactivate a Manager account.
+  const [editing, setEditing] = useState<User | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editError, setEditError] = useState('');
+  const [statusTarget, setStatusTarget] = useState<User | null>(null);
 
   const assignableRoles = role ? assignableRolesFor(role) : [];
   const needsOrganizationId = role ? requiresOrganizationId(role) : false;
@@ -123,6 +132,53 @@ export default function AccountsPage() {
     }
   }
 
+  function openEdit(user: User) {
+    setEditName(user.full_name); setEditEmail(user.email); setEditPassword(''); setEditError(''); setEditing(user);
+  }
+
+  async function saveEdit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    if (!editName.trim()) { setEditError('Enter the full name.'); return; }
+    if (!isValidEmail(editEmail.trim())) { setEditError('Enter a valid email address.'); return; }
+    if (editPassword && !isValidPassword(editPassword)) { setEditError('A new password must be at least 8 characters.'); return; }
+    setSaving(true); setEditError(''); setSuccess('');
+    try {
+      await managementApi.updateManagerAccount(session.api, editing.id, {
+        ...(editName.trim() !== editing.full_name ? { fullName: editName.trim() } : {}),
+        ...(editEmail.trim() !== editing.email ? { email: editEmail.trim() } : {}),
+        ...(editPassword ? { password: editPassword } : {}),
+      });
+      setEditing(null); setEditPassword('');
+      await refresh();
+      setSuccess('Account updated.');
+    } catch (reason) {
+      setEditPassword('');
+      setEditError(
+        reason instanceof ApiRequestError && reason.status === 409
+          ? 'An account with this email already exists.'
+          : reason instanceof ApiRequestError ? reason.message : 'The account could not be changed. Please try again.',
+      );
+    } finally { setSaving(false); }
+  }
+
+  async function confirmStatusChange() {
+    if (!statusTarget) return;
+    const turningOff = statusTarget.status === 'active';
+    setSaving(true); setError(''); setSuccess('');
+    try {
+      await (turningOff
+        ? managementApi.deactivateManagerAccount(session.api, statusTarget.id)
+        : managementApi.reactivateManagerAccount(session.api, statusTarget.id));
+      setStatusTarget(null);
+      await refresh();
+      setSuccess(turningOff ? 'Account deactivated. Nothing was deleted.' : 'Account is active again.');
+    } catch (reason) {
+      setStatusTarget(null);
+      setError(reason instanceof ApiRequestError ? reason.message : 'The account could not be changed. Please try again.');
+    } finally { setSaving(false); }
+  }
+
   const usersMore = useShowMore(users, 10, 20);
 
   if (!canView) {
@@ -151,7 +207,9 @@ export default function AccountsPage() {
           <PageHeader
             eyebrow="Who can sign in"
             title="Accounts"
-            subtitle="Everyone who can sign in to this portal. A Site's Supervisor and Admins are added from that Site's People tab. To change or turn off an account, ask the platform team."
+            subtitle={role === 'engineer'
+              ? "Everyone who can sign in to this portal. As an Engineer you can add, edit and deactivate Manager accounts. A Site's Supervisor and Admins are added from that Site's People tab."
+              : "Everyone who can sign in to this portal. A Site's Supervisor and Admins are added from that Site's People tab. To change or turn off an account, ask the platform team."}
             actions={(
               <>
                 <Button variant="outline" onClick={() => void refresh()} disabled={loading}>
@@ -260,12 +318,68 @@ export default function AccountsPage() {
                       </div>
                       <p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>
                     </div>
+                    {role && canManageAccount(role, user.role) && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => openEdit(user)}>Edit</Button>
+                        <Button variant={user.status === 'active' ? 'destructive' : 'outline'} onClick={() => setStatusTarget(user)}>
+                          {user.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 <ShowMore remaining={usersMore.remaining} onClick={usersMore.showMore} step={usersMore.step} />
               </div>
             ) : null}
           </section>
+          <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Manager account</DialogTitle>
+                <DialogDescription>Change the name or email, or set a new password. Leave the password empty to keep the current one.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={saveEdit}>
+                <div className="grid gap-4">
+                  <label htmlFor="edit-account-name" className="grid gap-2 font-bold">
+                    Full name
+                    <Input id="edit-account-name" value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={150} required />
+                  </label>
+                  <label htmlFor="edit-account-email" className="grid gap-2 font-bold">
+                    Email
+                    <Input id="edit-account-email" type="email" autoComplete="off" value={editEmail} onChange={(event) => setEditEmail(event.target.value)} required />
+                  </label>
+                  <label htmlFor="edit-account-password" className="grid gap-2 font-bold">
+                    New password <span className="font-normal text-muted-foreground">(optional)</span>
+                    <Input id="edit-account-password" type="password" autoComplete="new-password" minLength={8} value={editPassword} onChange={(event) => setEditPassword(event.target.value)} />
+                  </label>
+                  {editError && <p role="alert" className="flex gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100"><AlertTriangle className="size-4 shrink-0" />{editError}</p>}
+                </div>
+                <DialogFooter className="mt-5">
+                  <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+                  <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={statusTarget !== null} onOpenChange={(open) => { if (!open) setStatusTarget(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{statusTarget?.status === 'active' ? 'Deactivate this account?' : 'Reactivate this account?'}</DialogTitle>
+                <DialogDescription>
+                  {statusTarget?.status === 'active'
+                    ? `${statusTarget?.full_name} will no longer be able to sign in. Nothing is deleted, and you can reactivate the account later. If they are signed in right now, they stay signed in until their session ends.`
+                    : `${statusTarget?.full_name} will be able to sign in again.`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setStatusTarget(null)}>Cancel</Button>
+                <Button type="button" variant={statusTarget?.status === 'active' ? 'destructive' : 'default'} disabled={saving} onClick={() => void confirmStatusChange()}>
+                  {statusTarget?.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </PageContainer>
       </PortalShell>
     </ProtectedPortal>
