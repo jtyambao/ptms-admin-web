@@ -84,13 +84,16 @@ test('a legacy/non-preset value (e.g. editing an existing Round) falls back to a
   const frequencyFieldStart = panel.indexOf('function FrequencyField');
   const frequencyFieldEnd = panel.indexOf('\n}', frequencyFieldStart);
   const frequencyField = panel.slice(frequencyFieldStart, frequencyFieldEnd);
-  assert.match(frequencyField, /const isCustom = value\.trim\(\) !== '' && !preset;/);
-  assert.match(frequencyField, /\{\(isCustom \|\| !preset\) && \(/);
+  // a legacy value starts the field in Custom mode (value is non-empty and not a preset) and the box stays visible
+  assert.match(frequencyField, /useCustomField\(value\.trim\(\) !== '' && !preset\)/);
+  assert.match(frequencyField, /const showCustom = custom\.customMode \|\| !preset;/);
+  assert.match(frequencyField, /\{showCustom && \(/);
 
   const secondsFieldStart = panel.indexOf('function SecondsPresetField');
   const secondsFieldEnd = panel.indexOf('function frequencyBadgeLabel');
   const secondsField = panel.slice(secondsFieldStart, secondsFieldEnd);
-  assert.match(secondsField, /const isCustom = !isDefault && !preset;/);
+  assert.match(secondsField, /useCustomField\(!isDefault && !preset\)/);
+  assert.match(secondsField, /const isCustom = custom\.customMode \|\| \(!isDefault && !preset\);/);
 });
 
 test('the Rounds list badge shows the friendly frequency label, not the raw minutes number', () => {

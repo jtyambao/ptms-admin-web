@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, BadgeCheck, Clock, Plus, RefreshCw, Route, ShieldAlert } from 'lucide-react';
-import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ShowMore, useShowMore } from '@/components/page-layout';
 import { Badge } from '@/components/ui/badge';
@@ -57,25 +57,52 @@ const SECONDS_PRESETS = [
   { label: '5 minutes', seconds: 300 },
 ] as const;
 
+// "Custom" fields: choosing Custom selects the number that is shown, so the person can type straight over it,
+// and the field STAYS Custom while it is being edited - clearing it (or typing a number that happens to equal a
+// preset) never snaps back to a preset / Default (owner report 2026-10-22).
+function useCustomField(initiallyCustom: boolean) {
+  const [customMode, setCustomMode] = useState(initiallyCustom);
+  const [selectNext, setSelectNext] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!selectNext) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+    setSelectNext(false);
+  }, [selectNext]);
+  return { customMode, setCustomMode, inputRef, selectCustomText: () => setSelectNext(true) };
+}
+
 function FrequencyField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const preset = FREQUENCY_PRESETS.find((p) => String(p.minutes) === value);
-  const isCustom = value.trim() !== '' && !preset;
+  const custom = useCustomField(value.trim() !== '' && !preset);
+  const showCustom = custom.customMode || !preset;
   return (
     <div className="grid gap-2">
       <label htmlFor="round-frequency" className="font-bold">How often</label>
       <select
         id="round-frequency"
         className="h-10 rounded-lg border bg-background px-3 font-normal"
-        value={preset ? String(preset.minutes) : 'custom'}
-        onChange={(e) => onChange(e.target.value === 'custom' ? (isCustom ? value : '10') : e.target.value)}
+        value={showCustom ? 'custom' : String(preset!.minutes)}
+        onChange={(e) => {
+          if (e.target.value === 'custom') {
+            custom.setCustomMode(true);
+            if (preset || value.trim() === '') onChange('10');
+            custom.selectCustomText();
+          } else {
+            custom.setCustomMode(false);
+            onChange(e.target.value);
+          }
+        }}
       >
         {FREQUENCY_PRESETS.map((p) => <option key={p.minutes} value={p.minutes}>{p.label}</option>)}
         <option value="custom">Custom</option>
       </select>
-      {(isCustom || !preset) && (
+      {showCustom && (
         <label htmlFor="round-frequency-custom" className="grid gap-2 text-sm font-normal text-muted-foreground">
           Every this many minutes
           <input
+            ref={custom.inputRef}
             id="round-frequency-custom"
             type="number"
             min={1}
@@ -95,18 +122,23 @@ function SecondsPresetField({ id, label, value, onChange }: {
 }) {
   const preset = SECONDS_PRESETS.find((p) => String(p.seconds) === value);
   const isDefault = value.trim() === '';
-  const isCustom = !isDefault && !preset;
+  const custom = useCustomField(!isDefault && !preset);
+  // Stays Custom while being edited, even when emptied (an empty custom box used to flip straight back to Default).
+  const isCustom = custom.customMode || (!isDefault && !preset);
   return (
     <div className="grid gap-2">
       <label htmlFor={id} className="font-bold">{label}</label>
       <select
         id={id}
         className="h-10 rounded-lg border bg-background px-3 font-normal"
-        value={isDefault ? 'default' : preset ? String(preset.seconds) : 'custom'}
+        value={isCustom ? 'custom' : isDefault ? 'default' : String(preset!.seconds)}
         onChange={(e) => {
-          if (e.target.value === 'default') onChange('');
-          else if (e.target.value === 'custom') onChange(isCustom ? value : '90');
-          else onChange(e.target.value);
+          if (e.target.value === 'default') { custom.setCustomMode(false); onChange(''); }
+          else if (e.target.value === 'custom') {
+            custom.setCustomMode(true);
+            if (isDefault || preset) onChange('90');
+            custom.selectCustomText();
+          } else { custom.setCustomMode(false); onChange(e.target.value); }
         }}
       >
         <option value="default">Default</option>
@@ -117,6 +149,7 @@ function SecondsPresetField({ id, label, value, onChange }: {
         <label htmlFor={`${id}-custom`} className="grid gap-2 text-sm font-normal text-muted-foreground">
           Exact seconds
           <input
+            ref={custom.inputRef}
             id={`${id}-custom`}
             type="number"
             min={10}
