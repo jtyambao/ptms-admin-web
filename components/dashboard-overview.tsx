@@ -12,7 +12,7 @@ import {
   dobItem, incidentItem, isOnDay, newestFirst, notifyItem, sumRoundsSummaries, visitorItem, type ReportItem,
 } from '@/lib/dashboard-details';
 import { managementApi } from '@/lib/management-api';
-import { isOpenSos } from '@/lib/sos-console';
+import { isOpenSosToday } from '@/lib/sos-console';
 import type { RoundsDayHistory, Site, SosAlertEntry, StaffCallEntry, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
@@ -120,7 +120,7 @@ export function DashboardOverview({ sites, refreshKey }: { sites: Site[]; refres
   }, [session.api, session.status, sites, refreshKey, canIncidents, loadSos]);
 
   const totals = summaries.state === 'ready' ? sumRoundsSummaries(summaries.data.perSite.map((entry) => entry.history.summary)) : null;
-  const openSos = sos.state === 'ready' ? sos.data.filter(isOpenSos) : [];
+  const openSos = sos.state === 'ready' ? sos.data.filter((a) => isOpenSosToday(a, timezone)) : [];
   const todayReports = useMemo(
     () => (reports.state === 'ready' && day ? newestFirst(reports.data.filter((item) => isOnDay(item.at, day, timezone))) : []),
     [reports, day, timezone],
@@ -220,7 +220,7 @@ export function DashboardOverview({ sites, refreshKey }: { sites: Site[]; refres
             </div>
           )}
           {selected === 'missed' && <MissedDetail day={day} sites={sites} timezone={timezone} />}
-          {selected === 'sos' && <SosDetail alerts={sos.state === 'ready' ? sos.data : []} onChanged={loadSos} unavailable={sos.state === 'unavailable' ? sos.reason : null} />}
+          {selected === 'sos' && <SosDetail alerts={sos.state === 'ready' ? sos.data : []} onChanged={loadSos} timezone={timezone} unavailable={sos.state === 'unavailable' ? sos.reason : null} />}
           {selected === 'oic' && <OicDetail onPhotos={(photos, index) => setViewer({ photos, index })} sites={sites} staffing={staffing} timezone={timezone} />}
           {selected === 'reports' && <ReportsDetail errors={reportErrors} items={todayReports} onPhotos={(photos, index) => setViewer({ photos, index })} timezone={timezone} />}
           {selected === 'calls' && <CallsDetail calls={calls.state === 'ready' ? todayCalls : []} timezone={timezone} unavailable={calls.state === 'unavailable' ? calls.reason : null} />}

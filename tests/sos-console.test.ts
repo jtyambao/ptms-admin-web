@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { managementApi } from '../lib/management-api.ts';
-import { formatDuration, formatElapsed, mapsUrl, sosOutcome, splitSosAlerts, trackLocationChange } from '../lib/sos-console.ts';
+import { formatDuration, formatElapsed, isOpenSosToday, mapsUrl, sosOutcome, splitSosAlerts, trackLocationChange } from '../lib/sos-console.ts';
 import type { SosAlertEntry } from '../lib/ptms-api.ts';
 
 // SOS receiver console (user-authorized 2026-10-07).
@@ -143,4 +143,15 @@ test('the SOS page, the banner and the Calls page all wire the sender call; staf
     { callType: 'voice', siteId: 4, sosAlertId: 9, targetSiteDeviceId: 7 },
     { callType: 'video', siteId: 4 },
   ]);
+});
+
+test('"SOS right now" = open AND triggered today (organization day): an old unclosed alert and finished ones are not it', () => {
+  const now = new Date('2026-10-29T03:00:00.000Z'); // 11:00 Asia/Manila on Oct 29
+  const tz = 'Asia/Manila';
+  assert.equal(isOpenSosToday(alert({ status: 'active', triggered_at: '2026-10-29T01:00:00.000Z' }), tz, now), true);
+  assert.equal(isOpenSosToday(alert({ status: 'acknowledged', triggered_at: '2026-10-28T16:30:00.000Z' }), tz, now), true); // 00:30 Manila Oct 29
+  assert.equal(isOpenSosToday(alert({ status: 'active', triggered_at: '2026-10-22T05:00:00.000Z' }), tz, now), false); // Oct 22, never closed
+  assert.equal(isOpenSosToday(alert({ status: 'active', triggered_at: '2026-10-28T15:59:00.000Z' }), tz, now), false); // 23:59 Manila Oct 28
+  assert.equal(isOpenSosToday(alert({ status: 'resolved', triggered_at: '2026-10-29T01:00:00.000Z' }), tz, now), false);
+  assert.equal(isOpenSosToday(alert({ status: 'cancelled', triggered_at: '2026-10-29T01:00:00.000Z' }), tz, now), false);
 });

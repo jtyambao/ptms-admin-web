@@ -4,6 +4,22 @@ import type { SosAlertEntry } from './ptms-api';
 
 export const isOpenSos = (alert: SosAlertEntry) => alert.status === 'active' || alert.status === 'acknowledged';
 
+/**
+ * The Dashboard's "SOS right now": an alert that is still open AND was triggered today (organization calendar day).
+ * An alert nobody closed days ago is not "right now" - it stays on the SOS page (open section) until someone resolves it.
+ */
+export function isOpenSosToday(alert: SosAlertEntry, timezone: string, now: Date = new Date()): boolean {
+  if (!isOpenSos(alert)) return false;
+  const dayOf = (value: Date) => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+    } catch {
+      return value.toISOString().slice(0, 10);
+    }
+  };
+  return dayOf(new Date(alert.triggered_at)) === dayOf(now);
+}
+
 export function splitSosAlerts(alerts: SosAlertEntry[]): { open: SosAlertEntry[]; history: SosAlertEntry[] } {
   const byTriggeredDesc = (a: SosAlertEntry, b: SosAlertEntry) =>
     new Date(b.triggered_at).getTime() - new Date(a.triggered_at).getTime();

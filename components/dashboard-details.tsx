@@ -15,7 +15,7 @@ import {
   type ReportItem, type ReportKind,
 } from '@/lib/dashboard-details';
 import { managementApi } from '@/lib/management-api';
-import { callSenderUrl, canCallSosSender, isOpenSos } from '@/lib/sos-console';
+import { callSenderUrl, canCallSosSender, isOpenSosToday } from '@/lib/sos-console';
 import type { CheckpointScan, RoundsDayHistory, Site, SiteDevice, SiteCheckIn, SosAlertEntry, StaffCallEntry, StaffingStatus } from '@/lib/ptms-api';
 import { useSession } from '@/lib/session-provider';
 
@@ -237,9 +237,9 @@ export function MissedDetail({ sites, day, timezone }: { sites: Site[]; day: str
 }
 
 // ---------------- 3. SOS ----------------
-// "SOS right now" shows and counts ONLY the alerts that are still open. Finished ones (resolved / false alarm) are not
-// listed or counted here at all - they live in the SOS page's History.
-export function SosDetail({ alerts, onChanged, unavailable }: { alerts: SosAlertEntry[]; onChanged: () => Promise<void>; unavailable: string | null }) {
+// "SOS right now" shows and counts ONLY the alerts that are still open AND were triggered today. Finished ones
+// (resolved / false alarm) and open ones from earlier days are not listed or counted here - they live on the SOS page.
+export function SosDetail({ alerts, onChanged, timezone, unavailable }: { alerts: SosAlertEntry[]; onChanged: () => Promise<void>; timezone: string; unavailable: string | null }) {
   const session = useSession();
   const actions = useSosActions(session.api, onChanged);
   const [now, setNow] = useState(() => Date.now());
@@ -249,7 +249,7 @@ export function SosDetail({ alerts, onChanged, unavailable }: { alerts: SosAlert
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-  const open = alerts.filter(isOpenSos);
+  const open = alerts.filter((a) => isOpenSosToday(a, timezone));
   if (unavailable) return <Note>{unavailable}</Note>;
   return (
     <div className="space-y-4">
@@ -275,7 +275,7 @@ export function SosDetail({ alerts, onChanged, unavailable }: { alerts: SosAlert
       ))}
       {actions.success && <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{actions.success}</p>}
       {actions.error && <p className="text-sm font-bold text-red-700 dark:text-red-400" role="alert">{actions.error}</p>}
-      <p className="text-sm text-muted-foreground">Finished alerts are in the <Link className="font-medium underline" href="/sos">SOS history</Link>.</p>
+      <p className="text-sm text-muted-foreground">Finished alerts, and any alert still open from an earlier day, are on the <Link className="font-medium underline" href="/sos">SOS page</Link>.</p>
       <SosActionDialog actions={actions} />
     </div>
   );
