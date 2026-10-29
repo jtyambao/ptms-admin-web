@@ -11,7 +11,7 @@ import { callsFeatureEnabled } from '@/lib/calls-feature';
 import { scanTimeLabel } from '@/lib/checkpoint-scans';
 import { canRespondToSos, deviceOnlineStatus } from '@/lib/dashboard';
 import {
-  MISSED_STATE_LABEL, REPORT_KIND_LABEL, callBackUrl, callDirectionLabel, callDuration, callOutcomeLabel, isOnDay,
+  MISSED_STATE_LABEL, REPORT_KIND_LABEL, callBackUrl, callDirectionLabel, callDuration, callOutcomeLabel,
   type ReportItem, type ReportKind,
 } from '@/lib/dashboard-details';
 import { managementApi } from '@/lib/management-api';
@@ -237,7 +237,9 @@ export function MissedDetail({ sites, day, timezone }: { sites: Site[]; day: str
 }
 
 // ---------------- 3. SOS ----------------
-export function SosDetail({ alerts, day, timezone, onChanged, unavailable }: { alerts: SosAlertEntry[]; day: string | null; timezone: string; onChanged: () => Promise<void>; unavailable: string | null }) {
+// "SOS right now" shows and counts ONLY the alerts that are still open. Finished ones (resolved / false alarm) are not
+// listed or counted here at all - they live in the SOS page's History.
+export function SosDetail({ alerts, onChanged, unavailable }: { alerts: SosAlertEntry[]; onChanged: () => Promise<void>; unavailable: string | null }) {
   const session = useSession();
   const actions = useSosActions(session.api, onChanged);
   const [now, setNow] = useState(() => Date.now());
@@ -248,8 +250,6 @@ export function SosDetail({ alerts, day, timezone, onChanged, unavailable }: { a
     return () => window.clearInterval(timer);
   }, []);
   const open = alerts.filter(isOpenSos);
-  const closedToday = alerts.filter((a) => !isOpenSos(a) && day && isOnDay(a.triggered_at, day, timezone));
-  const closedMore = useShowMore(closedToday, 5, 10);
   if (unavailable) return <Note>{unavailable}</Note>;
   return (
     <div className="space-y-4">
@@ -275,21 +275,7 @@ export function SosDetail({ alerts, day, timezone, onChanged, unavailable }: { a
       ))}
       {actions.success && <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{actions.success}</p>}
       {actions.error && <p className="text-sm font-bold text-red-700 dark:text-red-400" role="alert">{actions.error}</p>}
-      <Disclosure count={closedToday.length} title="Closed today">
-        {closedToday.length === 0 ? <p className="p-4 text-sm text-muted-foreground">Nothing was closed today.</p> : (
-          <ul className="divide-y">
-            {closedMore.visible.map((alert) => (
-              <li className="flex flex-wrap items-center gap-x-3 gap-y-1 p-4 text-sm" key={alert.id}>
-                <Badge variant="outline">{alert.status === 'resolved' ? 'Resolved' : 'False alarm'}</Badge>
-                <span className="font-bold">{alert.site_name ?? 'Unknown Site'}</span>
-                <span className="text-muted-foreground tabular-nums">{scanTimeLabel(alert.triggered_at, timezone, false)}</span>
-                {alert.resolution_note && <span className="w-full text-xs text-muted-foreground">{alert.resolution_note}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-        <ShowMore onClick={closedMore.showMore} remaining={closedMore.remaining} step={closedMore.step} />
-      </Disclosure>
+      <p className="text-sm text-muted-foreground">Finished alerts are in the <Link className="font-medium underline" href="/sos">SOS history</Link>.</p>
       <SosActionDialog actions={actions} />
     </div>
   );

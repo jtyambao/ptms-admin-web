@@ -92,7 +92,10 @@ test('details: lists are capped with Show more, photos open the shared viewer, S
   assert.match(details, /onPhotos\(photos, photoIndex\)/);
   assert.match(details, /<SosAlertCard/);
   assert.match(details, /Call sender now/);
-  assert.match(details, /Closed today/);
+  // "SOS right now" lists and counts only OPEN alerts: finished ones are in the SOS page's History, not here.
+  assert.doesNotMatch(details, /Closed today/);
+  assert.doesNotMatch(details, /closedToday/);
+  assert.match(details, /href="\/sos">SOS history/);
   assert.match(details, /Call back/);
   assert.match(details, /Checked in by guard in charge/);
   assert.match(details, /<Disclosure count=\{history\.length\} title="Check-in history">/);
