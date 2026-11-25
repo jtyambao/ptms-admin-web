@@ -24,7 +24,7 @@ test('gated by canRespondToSos (canViewSos minus the monitoring-only Owner — s
 
 test('polls listSosAlerts on an interval, not a one-shot load', () => {
   assert.match(banner, /window\.setInterval\(\(\) => void poll\(\), POLL_MS\)/);
-  assert.match(banner, /managementApi\.listSosAlerts\(session\.api\)/);
+  assert.match(banner, /managementApi\.listSosAlerts\(session\.api, \{ status: \['active'\] \}\)/);
 });
 
 test('shows only alerts nobody has responded to yet (owner decision 2026-10-08)', () => {

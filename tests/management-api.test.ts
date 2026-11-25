@@ -179,3 +179,13 @@ test('Per-Site Operational Settings uses sites/:siteId/operational-settings, dis
   assert.deepEqual(JSON.parse(String(calls[1].init?.body)), { guardIdleTimeoutSeconds: 30 });
   assert.equal(calls[2].init?.method, 'DELETE');
 });
+
+test('listSosAlerts asks the API to filter by status only when told to (the 5s SOS banner must not download the whole history)', async () => {
+  const paths: string[] = [];
+  const api = { request: async (path: string) => { paths.push(path); return []; } } as never;
+  const { managementApi } = await import('../lib/management-api.ts');
+  await managementApi.listSosAlerts(api);
+  await managementApi.listSosAlerts(api, { status: ['active'] });
+  await managementApi.listSosAlerts(api, { status: ['active', 'acknowledged'] });
+  assert.deepEqual(paths, ['/sos-alerts', '/sos-alerts?status=active', '/sos-alerts?status=active,acknowledged']);
+});
