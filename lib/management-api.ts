@@ -104,8 +104,10 @@ export const managementApi = {
   // get every SOS alert in the org (still filtered to one Site
   // client-side here); admin/site_admin (dry-run fix, P3(a)) are already
   // narrowed server-side to their own assigned Site.
-  listSosAlerts: (api: AuthenticatedApiClient) =>
-    api.request<SosAlertEntry[]>('/sos-alerts'),
+  // `status` filters in the database (GET /sos-alerts?status=active). The Incoming SOS banner polls every 5s from every
+  // open page and only needs the open ones - without the filter each poll downloaded the whole SOS history.
+  listSosAlerts: (api: AuthenticatedApiClient, opts?: { status?: SosAlertEntry['status'][] }) =>
+    api.request<SosAlertEntry[]>(opts?.status?.length ? `/sos-alerts?status=${opts.status.join(',')}` : '/sos-alerts'),
   // Incoming SOS banner + Reports widget (P3, branch release/dry-run-ops)
   // — admin/site_admin can now acknowledge/cancel too, restricted
   // server-side to their own assigned Site (SosService); legacy roles

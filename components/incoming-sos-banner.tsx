@@ -54,7 +54,7 @@ export function IncomingSosBanner() {
 
   const poll = useCallback(async () => {
     try {
-      const all = await managementApi.listSosAlerts(session.api);
+      const all = await managementApi.listSosAlerts(session.api, { status: ['active'] });
       // Only SOS alerts nobody has responded to yet. Once someone presses
       // "I'm responding" the banner goes away; calling back and resolving
       // continue on the SOS page.
